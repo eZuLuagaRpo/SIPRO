@@ -1,0 +1,28 @@
+# Configuracion no sensible inyectada al contenedor como variables de entorno.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+data:
+  # Perfil de Spring activo (qa/prd). Determina que application-{profile}.yml se carga.
+  SPRING_PROFILES_ACTIVE: {{ .Values.env.SPRING_PROFILES_ACTIVE | quote }}
+  # JDBC_URL apunta a la base primaria del servicio y cambia por ambiente.
+  JDBC_URL: {{ .Values.env.JDBC_URL | quote }}
+  # Parametros de Active Directory o integracion corporativa no secreta.
+  AD_URL: {{ .Values.env.AD_URL | quote }}
+  AD_DOMAIN: {{ .Values.env.AD_DOMAIN | quote }}
+  # Dominio(s) del frontend permitidos por CORS en este ambiente.
+  APP_CORS_ALLOWED_ORIGINS: {{ .Values.env.APP_CORS_ALLOWED_ORIGINS | quote }}
+  # Almacenamiento S3: endpoint, region y bucket no son secretos (las credenciales si, ver Secret).
+  APP_STORAGE_S3_ENDPOINT: {{ .Values.env.APP_STORAGE_S3_ENDPOINT | quote }}
+  APP_STORAGE_S3_REGION: {{ .Values.env.APP_STORAGE_S3_REGION | quote }}
+  APP_STORAGE_S3_BUCKET: {{ .Values.env.APP_STORAGE_S3_BUCKET | quote }}
+  # Notificaciones por correo: configuracion no sensible (la contrasena va en Secret).
+  APP_MAIL_ENABLED: {{ .Values.env.APP_MAIL_ENABLED | quote }}
+  APP_MAIL_TRANSPORT: {{ .Values.env.APP_MAIL_TRANSPORT | quote }}
+  APP_MAIL_FROM: {{ .Values.env.APP_MAIL_FROM | quote }}
+  APP_MAIL_ACTION_URL: {{ .Values.env.APP_MAIL_ACTION_URL | quote }}
+  APP_MAIL_BANNER_URL: {{ .Values.env.APP_MAIL_BANNER_URL | quote }}
+  MAIL_HOST: {{ .Values.env.MAIL_HOST | quote }}
+  MAIL_PORT: {{ .Values.env.MAIL_PORT | quote }}
+  MAIL_USERNAME: {{ .Values.env.MAIL_USERNAME | quote }}

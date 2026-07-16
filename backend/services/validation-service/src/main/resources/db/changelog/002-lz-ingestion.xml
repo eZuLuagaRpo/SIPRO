@@ -1,0 +1,761 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.24.xsd">
+
+    <!-- ================================================================
+         002-001: Tabla de parametros de tablas LZ
+         Guarda la configuracion de cada tabla a ingestar:
+           - tabla_origen: nombre en LZ (Impala)
+           - columnas_seleccionadas: CSV de columnas LZ que se extraen
+           - filtros: fragmento WHERE con placeholders {year} y {month}
+           - tabla_destino_pg / tabla_staging_pg: tablas en Postgres
+    ================================================================ -->
+    <changeSet id="002-001" author="sipro">
+        <sql>
+            CREATE TABLE IF NOT EXISTS sipro_parametros_tablas_lz (
+                id_parametro          SERIAL PRIMARY KEY,
+                tabla_origen          TEXT        NOT NULL,
+                estado                TEXT        NOT NULL DEFAULT 'ACTIVO',
+                version               INTEGER     NOT NULL DEFAULT 1,
+                columnas_seleccionadas TEXT        NOT NULL,
+                filtros               TEXT,
+                tabla_destino_pg      TEXT        NOT NULL,
+                tabla_staging_pg      TEXT        NOT NULL,
+                descripcion           TEXT,
+                created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+                CONSTRAINT chk_estado CHECK (estado IN ('ACTIVO','INACTIVO'))
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_sipro_params_lz_tabla
+                ON sipro_parametros_tablas_lz (tabla_origen, estado);
+        </sql>
+        <rollback>
+            DROP TABLE IF EXISTS sipro_parametros_tablas_lz;
+        </rollback>
+    </changeSet>
+
+    <!-- ================================================================
+         002-002: Enum sipro_run_status (si no existe)
+    ================================================================ -->
+    <changeSet id="002-002" author="sipro">
+        <sql>
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'sipro_run_status') THEN
+                    CREATE TYPE sipro_run_status AS ENUM ('STARTED','SUCCESS','FAILED','INCOMPLETE');
+                END IF;
+            END
+            $$;
+        </sql>
+        <rollback>
+            DROP TYPE IF EXISTS sipro_run_status;
+        </rollback>
+    </changeSet>
+
+    <!-- ================================================================
+         002-003: Tabla sipro_lz_ingestion_run (si no existe)
+         Registro auditoria de cada ejecucion de ingesta.
+    ================================================================ -->
+    <changeSet id="002-003" author="sipro">
+        <sql>
+            CREATE TABLE IF NOT EXISTS sipro_lz_ingestion_run (
+                run_id                  BIGSERIAL PRIMARY KEY,
+                tabla_origen            TEXT            NOT NULL,
+                id_parametro            INTEGER         NOT NULL
+                    REFERENCES sipro_parametros_tablas_lz(id_parametro),
+                period_year             INTEGER         NOT NULL,
+                period_month            INTEGER         NOT NULL,
+                parametro_version       INTEGER         NOT NULL,
+                parametro_estado        TEXT            NOT NULL,
+                columnas_seleccionadas  TEXT            NOT NULL,
+                filtros                 TEXT,
+                query_hash              TEXT            NOT NULL,
+                lz_row_count            BIGINT,
+                pg_stg_row_count        BIGINT,
+                pg_final_row_count      BIGINT,
+                status                  TEXT            NOT NULL DEFAULT 'STARTED',
+                message                 TEXT,
+                started_at              TIMESTAMPTZ     NOT NULL DEFAULT now(),
+                ended_at                TIMESTAMPTZ,
+                overwrite_allowed       BOOLEAN         NOT NULL DEFAULT true
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_sipro_lz_run_lookup
+                ON sipro_lz_ingestion_run (tabla_origen, period_year, period_month, started_at DESC);
+
+            -- Garantiza unicidad de exito por tabla+periodo (el guard de negocio en DB)
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_sipro_lz_run_success_month
+                ON sipro_lz_ingestion_run (tabla_origen, period_year, period_month)
+                WHERE status = 'SUCCESS';
+        </sql>
+        <rollback>
+            DROP TABLE IF EXISTS sipro_lz_ingestion_run;
+        </rollback>
+    </changeSet>
+
+    <!-- ================================================================
+         002-004: Tabla final MDM datos generales clientes (si no existe)
+    ================================================================ -->
+    <changeSet id="002-004" author="sipro">
+        <sql>
+            CREATE TABLE IF NOT EXISTS sipro_lz_mdm_datos_generales_clientes (
+                period_year             INTEGER         NOT NULL,
+                period_month            INTEGER         NOT NULL,
+                llave_mdm               TEXT            NOT NULL,
+                desc_tipo_documento     TEXT,
+                numero_id               TEXT,
+                numeroid_externo        TEXT,
+                tipo_persona            TEXT,
+                desc_tipo_persona       TEXT,
+                nombre_o_razon_social   TEXT,
+                primer_nombre           TEXT,
+                segundo_nombre          TEXT,
+                primer_apellido         TEXT,
+                segundo_apellido        TEXT,
+                estado_cliente          TEXT,
+                year                    INTEGER,
+                month                   INTEGER,
+                day                     INTEGER,
+                version                 INTEGER,
+                ingestion_run_id        BIGINT          NOT NULL,
+                inserted_at             TIMESTAMPTZ     NOT NULL DEFAULT now(),
+                PRIMARY KEY (period_year, period_month, ingestion_run_id, llave_mdm)
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_sipro_lz_mdm_clientes_period
+                ON sipro_lz_mdm_datos_generales_clientes (period_year, period_month);
+        </sql>
+        <rollback>
+            DROP TABLE IF EXISTS sipro_lz_mdm_datos_generales_clientes;
+        </rollback>
+    </changeSet>
+
+    <!-- ================================================================
+         002-005: Tabla staging MDM datos generales clientes (si no existe)
+    ================================================================ -->
+    <changeSet id="002-005" author="sipro">
+        <sql>
+            CREATE TABLE IF NOT EXISTS sipro_lz_mdm_datos_generales_clientes_stg (
+                period_year             INTEGER         NOT NULL,
+                period_month            INTEGER         NOT NULL,
+                llave_mdm               TEXT            NOT NULL,
+                desc_tipo_documento     TEXT,
+                numero_id               TEXT,
+                numeroid_externo        TEXT,
+                tipo_persona            TEXT,
+                desc_tipo_persona       TEXT,
+                nombre_o_razon_social   TEXT,
+                primer_nombre           TEXT,
+                segundo_nombre          TEXT,
+                primer_apellido         TEXT,
+                segundo_apellido        TEXT,
+                estado_cliente          TEXT,
+                year                    INTEGER,
+                month                   INTEGER,
+                day                     INTEGER,
+                version                 INTEGER,
+                ingestion_run_id        BIGINT          NOT NULL,
+                inserted_at             TIMESTAMPTZ     NOT NULL DEFAULT now()
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_sipro_lz_mdm_clientes_stg_period
+                ON sipro_lz_mdm_datos_generales_clientes_stg (period_year, period_month);
+        </sql>
+        <rollback>
+            DROP TABLE IF EXISTS sipro_lz_mdm_datos_generales_clientes_stg;
+        </rollback>
+    </changeSet>
+
+    <!-- ================================================================
+         002-006: Parametro inicial para MDM datos generales clientes
+    ================================================================ -->
+    <changeSet id="002-006" author="sipro">
+        <sql>
+            INSERT INTO sipro_parametros_tablas_lz
+              (tabla_origen, estado, version, columnas_seleccionadas, filtros,
+               tabla_destino_pg, tabla_staging_pg, descripcion)
+            SELECT
+              'mdm_zona_mdm_datos_generales_clientes',
+              'ACTIVO',
+              1,
+              'llave_mdm,desc_tipo_documento,numero_id,numeroid_externo,tipo_persona,'
+              'desc_tipo_persona,nombre_o_razon_social,primer_nombre,segundo_nombre,'
+              'primer_apellido,segundo_apellido,estado_cliente,year,month,day,version',
+              'year = {year} AND month = {month}',
+              'sipro_lz_mdm_datos_generales_clientes',
+              'sipro_lz_mdm_datos_generales_clientes_stg',
+              'MDM datos generales clientes - extraccion mensual desde LZ'
+            WHERE NOT EXISTS (
+              SELECT 1 FROM sipro_parametros_tablas_lz
+              WHERE tabla_origen = 'mdm_zona_mdm_datos_generales_clientes'
+            );
+        </sql>
+        <rollback>
+            DELETE FROM sipro_parametros_tablas_lz
+            WHERE tabla_origen = 'mdm_zona_mdm_datos_generales_clientes';
+        </rollback>
+    </changeSet>
+    <!-- ================================================================
+         002-007: Agregar created_at a sipro_parametros_tablas_lz
+         si la tabla ya existia antes de esta migracion (sin esa columna)
+    ================================================================ -->
+    <changeSet id="002-007" author="sipro">
+        <sql>
+            ALTER TABLE sipro_parametros_tablas_lz
+                ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
+        </sql>
+        <rollback>
+            ALTER TABLE sipro_parametros_tablas_lz DROP COLUMN IF EXISTS created_at;
+        </rollback>
+    </changeSet>
+
+    <!-- ================================================================
+         002-008: Seed correcto del parametro MDM clientes usando
+         solo las columnas que existen en la tabla real.
+         (002-006 tenia columnas tabla_destino_pg/tabla_staging_pg/descripcion
+          que solo existen si Liquibase creo la tabla desde cero).
+    ================================================================ -->
+    <changeSet id="002-008" author="sipro">
+        <sql>
+            INSERT INTO sipro_parametros_tablas_lz
+              (tabla_origen, estado, version, columnas_seleccionadas, filtros)
+            SELECT
+              'resultados_fcr.fcr_mdm_datos_generales_clientes',
+              'ACTIVO',
+              1,
+              'llave_mdm,desc_tipo_documento,numero_id,numeroid_externo,tipo_persona,desc_tipo_persona,nombre_o_razon_social,primer_nombre,segundo_nombre,primer_apellido,segundo_apellido,estado_cliente,year,month,day,version',
+              'year = {year} AND month = {month} AND llave_mdm IS NOT NULL'
+            WHERE NOT EXISTS (
+              SELECT 1 FROM sipro_parametros_tablas_lz
+              WHERE tabla_origen = 'resultados_fcr.fcr_mdm_datos_generales_clientes'
+                AND estado = 'ACTIVO'
+            );
+        </sql>
+        <rollback>
+            DELETE FROM sipro_parametros_tablas_lz
+            WHERE tabla_origen = 'mdm_zona_mdm_datos_generales_clientes'
+              AND estado = 'ACTIVO' AND version = 1;
+        </rollback>
+    </changeSet>
+
+    <!-- ================================================================
+         002-009: Convertir sipro_lz_ingestion_run.status de ENUM a TEXT
+         para compatibilidad con Hibernate/JDBC (no requiere cast especial).
+         Recrea el indice parcial ajustado al nuevo tipo.
+    ================================================================ -->
+    <changeSet id="002-009" author="sipro">
+        <sql>
+            DO $$
+            BEGIN
+                -- Solo actuar si el tipo de la columna es el enum
+                IF EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_name = 'sipro_lz_ingestion_run'
+                      AND column_name = 'status'
+                      AND udt_name = 'sipro_run_status'
+                ) THEN
+                    -- Eliminar el indice parcial que referencia el tipo enum
+                    DROP INDEX IF EXISTS ux_sipro_lz_run_success_month;
+
+                    -- Cambiar tipo de columna a TEXT (cast implicito desde enum)
+                    ALTER TABLE sipro_lz_ingestion_run
+                        ALTER COLUMN status TYPE TEXT USING status::TEXT;
+
+                    -- Recrear el indice parcial usando TEXT
+                    CREATE UNIQUE INDEX IF NOT EXISTS ux_sipro_lz_run_success_month
+                        ON sipro_lz_ingestion_run (tabla_origen, period_year, period_month)
+                        WHERE status = 'SUCCESS';
+                END IF;
+            END
+            $$;
+        </sql>
+        <rollback>
+            -- No se revierte el cambio de tipo por seguridad
+        </rollback>
+    </changeSet>
+
+    <!-- ================================================================
+         002-010: Soporte para tablas particionadas.
+
+         Si las tablas fueron recreadas como particionadas (DDL manual),
+         este changeset crea las DEFAULT partitions necesarias para que
+         los INSERTs funcionen. Tambien asegura la secuencia de run_id
+         y los indices relevantes.
+
+         Es idempotente: solo actua si la tabla esta particionada.
+         En BD donde Liquibase creo tablas normales (no particionadas),
+         este changeset no hace nada.
+
+         Tablas afectadas:
+           - sipro_lz_ingestion_run:                   RANGE(started_at)
+           - sipro_lz_mdm_datos_generales_clientes:    LIST(ingestion_run_id)
+           - sipro_lz_mdm_datos_generales_clientes_stg: LIST(ingestion_run_id)
+    ================================================================ -->
+    <changeSet id="002-010" author="sipro">
+        <sql>
+            DO $$
+            BEGIN
+                -- ══════════════════════════════════════════════════════
+                -- 1) sipro_lz_ingestion_run — PARTITION BY RANGE (started_at)
+                -- ══════════════════════════════════════════════════════
+                IF EXISTS (
+                    SELECT 1 FROM pg_partitioned_table
+                    WHERE partrelid = 'sipro_lz_ingestion_run'::regclass
+                ) THEN
+                    -- DEFAULT partition
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_class c
+                        JOIN pg_inherits i ON c.oid = i.inhrelid
+                        WHERE i.inhparent = 'sipro_lz_ingestion_run'::regclass
+                          AND c.relname = 'sipro_lz_ingestion_run_default'
+                    ) THEN
+                        CREATE TABLE sipro_lz_ingestion_run_default
+                            PARTITION OF sipro_lz_ingestion_run DEFAULT;
+                        RAISE NOTICE 'Created DEFAULT partition for sipro_lz_ingestion_run';
+                    END IF;
+
+                    -- Secuencia para run_id (auto-increment)
+                    CREATE SEQUENCE IF NOT EXISTS sipro_lz_ingestion_run_run_id_seq;
+                    PERFORM setval('sipro_lz_ingestion_run_run_id_seq',
+                        GREATEST(COALESCE((SELECT MAX(run_id) FROM sipro_lz_ingestion_run), 0), 1));
+                    ALTER TABLE sipro_lz_ingestion_run
+                        ALTER COLUMN run_id SET DEFAULT nextval('sipro_lz_ingestion_run_run_id_seq');
+
+                    -- Index de busqueda (no unique — particionada no soporta unique sin partition key)
+                    CREATE INDEX IF NOT EXISTS ix_sipro_lz_run_lookup
+                        ON sipro_lz_ingestion_run (tabla_origen, period_year, period_month, started_at DESC);
+
+                    RAISE NOTICE 'sipro_lz_ingestion_run: partitioned setup complete';
+                END IF;
+
+                -- ══════════════════════════════════════════════════════
+                -- 2) sipro_lz_mdm_datos_generales_clientes — PARTITION BY LIST (ingestion_run_id)
+                -- ══════════════════════════════════════════════════════
+                IF EXISTS (
+                    SELECT 1 FROM pg_partitioned_table
+                    WHERE partrelid = 'sipro_lz_mdm_datos_generales_clientes'::regclass
+                ) THEN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_class c
+                        JOIN pg_inherits i ON c.oid = i.inhrelid
+                        WHERE i.inhparent = 'sipro_lz_mdm_datos_generales_clientes'::regclass
+                          AND c.relname = 'sipro_lz_mdm_datos_generales_clientes_default'
+                    ) THEN
+                        CREATE TABLE sipro_lz_mdm_datos_generales_clientes_default
+                            PARTITION OF sipro_lz_mdm_datos_generales_clientes DEFAULT;
+                        RAISE NOTICE 'Created DEFAULT partition for sipro_lz_mdm_datos_generales_clientes';
+                    END IF;
+                END IF;
+
+                -- ══════════════════════════════════════════════════════
+                -- 3) sipro_lz_mdm_datos_generales_clientes_stg — PARTITION BY LIST (ingestion_run_id)
+                -- ══════════════════════════════════════════════════════
+                IF EXISTS (
+                    SELECT 1 FROM pg_partitioned_table
+                    WHERE partrelid = 'sipro_lz_mdm_datos_generales_clientes_stg'::regclass
+                ) THEN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_class c
+                        JOIN pg_inherits i ON c.oid = i.inhrelid
+                        WHERE i.inhparent = 'sipro_lz_mdm_datos_generales_clientes_stg'::regclass
+                          AND c.relname = 'sipro_lz_mdm_datos_generales_clientes_stg_default'
+                    ) THEN
+                        CREATE TABLE sipro_lz_mdm_datos_generales_clientes_stg_default
+                            PARTITION OF sipro_lz_mdm_datos_generales_clientes_stg DEFAULT;
+                        RAISE NOTICE 'Created DEFAULT partition for sipro_lz_mdm_datos_generales_clientes_stg';
+                    END IF;
+                END IF;
+
+            END $$;
+        </sql>
+        <rollback>
+            DROP TABLE IF EXISTS sipro_lz_ingestion_run_default;
+            DROP TABLE IF EXISTS sipro_lz_mdm_datos_generales_clientes_default;
+            DROP TABLE IF EXISTS sipro_lz_mdm_datos_generales_clientes_stg_default;
+        </rollback>
+    </changeSet>
+
+    <!-- ================================================================
+         002-011: Compatibilidad con modelo LZ homogéneo.
+
+         - Parametros: id_tabla obligatorio por catálogo + query_sql completo.
+         - Runs: id_tabla obligatorio por catálogo.
+         - Se agregan fecha_creacion/fecha_modificacion para alinear con el entity.
+
+         La migración es conservadora: agrega columnas, migra datos existentes
+         y cierra FKs/índices nuevos sin depender de truncados automáticos.
+    ================================================================ -->
+    <changeSet id="002-011" author="copilot">
+        <sql>
+            ALTER TABLE sipro_parametros_tablas_lz
+                ADD COLUMN IF NOT EXISTS id_tabla INTEGER;
+            ALTER TABLE sipro_parametros_tablas_lz
+                ADD COLUMN IF NOT EXISTS query_sql TEXT;
+            ALTER TABLE sipro_parametros_tablas_lz
+                ADD COLUMN IF NOT EXISTS fecha_creacion TIMESTAMP;
+            ALTER TABLE sipro_parametros_tablas_lz
+                ADD COLUMN IF NOT EXISTS fecha_modificacion TIMESTAMP;
+            ALTER TABLE sipro_parametros_tablas_lz
+                ALTER COLUMN estado SET DEFAULT 'ACTIVO';
+
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_name = 'sipro_parametros_tablas_lz'
+                      AND column_name = 'created_at'
+                ) THEN
+                    UPDATE sipro_parametros_tablas_lz
+                    SET fecha_creacion = COALESCE(fecha_creacion, created_at, now()),
+                        fecha_modificacion = COALESCE(fecha_modificacion, created_at, now())
+                    WHERE fecha_creacion IS NULL OR fecha_modificacion IS NULL;
+                ELSE
+                    UPDATE sipro_parametros_tablas_lz
+                    SET fecha_creacion = COALESCE(fecha_creacion, now()),
+                        fecha_modificacion = COALESCE(fecha_modificacion, now())
+                    WHERE fecha_creacion IS NULL OR fecha_modificacion IS NULL;
+                END IF;
+            END
+            $$;
+
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_name = 'sipro_parametros_tablas_lz'
+                      AND column_name = 'tabla_origen'
+                ) THEN
+                    UPDATE sipro_parametros_tablas_lz p
+                    SET id_tabla = c.id_tabla
+                    FROM sipro_lz_catalogo_tablas c
+                    WHERE p.id_tabla IS NULL
+                      AND LOWER(TRIM(c.tabla_origen)) = LOWER(TRIM(p.tabla_origen));
+                END IF;
+            END
+            $$;
+
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_name = 'sipro_parametros_tablas_lz'
+                      AND column_name = 'tabla_origen'
+                ) AND EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_name = 'sipro_parametros_tablas_lz'
+                      AND column_name = 'columnas_seleccionadas'
+                ) THEN
+                    UPDATE sipro_parametros_tablas_lz
+                    SET query_sql = 'SELECT ' || columnas_seleccionadas || ' FROM ' || tabla_origen
+                        || CASE
+                               WHEN filtros IS NOT NULL AND BTRIM(filtros) &lt;&gt; '' THEN ' WHERE ' || filtros
+                               ELSE ''
+                           END
+                    WHERE (query_sql IS NULL OR BTRIM(query_sql) = '')
+                      AND columnas_seleccionadas IS NOT NULL
+                      AND tabla_origen IS NOT NULL;
+                END IF;
+            END
+            $$;
+
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage kcu
+                      ON tc.constraint_schema = kcu.constraint_schema
+                     AND tc.constraint_name = kcu.constraint_name
+                    WHERE tc.table_name = 'sipro_parametros_tablas_lz'
+                      AND tc.constraint_type = 'FOREIGN KEY'
+                      AND kcu.column_name = 'id_tabla'
+                ) THEN
+                    ALTER TABLE sipro_parametros_tablas_lz
+                        ADD CONSTRAINT fk_sipro_parametros_tablas_lz_id_tabla
+                        FOREIGN KEY (id_tabla)
+                        REFERENCES sipro_lz_catalogo_tablas(id_tabla);
+                END IF;
+            END
+            $$;
+
+            CREATE INDEX IF NOT EXISTS ix_sipro_params_lz_id_tabla_estado
+                ON sipro_parametros_tablas_lz (id_tabla, estado, version DESC);
+
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM sipro_parametros_tablas_lz WHERE id_tabla IS NULL)
+                    AND EXISTS (
+                        SELECT 1
+                        FROM information_schema.columns
+                        WHERE table_name = 'sipro_parametros_tablas_lz'
+                          AND column_name = 'id_tabla'
+                    ) THEN
+                    ALTER TABLE sipro_parametros_tablas_lz
+                        ALTER COLUMN id_tabla SET NOT NULL;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM sipro_parametros_tablas_lz WHERE query_sql IS NULL)
+                    AND EXISTS (
+                        SELECT 1
+                        FROM information_schema.columns
+                        WHERE table_name = 'sipro_parametros_tablas_lz'
+                          AND column_name = 'query_sql'
+                    ) THEN
+                    ALTER TABLE sipro_parametros_tablas_lz
+                        ALTER COLUMN query_sql SET NOT NULL;
+                END IF;
+            END
+            $$;
+
+            ALTER TABLE sipro_lz_ingestion_run
+                ADD COLUMN IF NOT EXISTS id_tabla INTEGER;
+
+            DO $$
+            BEGIN
+                UPDATE sipro_lz_ingestion_run r
+                SET id_tabla = p.id_tabla
+                FROM sipro_parametros_tablas_lz p
+                WHERE r.id_tabla IS NULL
+                  AND r.id_parametro = p.id_parametro;
+            END
+            $$;
+
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage kcu
+                      ON tc.constraint_schema = kcu.constraint_schema
+                     AND tc.constraint_name = kcu.constraint_name
+                    WHERE tc.table_name = 'sipro_lz_ingestion_run'
+                      AND tc.constraint_type = 'FOREIGN KEY'
+                      AND kcu.column_name = 'id_tabla'
+                ) THEN
+                    ALTER TABLE sipro_lz_ingestion_run
+                        ADD CONSTRAINT fk_sipro_lz_ingestion_run_id_tabla
+                        FOREIGN KEY (id_tabla)
+                        REFERENCES sipro_lz_catalogo_tablas(id_tabla);
+                END IF;
+            END
+            $$;
+
+            CREATE INDEX IF NOT EXISTS ix_sipro_lz_run_lookup_id_tabla
+                ON sipro_lz_ingestion_run (id_tabla, period_year, period_month, started_at DESC);
+
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM sipro_lz_ingestion_run WHERE id_tabla IS NULL)
+                    AND EXISTS (
+                        SELECT 1
+                        FROM information_schema.columns
+                        WHERE table_name = 'sipro_lz_ingestion_run'
+                          AND column_name = 'id_tabla'
+                    ) THEN
+                    ALTER TABLE sipro_lz_ingestion_run
+                        ALTER COLUMN id_tabla SET NOT NULL;
+                END IF;
+            END
+            $$;
+        </sql>
+        <rollback>
+            DROP INDEX IF EXISTS ix_sipro_lz_run_lookup_id_tabla;
+            ALTER TABLE sipro_lz_ingestion_run DROP CONSTRAINT IF EXISTS fk_sipro_lz_ingestion_run_id_tabla;
+            ALTER TABLE sipro_lz_ingestion_run DROP COLUMN IF EXISTS id_tabla;
+            DROP INDEX IF EXISTS ix_sipro_params_lz_id_tabla_estado;
+            ALTER TABLE sipro_parametros_tablas_lz DROP CONSTRAINT IF EXISTS fk_sipro_parametros_tablas_lz_id_tabla;
+            ALTER TABLE sipro_parametros_tablas_lz DROP COLUMN IF EXISTS fecha_modificacion;
+            ALTER TABLE sipro_parametros_tablas_lz DROP COLUMN IF EXISTS fecha_creacion;
+            ALTER TABLE sipro_parametros_tablas_lz DROP COLUMN IF EXISTS query_sql;
+            ALTER TABLE sipro_parametros_tablas_lz DROP COLUMN IF EXISTS id_tabla;
+        </rollback>
+    </changeSet>
+
+    <!-- ================================================================
+         002-012: Alinear shape MDM con el query_sql vigente.
+         El query nuevo expone tipo_id y la carga dinámica debe encontrarlo
+         tanto en staging como en final.
+    ================================================================ -->
+    <changeSet id="002-012" author="copilot">
+        <sql>
+            ALTER TABLE sipro_lz_mdm_datos_generales_clientes
+                ADD COLUMN IF NOT EXISTS tipo_id TEXT;
+            ALTER TABLE sipro_lz_mdm_datos_generales_clientes_stg
+                ADD COLUMN IF NOT EXISTS tipo_id TEXT;
+        </sql>
+        <rollback>
+            ALTER TABLE sipro_lz_mdm_datos_generales_clientes_stg DROP COLUMN IF EXISTS tipo_id;
+            ALTER TABLE sipro_lz_mdm_datos_generales_clientes DROP COLUMN IF EXISTS tipo_id;
+        </rollback>
+    </changeSet>
+
+    <!-- ================================================================
+         002-013: Seed base del parámetro homogéneo para MDM clientes.
+         Mantiene versión 4 ACTIVA y query_sql completo.
+    ================================================================ -->
+    <changeSet id="002-013" author="copilot">
+        <sql>
+            WITH catalogo AS (
+                SELECT id_tabla
+                FROM sipro_lz_catalogo_tablas
+                WHERE LOWER(TRIM(tabla_origen)) = 'resultados_fcr.fcr_mdm_datos_generales_clientes'
+                ORDER BY id_tabla
+                LIMIT 1
+            ), target AS (
+                SELECT p.id_parametro
+                FROM sipro_parametros_tablas_lz p
+                JOIN catalogo c ON c.id_tabla = p.id_tabla
+                ORDER BY p.version DESC, p.id_parametro DESC
+                LIMIT 1
+            )
+            UPDATE sipro_parametros_tablas_lz p
+            SET version = 4,
+                estado = 'ACTIVO',
+                query_sql = $LZQUERY$
+SELECT
+    t.llave_mdm,
+    t.tipo_id,
+    t.desc_tipo_documento,
+    t.numero_id,
+    t.numeroid_externo,
+    t.tipo_persona,
+    t.desc_tipo_persona,
+    t.nombre_o_razon_social,
+    t.primer_nombre,
+    t.segundo_nombre,
+    t.primer_apellido,
+    t.segundo_apellido,
+    t.estado_cliente,
+    t.year,
+    t.month,
+    t.day,
+    t.version,
+    t.f_ult_actualizacion
+FROM resultados_fcr.fcr_mdm_datos_generales_clientes t
+INNER JOIN (
+    SELECT
+        numero_id,
+        numeroid_externo,
+        tipo_persona,
+        desc_tipo_persona,
+        MAX(f_ult_actualizacion) AS max_f_ult_actualizacion
+    FROM resultados_fcr.fcr_mdm_datos_generales_clientes
+    WHERE
+        year = EXTRACT(YEAR FROM NOW() - INTERVAL '10 days')
+        AND month = EXTRACT(MONTH FROM NOW() - INTERVAL '10 days')
+        AND day = EXTRACT(DAY FROM NOW() - INTERVAL '10 days')
+    GROUP BY
+        numero_id,
+        numeroid_externo,
+        tipo_persona,
+        desc_tipo_persona
+) m
+    ON t.numero_id = m.numero_id
+    AND t.numeroid_externo = m.numeroid_externo
+    AND t.tipo_persona = m.tipo_persona
+    AND t.desc_tipo_persona = m.desc_tipo_persona
+    AND t.f_ult_actualizacion = m.max_f_ult_actualizacion
+WHERE
+    (
+        (t.year = EXTRACT(YEAR FROM NOW())
+         AND t.month = EXTRACT(MONTH FROM NOW())
+         AND t.day = EXTRACT(DAY FROM NOW()))
+        OR
+        (t.year = EXTRACT(YEAR FROM NOW() - INTERVAL '10 days')
+         AND t.month = EXTRACT(MONTH FROM NOW() - INTERVAL '10 days')
+         AND t.day = EXTRACT(DAY FROM NOW() - INTERVAL '10 days'))
+    )
+$LZQUERY$,
+                fecha_creacion = COALESCE(p.fecha_creacion, NOW()),
+                fecha_modificacion = NOW()
+            WHERE p.id_parametro IN (SELECT id_parametro FROM target);
+
+            INSERT INTO sipro_parametros_tablas_lz
+                (estado, version, id_tabla, query_sql, fecha_creacion, fecha_modificacion)
+            SELECT
+                'ACTIVO',
+                4,
+                c.id_tabla,
+                $LZQUERY$
+SELECT
+    t.llave_mdm,
+    t.tipo_id,
+    t.desc_tipo_documento,
+    t.numero_id,
+    t.numeroid_externo,
+    t.tipo_persona,
+    t.desc_tipo_persona,
+    t.nombre_o_razon_social,
+    t.primer_nombre,
+    t.segundo_nombre,
+    t.primer_apellido,
+    t.segundo_apellido,
+    t.estado_cliente,
+    t.year,
+    t.month,
+    t.day,
+    t.version,
+    t.f_ult_actualizacion
+FROM resultados_fcr.fcr_mdm_datos_generales_clientes t
+INNER JOIN (
+    SELECT
+        numero_id,
+        numeroid_externo,
+        tipo_persona,
+        desc_tipo_persona,
+        MAX(f_ult_actualizacion) AS max_f_ult_actualizacion
+    FROM resultados_fcr.fcr_mdm_datos_generales_clientes
+    WHERE
+        year = EXTRACT(YEAR FROM NOW() - INTERVAL '10 days')
+        AND month = EXTRACT(MONTH FROM NOW() - INTERVAL '10 days')
+        AND day = EXTRACT(DAY FROM NOW() - INTERVAL '10 days')
+    GROUP BY
+        numero_id,
+        numeroid_externo,
+        tipo_persona,
+        desc_tipo_persona
+) m
+    ON t.numero_id = m.numero_id
+    AND t.numeroid_externo = m.numeroid_externo
+    AND t.tipo_persona = m.tipo_persona
+    AND t.desc_tipo_persona = m.desc_tipo_persona
+    AND t.f_ult_actualizacion = m.max_f_ult_actualizacion
+WHERE
+    (
+        (t.year = EXTRACT(YEAR FROM NOW())
+         AND t.month = EXTRACT(MONTH FROM NOW())
+         AND t.day = EXTRACT(DAY FROM NOW()))
+        OR
+        (t.year = EXTRACT(YEAR FROM NOW() - INTERVAL '10 days')
+         AND t.month = EXTRACT(MONTH FROM NOW() - INTERVAL '10 days')
+         AND t.day = EXTRACT(DAY FROM NOW() - INTERVAL '10 days'))
+    )
+$LZQUERY$,
+                NOW(),
+                NOW()
+            FROM catalogo c
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM sipro_parametros_tablas_lz p
+                WHERE p.id_tabla = c.id_tabla
+            );
+        </sql>
+        <rollback>
+            DELETE FROM sipro_parametros_tablas_lz
+            WHERE version = 4
+              AND id_tabla IN (
+                    SELECT id_tabla
+                    FROM sipro_lz_catalogo_tablas
+                    WHERE LOWER(TRIM(tabla_origen)) = 'resultados_fcr.fcr_mdm_datos_generales_clientes'
+              );
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

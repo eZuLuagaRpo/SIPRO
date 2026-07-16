@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.24.xsd">
+
+    <!-- ================================================================
+         005: Agregar columnas FK de usuario (id_usuario_carga, id_lider,
+              id_usuario_rechazo, id_usuario_validacion)
+         Estas columnas referencian a usuario_persona.id_usuario y son
+         necesarias para mantener integridad referencial.
+         ================================================================ -->
+
+    <!-- 005-001: sipro_detalle_carga_planillas.id_usuario_carga -->
+    <changeSet id="005-001" author="sipro">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="sipro_detalle_carga_planillas" columnName="id_usuario_carga"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="sipro_detalle_carga_planillas">
+            <column name="id_usuario_carga" type="bigint">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+        <addForeignKeyConstraint
+                baseTableName="sipro_detalle_carga_planillas"
+                baseColumnNames="id_usuario_carga"
+                referencedTableName="usuario_persona"
+                referencedColumnNames="id_usuario"
+                constraintName="fk_carga_usuario"
+                onUpdate="NO ACTION"
+                onDelete="NO ACTION"/>
+    </changeSet>
+
+    <!-- 005-002: sipro_detalle_carga_planillas.id_lider -->
+    <changeSet id="005-002" author="sipro">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="sipro_detalle_carga_planillas" columnName="id_lider"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="sipro_detalle_carga_planillas">
+            <column name="id_lider" type="bigint">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+        <addForeignKeyConstraint
+                baseTableName="sipro_detalle_carga_planillas"
+                baseColumnNames="id_lider"
+                referencedTableName="usuario_persona"
+                referencedColumnNames="id_usuario"
+                constraintName="fk_carga_lider"
+                onUpdate="NO ACTION"
+                onDelete="NO ACTION"/>
+    </changeSet>
+
+    <!-- 005-003: sipro_detalle_rechazos_planilla.id_usuario_rechazo -->
+    <changeSet id="005-003" author="sipro">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="sipro_detalle_rechazos_planilla" columnName="id_usuario_rechazo"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="sipro_detalle_rechazos_planilla">
+            <column name="id_usuario_rechazo" type="bigint">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+        <addForeignKeyConstraint
+                baseTableName="sipro_detalle_rechazos_planilla"
+                baseColumnNames="id_usuario_rechazo"
+                referencedTableName="usuario_persona"
+                referencedColumnNames="id_usuario"
+                constraintName="fk_rechazo_usuario"
+                onUpdate="NO ACTION"
+                onDelete="NO ACTION"/>
+    </changeSet>
+
+    <!-- 005-004: sipro_detalle_archivo_validacion.id_usuario_validacion -->
+    <changeSet id="005-004" author="sipro">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="sipro_detalle_archivo_validacion" columnName="id_usuario_validacion"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="sipro_detalle_archivo_validacion">
+            <column name="id_usuario_validacion" type="bigint">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+        <addForeignKeyConstraint
+                baseTableName="sipro_detalle_archivo_validacion"
+                baseColumnNames="id_usuario_validacion"
+                referencedTableName="usuario_persona"
+                referencedColumnNames="id_usuario"
+                constraintName="fk_validacion_usuario"
+                onUpdate="NO ACTION"
+                onDelete="NO ACTION"/>
+    </changeSet>
+
+</databaseChangeLog>

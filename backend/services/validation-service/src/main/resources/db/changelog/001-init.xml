@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.24.xsd">
+
+    <changeSet id="001-001" author="sipro">
+        <createSchema schemaName="sipro_validaciones"/>
+    </changeSet>
+
+    <changeSet id="001-002" author="sipro">
+        <createTable schemaName="sipro_validaciones" tableName="v_lote">
+            <column name="id_lote" type="varchar(64)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="fecha_corte" type="date">
+                <constraints nullable="false"/>
+            </column>
+            <column name="origen" type="varchar(128)"/>
+            <column name="hash_fuente" type="varchar(128)"/>
+            <column name="estado" type="varchar(32)"/>
+            <column name="creado_por" type="varchar(128)"/>
+            <column name="creado_en" type="timestamp"/>
+            <column name="version_reglas" type="varchar(64)"/>
+            <column name="hash_reglas" type="varchar(128)"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="001-003" author="sipro">
+        <createTable schemaName="sipro_validaciones" tableName="v_resultado_regla">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="id_lote" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="id_regla" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="severidad" type="varchar(16)"/>
+            <column name="total_evaluados" type="bigint"/>
+            <column name="total_rechazados" type="bigint"/>
+            <column name="total_aceptados" type="bigint"/>
+            <column name="tiempo_ms" type="bigint"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="001-004" author="sipro">
+        <createTable schemaName="sipro_validaciones" tableName="v_rechazos">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="id_lote" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="id_regla" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="clave_registro" type="varchar(256)"/>
+            <column name="campo" type="varchar(128)"/>
+            <column name="valor" type="varchar(1024)"/>
+            <column name="causa" type="varchar(1024)"/>
+            <column name="timestamp" type="timestamp"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="001-005" author="sipro">
+        <createTable schemaName="sipro_validaciones" tableName="v_metricas">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="id_lote" type="varchar(64)"/>
+            <column name="nombre_metrica" type="varchar(128)"/>
+            <column name="valor" type="numeric(18,6)"/>
+            <column name="timestamp" type="timestamp"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="001-006" author="sipro">
+        <createTable schemaName="sipro_validaciones" tableName="v_auditoria">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="id_lote" type="varchar(64)"/>
+            <column name="evento" type="varchar(128)"/>
+            <column name="detalle" type="varchar(2048)"/>
+            <column name="usuario" type="varchar(128)"/>
+            <column name="timestamp" type="timestamp"/>
+        </createTable>
+    </changeSet>
+
+</databaseChangeLog>

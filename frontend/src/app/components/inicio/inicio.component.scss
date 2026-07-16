@@ -1,0 +1,474 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+// =================== Main con imagen de fondo posicionada ===================
+
+.sipro-main {
+  flex: 1;
+  padding: 24px;
+  position: relative;
+  overflow: hidden; // recorte limpio en los bordes del main
+
+  // Imagen SIPRO como pseudo-elemento: ocupa la mitad derecha completa
+  &::after {
+    content: '';
+    position: absolute;
+    top: -10%;         // se sale un poco arriba (recorte)
+    right: -5%;        // se sale un poco a la derecha (recorte)
+    bottom: -10%;      // se sale un poco abajo (recorte)
+    width: 55%;        // ocupa algo más de la mitad para verse grande
+    background-image: url('/assets/images/SiproLogoConTrazos.png');
+    background-repeat: no-repeat;
+    background-position: center center;
+    background-size: contain;
+    pointer-events: none;
+    z-index: 0;        // debajo de todo el contenido
+    opacity: 0.6;      // 60% de opacidad
+    // Desvanecimiento solo en el borde izquierdo (cerca de las cards)
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0,0,0,0.3) 15%, black 40%);
+    mask-image: linear-gradient(to right, transparent 0%, rgba(0,0,0,0.3) 15%, black 40%);
+  }
+}
+
+// Todo el contenido del main por encima de la imagen
+.page-title,
+.sipro-welcome-text,
+.home-cards {
+  position: relative;
+  z-index: 1;
+}
+
+.page-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: #2C2A29;
+}
+
+.sipro-welcome-text {
+  margin: 8px 0 24px;
+  color: #2C2A29;
+  font-weight: 600;
+}
+
+// =================== Cards container (mitad izquierda) ===================
+
+.home-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 55%; // las cards solo ocupan la mitad izquierda
+}
+
+// 2 cards inferiores lado a lado
+.home-cards__row {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 20px;
+  align-items: stretch;
+}
+
+// =================== Cards ===================
+
+.sipro-card {
+  background: #FFFFFF;
+  border: 1px solid #E0E0E0;
+  border-radius: 10px;
+  padding: 32px 40px;
+  width: 100%;
+  max-width: 100%;
+}
+
+.sipro-card--half {
+  padding: 24px 28px;
+}
+
+.sipro-card--action-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 100%;
+}
+
+.sipro-card__title {
+  margin: 0 0 12px;
+  font-size: 20px;
+  color: #2C2A29;
+  font-weight: 700;
+}
+
+.sipro-card__text {
+  margin: 0;
+  color: #2C2A29;
+  line-height: 1.5;
+
+  strong {
+    font-weight: 700;
+  }
+
+  &--muted {
+    color: #9E9E9E;
+    font-size: 14px;
+  }
+}
+
+.sipro-card__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 20px;
+  min-height: 46px;
+  border: 1px solid #D9D9D9;
+  border-radius: 999px;
+  background: #FFFFFF;
+  color: #2C2A29;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+  box-shadow: none;
+  cursor: pointer;
+  align-self: flex-start;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+
+  &:hover,
+  &:focus-visible {
+    background: #FDDA24;
+    border-color: #FDDA24;
+    color: #2C2A29;
+    box-shadow: 0 12px 24px rgba(253, 218, 36, 0.24);
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    background: #F3CC13;
+    border-color: #F3CC13;
+    transform: translateY(0);
+  }
+
+  &:focus-visible {
+    outline: 2px solid rgba(44, 42, 41, 0.22);
+    outline-offset: 3px;
+  }
+}
+
+.sipro-card--action-card .sipro-card__action {
+  margin-top: auto;
+}
+
+// =================== Resumen de cargas (lista compacta) ===================
+
+.resumen-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 16px;
+    color: #2C2A29;
+    line-height: 1.4;
+
+    span {
+      font-weight: 400;
+    }
+
+    strong {
+      font-weight: 700;
+    }
+  }
+}
+
+.ultima-actividad-valor {
+  display: inline-block;
+  min-width: 76px;
+  font-size: 13px;
+  line-height: 1.2;
+  text-align: right;
+}
+
+.resumen-ultima-actividad {
+  align-items: flex-start !important;
+}
+
+.ultima-actividad-label {
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+@media (max-width: 768px) {
+  .sipro-card__action {
+    width: 100%;
+  }
+
+  .ultima-actividad-label {
+    font-size: 13px;
+  }
+
+  .ultima-actividad-valor {
+    font-size: 12px;
+    min-width: 68px;
+  }
+}
+
+// =================== Cargas Pendientes — body layout ===================
+
+.pendientes-body {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+// =================== Mini-calendario (solo lectura, mes anterior) ===================
+
+.mini-calendario {
+  flex-shrink: 0;
+  width: 200px;
+  padding: 0;
+}
+
+.mini-calendario__nav {
+  text-align: center;
+  margin-bottom: 0px;
+
+  &--arrows {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.mini-cal-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: #F5F5F5;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #666;
+  transition: all 0.15s ease;
+  padding: 0;
+
+  &:hover:not(:disabled) {
+    background: #FDDA24;
+    color: #2C2A29;
+  }
+
+  &:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
+  }
+}
+
+.mini-calendario__title {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #2C2A29;
+}
+
+.mini-calendario__weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0;
+  margin-bottom: 2px;
+
+  span {
+    text-align: center;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #999;
+    padding: 1px 0;
+  }
+}
+
+.mini-calendario__days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0;
+}
+
+.mini-cal-day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #2C2A29;
+  background: transparent;
+
+  &.empty {
+    visibility: hidden;
+  }
+
+  &.ultimo-dia {
+    background: #FFF8E1;
+    border: 2px solid #FDDA24;
+    font-weight: 700;
+  }
+
+  &.marcado {
+    background: #FDDA24;
+    color: #2C2A29;
+    border: 2px solid #E6C200;
+    font-weight: 700;
+  }
+}
+
+.mini-calendario__hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 0.65rem;
+  color: #666;
+
+  svg {
+    flex-shrink: 0;
+  }
+}
+
+// =================== Lista de productos pendientes ===================
+
+.pendientes-lista {
+  flex: 1;
+  min-width: 0;
+}
+
+.pendientes-lista__item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0px 0;
+  font-size: 0.85rem;
+  color: #2C2A29;
+  line-height: 1.4;
+
+  & + & {
+    border-top: 0px solid #F5F5F5;
+  }
+
+  strong {
+    font-weight: 700;
+  }
+}
+
+.pendientes-lista__icon {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.pendientes-lista__more {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  color: #999;
+  font-style: italic;
+}
+
+// =================== Estado "Al día" ===================
+
+.al-dia {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 12px 8px;
+  gap: 4px;
+}
+
+.al-dia__icon {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  margin-bottom: 4px;
+}
+
+.al-dia__text {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #00A876;
+}
+
+.al-dia__sub {
+  font-size: 0.78rem;
+  color: #999;
+  line-height: 1.3;
+}
+
+// =================== Responsive ===================
+
+@media (max-width: 992px) {
+  .home-cards {
+    max-width: 100%; // en tablet/mobile las cards usan todo el ancho
+  }
+
+  .sipro-main::after {
+    display: none; // ocultar imagen en pantallas pequeñas
+  }
+}
+
+@media (max-width: 640px) {
+  .home-cards__row {
+    grid-template-columns: 1fr;
+  }
+
+  .sipro-card {
+    padding: 24px 20px;
+  }
+
+  .sipro-card--half {
+    padding: 20px 16px;
+  }
+
+  .pendientes-body {
+    flex-direction: column;
+  }
+
+  .mini-calendario {
+    width: 100%;
+  }
+}
+
+// =================== Submenú: enlaces deshabilitados ===================
+
+.sipro-subnav__disabled {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px 10px 36px;
+  color: #BDBDBD;
+  font-size: 14px;
+  cursor: not-allowed;
+  user-select: none;
+  position: relative;
+  transition: color 0.15s ease;
+
+  &:hover {
+    color: #9E9E9E;
+    background: rgba(0, 0, 0, 0.02);
+  }
+
+  &[title] {
+    position: relative;
+  }
+}
+
+.sipro-subnav__lock-icon {
+  opacity: 0.6;
+  flex-shrink: 0;
+}

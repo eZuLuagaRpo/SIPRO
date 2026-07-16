@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SIPRO Dataset (placeholder)",
+  "type": "object",
+  "properties": {
+    "id_lote": { "type": "string" },
+    "fecha_corte": { "type": "string", "format": "date" }
+  },
+  "required": ["id_lote", "fecha_corte"]
+}

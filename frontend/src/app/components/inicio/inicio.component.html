@@ -1,0 +1,376 @@
+<!-- Topbar -->
+<header class="sipro-topbar">
+  <div class="sipro-topbar__left">
+    <button id="btnMenu" class="sipro-topbar__menu" type="button" aria-label="Menú" (click)="toggleSidebar()">
+      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M4 6.5h16v2H4v-2Zm0 5h16v2H4v-2Zm0 5h16v2H4v-2Z" fill="currentColor" />
+      </svg>
+    </button>
+    <img class="sipro-topbar__logo" src="/assets/images/LogoBancolombia.svg" alt="Bancolombia">
+    <span class="sipro-topbar__title">SIPRO (Sistema Integral de Provisiones y Procesos Contables)</span>
+  </div>
+  <div class="sipro-topbar__right">
+    <span class="sipro-topbar__user">{{ userName }}</span>
+    <button type="button" class="sipro-topbar__logout" (click)="logout()">Salir</button>
+  </div>
+</header>
+
+<div class="sipro-shell">
+  <!-- Sidebar -->
+  <aside id="sidebar" class="sipro-sidebar" [class.is-open]="sidebarOpen" aria-label="Menú">
+    <nav class="sipro-nav">
+      <a class="active" routerLink="/inicio">
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 3 3 10v11h6v-7h6v7h6V10l-9-7Z" fill="currentColor" />
+        </svg>
+        <span class="label">Inicio</span>
+      </a>
+
+      <button id="btnOpciones" class="sipro-nav__btn" [class.active]="subMenuOpen" type="button"
+        [attr.aria-expanded]="subMenuOpen" (click)="toggleSubMenu()">
+        <span class="sipro-nav__btn-left">
+          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path
+              d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.4 7.4 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 1h-3.8a.5.5 0 0 0-.49.42l-.36 2.54c-.58.23-1.12.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 7.48a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L2.83 14.52a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.3.6.22l2.39-.96c.5.4 1.05.72 1.63.94l.36 2.54c.04.24.25.42.49.42h3.8c.24 0 .45-.18.49-.42l.36-2.54c.58-.23 1.12-.54 1.63-.94l2.39.96c.22.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z"
+              fill="currentColor" />
+          </svg>
+          <span class="label">Opciones</span>
+        </span>
+        <svg class="sipro-nav__chev" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round" />
+        </svg>
+      </button>
+
+      <div id="subOpciones" class="sipro-subnav" [class.hidden]="!subMenuOpen">
+        <!-- Carga archivos: habilitado/deshabilitado según permiso RBAC -->
+        <a *ngIf="puedeCargar" routerLink="/cargar"
+           [title]="tooltipCargar">
+          Carga archivos manuales
+        </a>
+        <span *ngIf="!puedeCargar" class="sipro-subnav__disabled"
+              [title]="tooltipCargar"
+              (click)="onDisabledLinkClick($event, 'cargar')">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" fill="currentColor"/>
+          </svg>
+          Carga archivos manuales
+        </span>
+
+        <!-- Aprobación archivos: habilitado/deshabilitado según permiso RBAC -->
+        <a *ngIf="puedeAprobar" routerLink="/aprobacion"
+           [title]="tooltipAprobar">
+          Aprobación archivos manuales
+        </a>
+        <span *ngIf="!puedeAprobar" class="sipro-subnav__disabled"
+              [title]="tooltipAprobar"
+              (click)="onDisabledLinkClick($event, 'aprobacion')">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" fill="currentColor"/>
+          </svg>
+          Aprobación archivos manuales
+        </span>
+
+        <a *ngIf="puedeVerResumen" routerLink="/resumen" [title]="tooltipResumen">Resumen consolidado</a>
+        <span *ngIf="!puedeVerResumen" class="sipro-subnav__disabled" [title]="tooltipResumen">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" fill="currentColor"/>
+          </svg>
+          Resumen consolidado
+        </span>
+
+        <a *ngIf="puedeVerResumen" routerLink="/tablero" [title]="tooltipTablero">Tablero de Control</a>
+        <span *ngIf="!puedeVerResumen" class="sipro-subnav__disabled" [title]="tooltipTablero">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" fill="currentColor"/>
+          </svg>
+          Tablero de Control
+        </span>
+
+        <a *ngIf="puedeVerAdmin" routerLink="/admin" [title]="tooltipAdmin">Panel de administrador</a>
+        <span *ngIf="!puedeVerAdmin" class="sipro-subnav__disabled" [title]="tooltipAdmin">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" fill="currentColor"/>
+          </svg>
+          Panel de administrador
+        </span>
+
+        <a *ngIf="puedeVerParametros" routerLink="/parametros" [title]="tooltipParametros">Cambio de parámetros</a>
+        <span *ngIf="!puedeVerParametros" class="sipro-subnav__disabled" [title]="tooltipParametros">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" fill="currentColor"/>
+          </svg>
+          Cambio de parámetros
+        </span>
+
+        <span class="sipro-subnav__disabled" [title]="tooltipModuloNoDisponible">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" fill="currentColor"/>
+          </svg>
+          Simulación de provisión
+        </span>
+        <span class="sipro-subnav__disabled" [title]="tooltipModuloNoDisponible">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" fill="currentColor"/>
+          </svg>
+          Aprobación de contabilidad
+        </span>
+        <span class="sipro-subnav__disabled" [title]="tooltipModuloNoDisponible">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" fill="currentColor"/>
+          </svg>
+          Asignación de roles
+        </span>
+      </div>
+
+      <a href="#" (click)="$event.preventDefault()">
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path
+            d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 17h-2v-2h2v2Zm1.9-7.5-.9.9c-.6.6-1 1.1-1 2.6h-2v-.5c0-1 .4-1.9 1-2.5l1.2-1.2a2 2 0 1 0-3.4-1.4H7.8a4 4 0 1 1 7.1 2.6Z"
+            fill="currentColor" />
+        </svg>
+        <span class="label">Ayuda</span>
+      </a>
+    </nav>
+  </aside>
+
+  <div class="sipro-content">
+    <main class="sipro-main">
+
+      <h1 class="page-title">Hola <span>{{ userName }}</span></h1>
+      <p class="sipro-welcome-text">
+        En la barra vertical de la izquierda podrás encontrar las opciones para navegar dentro de la herramienta.
+      </p>
+
+      <!-- Cards funcionales (mitad izquierda visual) -->
+      <div class="home-cards">
+
+        <!-- Card Bienvenida (full width dentro de la mitad izq) -->
+        <div class="sipro-card">
+          <h2 class="sipro-card__title">Bienvenido</h2>
+
+          <ng-container *ngIf="esAdmin">
+            <p class="sipro-card__text">
+              Tu perfil tiene acceso a <strong>Resumen consolidado</strong> y <strong>Panel de administrador</strong>.
+              Los módulos operativos de carga, aprobación y simulación permanecen bloqueados.
+            </p>
+          </ng-container>
+
+          <ng-container *ngIf="!esAdmin && puedeCargar && puedeAprobar">
+            <p class="sipro-card__text">
+              Tienes acceso para <strong>cargar archivos manuales</strong> y <strong>aprobar planillas</strong>.
+              Para comenzar, abre <strong>Opciones</strong> en el menú lateral y selecciona el módulo que necesite.
+            </p>
+          </ng-container>
+
+          <ng-container *ngIf="!esAdmin && puedeCargar && !puedeAprobar">
+            <p class="sipro-card__text">
+              Tienes acceso para <strong>cargar archivos manuales</strong>.
+              Para comenzar, abre <strong>Opciones</strong> en el menú lateral y selecciona
+              <strong>Carga archivos manuales</strong>.
+            </p>
+          </ng-container>
+
+          <ng-container *ngIf="!esAdmin && !puedeCargar && puedeAprobar">
+            <p class="sipro-card__text">
+              Tienes acceso para <strong>aprobar planillas</strong>.
+              Para comenzar, abre <strong>Opciones</strong> en el menú lateral y selecciona
+              <strong>Aprobación archivos manuales</strong>.
+            </p>
+          </ng-container>
+
+          <ng-container *ngIf="!esAdmin && !puedeCargar && !puedeAprobar">
+            <p class="sipro-card__text">
+              Actualmente no tiene asignaciones activas de carga o aprobación.
+              Contacte al administrador del sistema para solicitar acceso a los módulos que necesite.
+            </p>
+          </ng-container>
+
+        </div>
+
+        <!-- 2 cards inferiores lado a lado -->
+        <div class="home-cards__row">
+          <div class="sipro-card sipro-card--half" [class.sipro-card--action-card]="esAdmin">
+            <h2 class="sipro-card__title">{{ tituloResumenCard }}</h2>
+            <ng-container *ngIf="esAdmin">
+              <p class="sipro-card__text">
+                Consulta el consolidado mensual CREFFSOS.
+              </p>
+              <a class="sipro-card__action" routerLink="/resumen">Resumen consolidado</a>
+            </ng-container>
+            <ng-container *ngIf="!esAdmin">
+            <ng-container *ngIf="resumenCargando">
+              <p class="sipro-card__text sipro-card__text--muted">Cargando...</p>
+            </ng-container>
+            <ng-container *ngIf="!resumenCargando && resumenCargas">
+              <ul class="resumen-list">
+                <li><span>Aprobadas:</span> <strong>{{ resumenCargas.aprobados }}</strong></li>
+                <li><span>Rechazadas:</span> <strong>{{ resumenCargas.rechazados }}</strong></li>
+                <li><span>Pendientes:</span> <strong>{{ resumenCargas.pendientes }}</strong></li>
+                <li class="resumen-ultima-actividad">
+                  <span class="ultima-actividad-label">{{ labelUltimaActividad }}</span>
+                  <strong class="ultima-actividad-valor">{{ tiempoDesdeUltimaCarga }}</strong>
+                </li>
+              </ul>
+            </ng-container>
+            <ng-container *ngIf="!resumenCargando && !resumenCargas">
+              <p class="sipro-card__text sipro-card__text--muted">No hay datos disponibles.</p>
+            </ng-container>
+            </ng-container>
+          </div>
+          <div class="sipro-card sipro-card--half" [class.sipro-card--action-card]="esAdmin">
+            <h2 class="sipro-card__title">{{ tituloSegundaCard }}</h2>
+
+            <ng-container *ngIf="esAdmin">
+              <p class="sipro-card__text">
+                Administra consolidaciones, consulta operativa y monitoreo técnico desde el panel administrativo.
+              </p>
+              <a class="sipro-card__action" routerLink="/admin">Panel de administrador</a>
+            </ng-container>
+
+            <!-- ================== CARGADOR: Cargas Pendientes ================== -->
+            <ng-container *ngIf="!esAdmin && puedeCargar && !esAprobador">
+              <ng-container *ngIf="cargasPendientesCargando">
+                <p class="sipro-card__text sipro-card__text--muted">Cargando...</p>
+              </ng-container>
+
+              <ng-container *ngIf="!cargasPendientesCargando">
+                <div class="pendientes-body">
+                  <!-- Mini-calendario (estático, sin nav) -->
+                  <div class="mini-calendario">
+                    <div class="mini-calendario__nav">
+                      <span class="mini-calendario__title">{{ calMesNombre }} {{ calMesAnio }}</span>
+                    </div>
+                    <div class="mini-calendario__weekdays">
+                      <span *ngFor="let d of calWeekdays">{{ d }}</span>
+                    </div>
+                    <div class="mini-calendario__days">
+                      <span *ngFor="let cell of calDias"
+                            class="mini-cal-day"
+                            [class.empty]="cell.esVacio"
+                            [class.ultimo-dia]="cell.esUltimo"
+                            [class.marcado]="cell.esMarcado">
+                        {{ cell.esVacio ? '' : cell.dia }}
+                      </span>
+                    </div>
+                    <div class="mini-calendario__hint" *ngIf="totalProductosPendientes > 0">
+                      <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="2" y="2" width="20" height="20" rx="4" fill="#FDDA24" stroke="#E6C200" stroke-width="2"/>
+                      </svg>
+                      <span>Fecha de cierre con cargas pendientes</span>
+                    </div>
+                  </div>
+
+                  <!-- Lista o "Estás al día" -->
+                  <div class="pendientes-lista">
+                    <ng-container *ngIf="!cargadorAlDia">
+                      <div class="pendientes-lista__item" *ngFor="let prod of productosPendientesTop4">
+                        <img src="/assets/images/document.png" alt="" class="pendientes-lista__icon">
+                        <span>Pendiente {{ nombreMesPendiente }} Producto <strong>{{ prod.tituloProducto }}</strong></span>
+                      </div>
+                      <p class="pendientes-lista__more" *ngIf="totalProductosPendientes > 4">
+                        y {{ totalProductosPendientes - 4 }} producto(s) más…
+                      </p>
+                    </ng-container>
+                    <ng-container *ngIf="cargadorAlDia">
+                      <div class="al-dia">
+                        <img src="/assets/images/Ok.png" alt="Al día" class="al-dia__icon">
+                        <span class="al-dia__text">¡Estás al día!</span>
+                        <span class="al-dia__sub">Todas tus cargas del mes anterior están completas.</span>
+                      </div>
+                    </ng-container>
+                  </div>
+                </div>
+              </ng-container>
+            </ng-container>
+
+            <!-- ================== APROBADOR: Aprobaciones Pendientes ================== -->
+            <ng-container *ngIf="!esAdmin && esAprobador">
+              <ng-container *ngIf="aprobacionesCargando">
+                <p class="sipro-card__text sipro-card__text--muted">Cargando...</p>
+              </ng-container>
+
+              <ng-container *ngIf="!aprobacionesCargando">
+                <div class="pendientes-body">
+                  <!-- Mini-calendario con navegación -->
+                  <div class="mini-calendario">
+                    <div class="mini-calendario__nav mini-calendario__nav--arrows">
+                      <button type="button" class="mini-cal-nav-btn" [disabled]="!puedeNavPrev" (click)="calNavPrev()">
+                        <svg width="14" height="14" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      </button>
+                      <span class="mini-calendario__title">{{ calMesNombre }} {{ calMesAnio }}</span>
+                      <button type="button" class="mini-cal-nav-btn" [disabled]="!puedeNavNext" (click)="calNavNext()">
+                        <svg width="14" height="14" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      </button>
+                    </div>
+                    <div class="mini-calendario__weekdays">
+                      <span *ngFor="let d of calWeekdays">{{ d }}</span>
+                    </div>
+                    <div class="mini-calendario__days">
+                      <span *ngFor="let cell of calDias"
+                            class="mini-cal-day"
+                            [class.empty]="cell.esVacio"
+                            [class.ultimo-dia]="cell.esUltimo"
+                            [class.marcado]="cell.esMarcado">
+                        {{ cell.esVacio ? '' : cell.dia }}
+                      </span>
+                    </div>
+                    <div class="mini-calendario__hint" *ngIf="mesActualTienePendientes">
+                      <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="2" y="2" width="20" height="20" rx="4" fill="#FDDA24" stroke="#E6C200" stroke-width="2"/>
+                      </svg>
+                      <span>Cierre con aprobaciones pendientes</span>
+                    </div>
+                  </div>
+
+                  <!-- Lista o "Estás al día" -->
+                  <div class="pendientes-lista">
+                    <ng-container *ngIf="aprobadorAlDia">
+                      <div class="al-dia">
+                        <img src="/assets/images/Ok.png" alt="Al día" class="al-dia__icon">
+                        <span class="al-dia__text">¡Estás al día!</span>
+                        <span class="al-dia__sub">No tienes aprobaciones pendientes.</span>
+                      </div>
+                    </ng-container>
+                    <ng-container *ngIf="!aprobadorAlDia && mesActualTienePendientes">
+                      <div class="pendientes-lista__item" *ngFor="let prod of aprobacionesTop4">
+                        <img src="/assets/images/document.png" alt="" class="pendientes-lista__icon">
+                        <span>Pendiente {{ calMesNombre }} Producto <strong>{{ prod.tituloProducto }}</strong></span>
+                      </div>
+                      <p class="pendientes-lista__more" *ngIf="totalAprobacionesMes > 4">
+                        y {{ totalAprobacionesMes - 4 }} planilla(s) más…
+                      </p>
+                    </ng-container>
+                    <ng-container *ngIf="!aprobadorAlDia && !mesActualTienePendientes">
+                      <p class="sipro-card__text sipro-card__text--muted" style="margin-top: 8px;">
+                        Sin pendientes en {{ calMesNombre }}. Navega entre meses para verificar.
+                      </p>
+                    </ng-container>
+                  </div>
+                </div>
+              </ng-container>
+            </ng-container>
+
+            <!-- Sin asignaciones -->
+            <ng-container *ngIf="!esAdmin && !puedeCargar && !puedeAprobar">
+              <p class="sipro-card__text sipro-card__text--muted">Sin asignaciones activas.</p>
+            </ng-container>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="sipro-footer">
+      <div class="sipro-footer__left">
+        <img src="/assets/images/LogoBancolombia.svg" alt="Bancolombia" class="sipro-footer__logo">
+        <img src="/assets/images/vigiladoHorizontal.svg" alt="Vigilado" class="sipro-footer__vigilado">
+      </div>
+      <div class="sipro-footer__right">
+        <span class="sipro-footer__meta">Dirección IP: <span>{{ currentIp }}</span></span>
+        <span class="sipro-footer__meta">{{ currentDateTime }}</span>
+      </div>
+    </footer>
+  </div>
+</div>

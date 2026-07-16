@@ -1,0 +1,481 @@
+<!-- Topbar -->
+<header class="sipro-topbar">
+    <div class="sipro-topbar__left">
+        <button class="sipro-topbar__menu" type="button" aria-label="Menú" (click)="toggleSidebar()">
+            <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M4 6.5h16v2H4v-2Zm0 5h16v2H4v-2Zm0 5h16v2H4v-2Z" fill="currentColor" />
+            </svg>
+        </button>
+        <img class="sipro-topbar__logo" src="/assets/images/LogoBancolombia.svg" alt="Bancolombia">
+        <span class="sipro-topbar__title">SIPRO (Sistema Integral de Provisiones y Procesos Contables)</span>
+    </div>
+    <div class="sipro-topbar__right">
+        <span class="sipro-topbar__user">{{ userName }}</span>
+        <button type="button" class="sipro-topbar__logout" (click)="logout()">Salir</button>
+    </div>
+</header>
+
+<!-- OVERLAY DE CARGA (Componente Reutilizable) -->
+<app-loading [visible]="loading" message="Cargando..."></app-loading>
+
+<div class="sipro-shell">
+    <!-- Sidebar -->
+    <aside class="sipro-sidebar" [class.is-open]="sidebarOpen" aria-label="Menú">
+        <nav class="sipro-nav">
+            <a routerLink="/inicio">
+                <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M12 3 3 10v11h6v-7h6v7h6V10l-9-7Z" fill="currentColor" />
+                </svg>
+                <span class="label">Inicio</span>
+            </a>
+
+            <button class="sipro-nav__btn active" type="button" [attr.aria-expanded]="subMenuOpen"
+                (click)="toggleSubMenu()">
+                <span class="sipro-nav__btn-left">
+                    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path
+                            d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.4 7.4 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 1h-3.8a.5.5 0 0 0-.49.42l-.36 2.54c-.58.23-1.12.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 7.48a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L2.83 14.52a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.3.6.22l2.39-.96c.5.4 1.05.72 1.63.94l.36 2.54c.04.24.25.42.49.42h3.8c.24 0 .45-.18.49-.42l.36-2.54c.58-.23 1.12-.54 1.63-.94l2.39.96c.22.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z"
+                            fill="currentColor" />
+                    </svg>
+                    <span class="label">Opciones</span>
+                </span>
+                <svg class="sipro-nav__chev" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"
+                    focusable="false">
+                    <path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round" />
+                </svg>
+            </button>
+
+            <div class="sipro-subnav" [class.hidden]="!subMenuOpen">
+                <a *ngIf="puedeCargar" routerLink="/cargar" [title]="tooltipCargar">Carga archivos manuales</a>
+                <span *ngIf="!puedeCargar" class="sipro-subnav__disabled" [title]="tooltipCargar"
+                    (click)="onDisabledLinkClick($event, 'cargar')">
+                    <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+                    </svg>
+                    <span>Carga archivos manuales</span>
+                </span>
+
+                <a *ngIf="puedeAprobar" class="active" routerLink="/aprobacion" [title]="tooltipAprobar">Aprobación archivos manuales</a>
+                <span *ngIf="!puedeAprobar" class="sipro-subnav__disabled" [title]="tooltipAprobar"
+                    (click)="onDisabledLinkClick($event, 'aprobacion')">
+                    <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+                    </svg>
+                    <span>Aprobación archivos manuales</span>
+                </span>
+                <a *ngIf="puedeVerResumen" routerLink="/resumen" [title]="tooltipResumen">Resumen consolidado</a>
+                <span *ngIf="!puedeVerResumen" class="sipro-subnav__disabled" [title]="tooltipResumen">
+                    <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+                    </svg>
+                    <span>Resumen consolidado</span>
+                </span>
+                <a *ngIf="puedeVerResumen" routerLink="/tablero" [title]="tooltipTablero">Tablero de Control</a>
+                <span *ngIf="!puedeVerResumen" class="sipro-subnav__disabled" [title]="tooltipTablero">
+                    <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+                    </svg>
+                    <span>Tablero de Control</span>
+                </span>
+                <a *ngIf="puedeVerAdmin" routerLink="/admin" [title]="tooltipAdmin">Panel de administrador</a>
+                <span *ngIf="!puedeVerAdmin" class="sipro-subnav__disabled" [title]="tooltipAdmin">
+                    <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+                    </svg>
+                    <span>Panel de administrador</span>
+                </span>
+
+                <a *ngIf="puedeVerParametros" routerLink="/parametros" [title]="tooltipParametros">Cambio de parámetros</a>
+                <span *ngIf="!puedeVerParametros" class="sipro-subnav__disabled" [title]="tooltipParametros">
+                    <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+                    </svg>
+                    <span>Cambio de parámetros</span>
+                </span>
+
+                <span class="sipro-subnav__disabled" [title]="tooltipModuloNoDisponible">
+                    <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+                    </svg>
+                    <span>Simulación de provisión</span>
+                </span>
+                <span class="sipro-subnav__disabled" [title]="tooltipModuloNoDisponible">
+                    <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+                    </svg>
+                    <span>Aprobación de contabilidad</span>
+                </span>
+                <span class="sipro-subnav__disabled" [title]="tooltipModuloNoDisponible">
+                    <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+                    </svg>
+                    <span>Asignación de roles</span>
+                </span>
+            </div>
+
+            <a href="#" (click)="$event.preventDefault()">
+                <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path
+                        d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 17h-2v-2h2v2Zm1.9-7.5-.9.9c-.6.6-1 1.1-1 2.6h-2v-.5c0-1 .4-1.9 1-2.5l1.2-1.2a2 2 0 1 0-3.4-1.4H7.8a4 4 0 1 1 7.1 2.6Z"
+                        fill="currentColor" />
+                </svg>
+                <span class="label">Ayuda</span>
+            </a>
+        </nav>
+    </aside>
+
+    <div class="sipro-content">
+        <main class="sipro-main">
+
+            <!-- Page Title -->
+            <h1 class="page-title">Aprobación de Planillas</h1>
+            <p class="sipro-welcome-text">Revisa y aprueba las solicitudes de carga de planillas.</p>
+
+            <!-- Stats Bar (horizontal like Aprobacion.html reference) -->
+            <div class="status-bar">
+                <div class="sb-left">
+                    <span class="stat-item"><strong>Pendientes:</strong> {{ stats.pendientes }}</span>
+                    <span class="stat-item"><strong>Aprobadas:</strong> {{ stats.aprobados }}</span>
+                    <span class="stat-item"><strong>Rechazadas:</strong> {{ stats.rechazados }}</span>
+                </div>
+
+            </div>
+
+            <!-- Search Bar (style like Buscador.html) -->
+            <div class="input-search">
+                <div class="bc-card-search">
+                    <input type="text" class="input-card" placeholder="Buscar por nombre de responsable..."
+                        [(ngModel)]="searchTerm" (input)="applyFilter()">
+                    <button type="button" class="search-button">
+                        <span class="search-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 16 16">
+                                <path
+                                    d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0" />
+                            </svg>
+                        </span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filter Tabs -->
+            <div class="filter-tabs">
+                <button [class.active]="selectedFilter === 'TODAS'" (click)="setFilter('TODAS')">Todas</button>
+                <button [class.active]="selectedFilter === 'PENDIENTE'"
+                    (click)="setFilter('PENDIENTE')">Pendientes</button>
+                <button [class.active]="selectedFilter === 'APROBADO'"
+                    (click)="setFilter('APROBADO')">Aprobadas</button>
+                <button [class.active]="selectedFilter === 'RECHAZADO'"
+                    (click)="setFilter('RECHAZADO')">Rechazadas</button>
+            </div>
+
+            <!-- Table Card -->
+            <div class="sipro-card table-card">
+                <div class="table-header">
+                    <h3><span class="title-text">Planillas</span> <span
+                            class="title-count">({{filteredPlanillas.length}})</span></h3>
+                    <div class="table-info">
+                        Mostrando {{displayedPlanillas.length}} de {{filteredPlanillas.length}}
+                        <select class="page-size-select" [(ngModel)]="pageSize" (change)="onPageSizeChange()">
+                            <option [value]="10">10</option>
+                            <option [value]="50">50</option>
+                            <option [value]="100">100</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Table Wrapper with Scroll (#4) -->
+                <div class="table-wrapper" *ngIf="!loading && displayedPlanillas.length > 0">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Fecha Creación</th>
+                                <th>Responsable</th>
+                                <th>Producto</th>
+                                <th>Segmento</th>
+                                <th>Fecha de Corte</th>
+                                <th>N° Registros</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr *ngFor="let planilla of displayedPlanillas">
+                                <td>{{formatDate(planilla.fechaCreacion)}}</td>
+                                <td>{{planilla.nombreResponsable}}</td>
+                                <td>{{planilla.producto}}</td>
+                                <td>
+                                    <span class="badge segment-badge" [ngClass]="getSegmentoBadgeClass(planilla.segmento)">
+                                        {{ getSegmentoLabel(planilla.segmento) }}
+                                    </span>
+                                </td>
+                                <td>{{formatDate(planilla.fechaCorte)}}</td>
+                                <td class="num-col">
+                                    <span *ngIf="!planilla.sinDatos">{{planilla.numeroFilas || 0}}</span>
+                                    <span *ngIf="planilla.sinDatos">Sin datos</span>
+                                </td>
+                                <td>
+                                    <button
+                                        type="button"
+                                        class="badge badge-button"
+                                        [ngClass]="getEstadoBadgeClass(planilla.estado)"
+                                        (click)="openModal(planilla)"
+                                        [title]="'Ver detalle de la solicitud en estado ' + (planilla.estado | lowercase)">
+                                        {{planilla.estado | titlecase}}
+                                    </button>
+                                </td>
+                                <td>
+                                    <button class="action-btn" (click)="openModal(planilla)" title="Ver detalle">
+                                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M7 17L17 7" />
+                                            <path d="M7 7h10v10" />
+                                        </svg>
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div *ngIf="!loading && displayedPlanillas.length === 0" class="empty-state">
+                    <p>No hay planillas para mostrar.</p>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Footer -->
+        <footer class="sipro-footer">
+            <div class="sipro-footer__left">
+                <img src="/assets/images/LogoBancolombia.svg" alt="Bancolombia" class="sipro-footer__logo">
+                <img src="/assets/images/vigiladoHorizontal.svg" alt="Vigilado" class="sipro-footer__vigilado">
+            </div>
+            <div class="sipro-footer__right">
+                <span class="sipro-footer__meta">Dirección IP: <span>{{ currentIp }}</span></span>
+                <span class="sipro-footer__meta">{{currentDateTime}}</span>
+            </div>
+        </footer>
+    </div>
+</div>
+
+<!-- MODAL -->
+<div class="bc-modal-active" *ngIf="showModal">
+    <div class="bc-modal-backdrop" (click)="closeModal()"></div>
+    <div class="bc-modal-container">
+        <div class="bc-modal-header">
+            <button class="bc-modal-close" (click)="closeModal()">
+                <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+            </button>
+            <div class="bc-modal-header-content">
+                <img src="/assets/images/mano.svg" alt="Icono" class="bc-modal-icon">
+                <h2>Detalle de Solicitud</h2>
+            </div>
+        </div>
+
+        <p class="modal-instruction-text" *ngIf="!selectedPlanilla?.sinDatos">
+            Se ha solicitado aprobación manual para la siguiente planilla. Para validar la información cargada, haz clic
+            en el icono de descargar adjunto. Luego de revisar que todo esté correcto, haz clic en aprobar o rechazar.
+        </p>
+
+        <p class="modal-instruction-text" *ngIf="selectedPlanilla?.sinDatos">
+            El responsable ha declarado que <strong>no existen datos a reportar</strong> para este periodo.
+            Por favor, verifica que esta declaración sea correcta y procede a aprobar o rechazar.
+        </p>
+
+        <div class="bc-modal-body" *ngIf="selectedPlanilla">
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <label>Responsable</label>
+                    <p>{{selectedPlanilla.nombreResponsable}}</p>
+                </div>
+                <div class="detail-item">
+                    <label>Producto</label>
+                    <p>{{selectedPlanilla.producto}}</p>
+                </div>
+                <div class="detail-item">
+                    <label>Segmento</label>
+                    <span class="badge segment-badge" [ngClass]="getSegmentoBadgeClass(selectedPlanilla.segmento)">
+                        {{ getSegmentoLabel(selectedPlanilla.segmento) }}
+                    </span>
+                </div>
+                <div class="detail-item">
+                    <label>Fecha de Corte</label>
+                    <p>{{formatDate(selectedPlanilla.fechaCorte)}}</p>
+                </div>
+                <div class="detail-item">
+                    <label>Estado Actual</label>
+                    <span class="badge" [ngClass]="getEstadoBadgeClass(selectedPlanilla.estado)">
+                        {{selectedPlanilla.estado | titlecase}}
+                    </span>
+                </div>
+                <div class="detail-item full-width description-item">
+                    <label>Descripción</label>
+                    <p>{{selectedPlanilla.descripcion || 'Sin descripción'}}</p>
+                </div>
+
+                <!-- Archivo Adjunto: Solo visible cuando NO es Sin Datos -->
+                <div class="detail-item full-width" *ngIf="!selectedPlanilla.sinDatos">
+                    <label>Archivo Adjunto</label>
+                    <div class="adjunto-input-group">
+                        <input type="text" class="adjunto-input" [value]="selectedPlanilla.nombreArchivo" readonly>
+                        <button class="btn-download-square" (click)="descargarAdjunto()" title="Descargar">
+                            <img src="/assets/images/download.png" alt="Descargar">
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Certificación Sin Datos: Visible cuando ES Sin Datos -->
+                <div class="detail-item full-width sin-datos-certificacion-area" *ngIf="selectedPlanilla.sinDatos">
+                    <label>Tipo de Solicitud</label>
+                    <div class="sin-datos-badge-container">
+                        <span class="sin-datos-badge">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="12" y1="8" x2="12" y2="12"/>
+                                <line x1="12" y1="16" x2="12.01" y2="16"/>
+                            </svg>
+                            Certificación de Inexistencia de Datos
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bc-modal-footer" *ngIf="selectedPlanilla?.estado === 'PENDIENTE'">
+            <button class="btn-rechazar" (click)="openRejectionReasonModal()" [disabled]="modalLoading">
+                <span *ngIf="!modalLoading">Rechazar</span>
+                <span *ngIf="modalLoading">Procesando...</span>
+            </button>
+            <button class="btn-aprobar" (click)="aprobar()" [disabled]="modalLoading">
+                <span *ngIf="!modalLoading">Aprobar</span>
+                <span *ngIf="modalLoading">Procesando...</span>
+            </button>
+        </div>
+
+        <div class="bc-modal-footer bc-modal-footer--readonly" *ngIf="selectedPlanilla?.estado !== 'PENDIENTE'">
+            <p class="estado-info">Esta planilla ya fue procesada.</p>
+            <button class="btn-cerrar" (click)="closeModal()">Cerrar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DE APROBACIÓN EXITOSA -->
+<article class="bc-modal-active" role="dialog" aria-modal="true" *ngIf="showSuccessModal">
+    <div class="bc-modal-backdrop" (click)="closeSuccessModal()"></div>
+
+    <section class="bc-modal-container success-modal-container">
+        <button class="bc-modal-close" type="button" (click)="closeSuccessModal()" aria-label="Cerrar">
+            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+        </button>
+
+        <section class="bc-modal-header centered-column">
+            <img src="/assets/images/shield-user.png" alt="Aprobación" class="success-icon">
+            <h4 class="modal-title-label success-title">Aprobación exitosa</h4>
+        </section>
+
+        <section class="bc-modal-content approval-success-text">
+            <p>
+                La planilla de <strong>{{ approvedPlanilla?.producto }}</strong> gestionada por
+                <strong>{{ approvedPlanilla?.nombreResponsable }}</strong> ha sido aprobada y se procesará
+                automáticamente para el cierre del <strong>{{ formatDate(approvedPlanilla?.fechaCorte) }}</strong>.
+            </p>
+        </section>
+
+        <section class="bc-modal-footer centered-column">
+            <div class="approval-progress">
+                <div class="approval-progress-bar" [style.width.%]="((30 - successCountdown) / 30) * 100"></div>
+            </div>
+            <small style="color: #666;">Cerrando en {{ successCountdown }} segundos...</small>
+            <button class="bc-button-text" type="button" (click)="closeSuccessModal()" style="margin-top: 12px;">
+                Cerrar ahora
+            </button>
+        </section>
+    </section>
+</article>
+
+<!-- MODAL DE MOTIVO DE RECHAZO -->
+<article class="bc-modal-active" role="dialog" aria-modal="true" *ngIf="showRejectionReasonModal">
+    <div class="bc-modal-backdrop" (click)="closeRejectionReasonModal()"></div>
+
+    <section class="bc-modal-container rejection-modal-container">
+        <button class="bc-modal-close" type="button" (click)="closeRejectionReasonModal()" aria-label="Cerrar">
+            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+        </button>
+
+        <section class="bc-modal-header centered-column">
+            <img src="/assets/images/faild-user.png" alt="Rechazo" class="rejection-icon">
+            <h4 class="modal-title-label rejection-title">Rechazar información</h4>
+        </section>
+
+        <section class="bc-modal-content rejection-modal-text">
+            <p>
+                Estás a punto de rechazar la carga realizada por
+                <strong>{{ rejectedPlanilla?.nombreResponsable }}</strong> para el producto
+                <strong>{{ rejectedPlanilla?.producto }}</strong> del segmento
+                <strong>{{ getSegmentoLabel(rejectedPlanilla?.segmento) }}</strong> con fecha de corte
+                <strong>{{ formatDate(rejectedPlanilla?.fechaCorte) }}</strong>.
+            </p>
+            <p class="rejection-instruction">Por favor, indica el motivo del rechazo:</p>
+            <textarea class="rejection-textarea" [(ngModel)]="rejectionMotivo"
+                placeholder="Escribe el motivo del rechazo..." rows="4"></textarea>
+        </section>
+
+        <section class="bc-modal-footer centered-column">
+            <button class="btn-confirm-reject" (click)="confirmRejection()"
+                [disabled]="modalLoading || !rejectionMotivo.trim()">
+                <span *ngIf="!modalLoading">Sí, Rechazar</span>
+                <span *ngIf="modalLoading">Procesando...</span>
+            </button>
+            <button class="bc-button-text" type="button" (click)="closeRejectionReasonModal()">
+                Cancelar
+            </button>
+        </section>
+    </section>
+</article>
+
+<!-- MODAL DE ÉXITO DE RECHAZO -->
+<article class="bc-modal-active" role="dialog" aria-modal="true" *ngIf="showRejectionSuccessModal">
+    <div class="bc-modal-backdrop" (click)="closeRejectionSuccessModal()"></div>
+
+    <section class="bc-modal-container success-modal-container">
+        <button class="bc-modal-close" type="button" (click)="closeRejectionSuccessModal()" aria-label="Cerrar">
+            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+        </button>
+
+        <section class="bc-modal-header centered-column">
+            <img src="/assets/images/faild-user.png" alt="Rechazado" class="rejection-icon">
+            <h4 class="modal-title-label rejection-title">Proceso de carga rechazado</h4>
+        </section>
+
+        <section class="bc-modal-content approval-success-text">
+            <p>
+                Le notificaremos a <strong>{{ rejectedPlanilla?.nombreResponsable }}</strong>
+                que la información fue rechazada. El archivo ha sido movido al historial de rechazos.
+            </p>
+        </section>
+
+        <section class="bc-modal-footer centered-column">
+            <div class="approval-progress">
+                <div class="approval-progress-bar rejection-progress-bar"
+                    [style.width.%]="((30 - rejectionCountdown) / 30) * 100"></div>
+            </div>
+            <small style="color: #666;">Cerrando en {{ rejectionCountdown }} segundos...</small>
+            <button class="bc-button-text" type="button" (click)="closeRejectionSuccessModal()"
+                style="margin-top: 12px;">
+                Cerrar ahora
+            </button>
+        </section>
+    </section>
+</article>

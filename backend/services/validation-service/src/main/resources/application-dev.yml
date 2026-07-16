@@ -1,0 +1,73 @@
+# ============================================================
+# Variables LZ para entorno DEV local
+# Secrets Manager apunta a LocalStack (http://localhost:4567)
+# El secreto lz/creds debe estar sembrado con run.ps1
+# ============================================================
+
+# ── Almacenamiento local (evita dependencia de WSL2/Docker/LocalStack) ────
+app:
+  storage:
+    type: local
+    local:
+      base-dir: C:/s3mock2/sipro-local-storage
+  mail:
+    enabled: true
+    transport: outlook-win32
+    log-preview: true
+  # ── Tabla MDM en LZ ambiente intermedio ─────────────────────────────
+  # DEV y QA usan default.sipro_fcr_mdm_datos_generales_clientes.
+  # LzDevSeedService crea datos dummy en esa tabla al arrancar.
+  # PDN usa resultados_fcr.fcr_mdm_datos_generales_clientes (desde application.yml).
+  lz:
+    schema: ${APP_LZ_SCHEMA:proceso}
+    tables:
+      mdm: ${APP_LZ_TABLE_MDM:sipro_fcr_mdm_datos_generales_clientes}
+
+lz:
+  # ── Host/Puerto del ambiente PREPRODUCTIVO de LZ ─────────────────────────
+  # DEV y QA usan el mismo ambiente intermedio (10.8.85.237:21050).
+  # PDN hereda impala.bancolombia.corp desde application.yml — NO tocar.
+  host: ${LZ_HOST:10.8.85.237}
+  port: ${LZ_PORT:21050}
+
+  secrets:
+    endpoint: http://localhost:4567       # LocalStack DEV
+    region:   us-east-1
+    name:     lz/creds
+
+  # ── Credenciales directas DEV (bypass de Secrets Manager) ────────────────
+  # Poner en variables de entorno del IDE o del shell antes de arrancar:
+  #   LZ_DEV_USER=emzulu@ambientesbc.com
+  #   LZ_DEV_PASSWORD=<tu-clave-ambientesBC>
+  # NUNCA poner la contrasena real aqui. En QA/PDN dejar vacio para usar Secrets Manager.
+  dev:
+    user:     ${LZ_DEV_USER:emzulu@ambientesbc.com}
+    password: ${LZ_DEV_PASSWORD:}
+
+  # ── SSL / Truststore ─────────────────────────────────────────────────────
+  # El JKS esta dentro del proyecto en:
+  #   src/main/resources/certificates/impala-truststore.jks   (en .gitignore)
+  # LzJdbcService.prepareTruststore() lo carga desde classpath automaticamente.
+  # Si necesitas apuntar a otro JKS (ej: despues de rotacion antes de rebuild),
+  # define LZ_TRUSTSTORE_PATH=<ruta_absoluta> en las variables de entorno.
+  ssl:
+    truststore-path: ${LZ_TRUSTSTORE_PATH:}
+    truststore-password: ${LZ_TRUSTSTORE_PWD:changeit}
+    truststore-type: ${LZ_TRUSTSTORE_TYPE:JKS}
+
+  ingestion:
+    # Ejecutar validacion de secrets al arrancar el backend (siempre true en DEV)
+    validate-on-startup: true
+
+# ── Parámetros de Entra ID (fallback cuando PostgreSQL no está disponible) ─────
+# Cuando sipro_parametros_unico no puede cargarse desde la BD, ParametroUnicoService
+# busca estos valores como fallback con prefijo sipro.param.<CLAVE>.
+# Configura estas variables de entorno en tu IDE (Run/Debug Configurations)
+# si necesitas sobreescribir los defaults locales.
+sipro:
+  param:
+    AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:594dd05b-2c36-4b95-bb5e-bbf5958aa871}
+    AZURE_TENANT_ID: ${AZURE_TENANT_ID:7eaff77c-8430-4686-83bf-623e3164e409}
+    AZURE_API_SCOPE: ${AZURE_API_SCOPE:}
+    AZURE_API_AUDIENCE: ${AZURE_API_AUDIENCE:api://594dd05b-2c36-4b95-bb5e-bbf5958aa871}
+    APP_ADMIN_CONSOLIDACION_BYPASS_WINDOW: ${APP_ADMIN_CONSOLIDACION_BYPASS_WINDOW:true}

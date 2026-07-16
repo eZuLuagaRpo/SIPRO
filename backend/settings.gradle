@@ -1,0 +1,12 @@
+pluginManagement {
+	repositories {
+		maven {
+			url = uri('https://artifactory.apps.bancolombia.com/maven-bancolombia/')
+		}
+		gradlePluginPortal()
+	}
+}
+
+rootProject.name = 'sipro-validaciones'
+
+include 'services:validation-service'

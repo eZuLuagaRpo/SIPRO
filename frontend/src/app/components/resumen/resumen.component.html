@@ -1,0 +1,402 @@
+<!-- Topbar -->
+<header class="sipro-topbar">
+  <div class="sipro-topbar__left">
+    <button class="sipro-topbar__menu" type="button" aria-label="Menú" (click)="toggleSidebar()">
+      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M4 6.5h16v2H4v-2Zm0 5h16v2H4v-2Zm0 5h16v2H4v-2Z" fill="currentColor" />
+      </svg>
+    </button>
+    <img class="sipro-topbar__logo" src="/assets/images/LogoBancolombia.svg" alt="Bancolombia">
+    <span class="sipro-topbar__title">SIPRO (Sistema Integral de Provisiones y Procesos Contables)</span>
+  </div>
+  <div class="sipro-topbar__right">
+    <span class="sipro-topbar__user">{{ userName }}</span>
+    <button type="button" class="sipro-topbar__logout" (click)="logout()">Salir</button>
+  </div>
+</header>
+
+<app-loading [visible]="loading" message="Cargando resumen consolidado..."></app-loading>
+
+<div class="sipro-shell">
+  <aside class="sipro-sidebar" [class.is-open]="sidebarOpen" aria-label="Menú">
+    <nav class="sipro-nav">
+      <a routerLink="/inicio">
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 3 3 10v11h6v-7h6v7h6V10l-9-7Z" fill="currentColor" />
+        </svg>
+        <span class="label">Inicio</span>
+      </a>
+
+      <button class="sipro-nav__btn active" type="button" [attr.aria-expanded]="subMenuOpen" (click)="toggleSubMenu()">
+        <span class="sipro-nav__btn-left">
+          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path
+              d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.4 7.4 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 1h-3.8a.5.5 0 0 0-.49.42l-.36 2.54c-.58.23-1.12.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 7.48a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L2.83 14.52a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.3.6.22l2.39-.96c.5.4 1.05.72 1.63.94l.36 2.54c.04.24.25.42.49.42h3.8c.24 0 .45-.18.49-.42l.36-2.54c.58-.23 1.12-.54 1.63-.94l2.39.96c.22.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z"
+              fill="currentColor" />
+          </svg>
+          <span class="label">Opciones</span>
+        </span>
+        <svg class="sipro-nav__chev" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round" />
+        </svg>
+      </button>
+
+      <div class="sipro-subnav" [class.hidden]="!subMenuOpen">
+        <a *ngIf="puedeCargar" routerLink="/cargar" [title]="tooltipCargar">Carga archivos manuales</a>
+        <span *ngIf="!puedeCargar" class="sipro-subnav__disabled" [title]="tooltipCargar"
+          (click)="onDisabledLinkClick($event, 'cargar')">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Carga archivos manuales</span>
+        </span>
+
+        <a *ngIf="puedeAprobar" routerLink="/aprobacion" [title]="tooltipAprobar">Aprobación archivos manuales</a>
+        <span *ngIf="!puedeAprobar" class="sipro-subnav__disabled" [title]="tooltipAprobar"
+          (click)="onDisabledLinkClick($event, 'aprobacion')">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Aprobación archivos manuales</span>
+        </span>
+
+        <a *ngIf="puedeVerResumen" class="active" routerLink="/resumen" [title]="tooltipResumen">Resumen consolidado</a>
+        <span *ngIf="!puedeVerResumen" class="sipro-subnav__disabled" [title]="tooltipResumen">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Resumen consolidado</span>
+        </span>
+        <a *ngIf="puedeVerResumen" routerLink="/tablero" [title]="tooltipTablero">Tablero de Control</a>
+        <span *ngIf="!puedeVerResumen" class="sipro-subnav__disabled" [title]="tooltipTablero">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Tablero de Control</span>
+        </span>
+        <a *ngIf="puedeVerAdmin" routerLink="/admin" [title]="tooltipAdmin">Panel de administrador</a>
+        <span *ngIf="!puedeVerAdmin" class="sipro-subnav__disabled" [title]="tooltipAdmin">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Panel de administrador</span>
+        </span>
+
+        <a *ngIf="puedeVerParametros" routerLink="/parametros" [title]="tooltipParametros">Cambio de parámetros</a>
+        <span *ngIf="!puedeVerParametros" class="sipro-subnav__disabled" [title]="tooltipParametros">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Cambio de parámetros</span>
+        </span>
+
+        <span class="sipro-subnav__disabled" [title]="tooltipModuloNoDisponible">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Simulación de provisión</span>
+        </span>
+        <span class="sipro-subnav__disabled" [title]="tooltipModuloNoDisponible">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Aprobación de contabilidad</span>
+        </span>
+        <span class="sipro-subnav__disabled" [title]="tooltipModuloNoDisponible">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Asignación de roles</span>
+        </span>
+      </div>
+
+      <a href="#" (click)="$event.preventDefault()">
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path
+            d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 17h-2v-2h2v2Zm1.9-7.5-.9.9c-.6.6-1 1.1-1 2.6h-2v-.5c0-1 .4-1.9 1-2.5l1.2-1.2a2 2 0 1 0-3.4-1.4H7.8a4 4 0 1 1 7.1 2.6Z"
+            fill="currentColor" />
+        </svg>
+        <span class="label">Ayuda</span>
+      </a>
+    </nav>
+  </aside>
+
+  <div class="sipro-content">
+    <main class="sipro-main resumen-main">
+      <div class="resumen-shell">
+        <section class="resumen-page-header">
+          <div>
+            <h1 class="page-title">Pestaña de Resumen</h1>
+            <p class="sipro-welcome-text">Contrasta consolidado mensual en PostgreSQL con el archivo Colgaap/Modificado FullIFRS publicado para el mismo periodo.</p>
+          </div>
+
+          <div class="resumen-page-header__meta" *ngIf="resumen">
+            <span class="status-pill" [ngClass]="estadoResumenClase">{{ estadoResumenEtiqueta }}</span>
+            <span class="status-date">Actualizado: {{ fechaActualizacionLabel }}</span>
+          </div>
+        </section>
+
+        <section class="resumen-toolbar">
+          <div class="filter-row">
+            <div class="filter-group">
+              <span class="filter-group__label">Año</span>
+              <label class="filter-select">
+                <select class="filter-select__control" [value]="selectedYear ?? ''" (change)="onYearChange($any($event.target).value)">
+                  <option value="" disabled>Seleccione año</option>
+                  <option *ngFor="let periodo of periodosDisponibles; trackBy: trackByAnio" [value]="periodo.anio">
+                    {{ periodo.anio }}
+                  </option>
+                </select>
+                <span class="filter-select__chevron" aria-hidden="true">
+                  <svg width="18" height="18" viewBox="0 0 24 24" focusable="false">
+                    <path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </span>
+              </label>
+            </div>
+
+            <div class="filter-group filter-group--months">
+              <span class="filter-group__label">Mes de corte</span>
+              <div class="filter-chip-group filter-chip-group--months">
+                <button
+                  type="button"
+                  class="filter-chip"
+                  *ngFor="let mes of mesesDisponibles; trackBy: trackByMes"
+                  [class.active]="mes.numero === selectedMonth"
+                  (click)="selectMonth(mes.numero)">
+                  {{ mes.abreviatura }}
+                </button>
+              </div>
+            </div>
+
+            <button 
+              type="button"
+              class="btn btn-export"
+              (click)="exportarResumen()"
+              [disabled]="!resumen || !resumen.hayDatos"
+              title="Descargar resumen consolidado en Excel">
+              Exportar
+            </button>
+          </div>
+
+          <div class="toolbar-metrics" *ngIf="resumen">
+            <article class="toolbar-metric">
+              <span class="toolbar-metric__label">Periodo</span>
+              <strong class="toolbar-metric__value">{{ resumen.periodoEtiqueta }}</strong>
+            </article>
+            <article class="toolbar-metric">
+              <span class="toolbar-metric__label">Archivos consolidados (Colgaap/Modificado)</span>
+              <strong class="toolbar-metric__value">{{ formatNumber(resumen.cantidadArchivosConsolidados) }}</strong>
+            </article>
+            <article class="toolbar-metric toolbar-metric--accent">
+              <span class="toolbar-metric__label">Métricas con diferencia</span>
+              <strong class="toolbar-metric__value">{{ formatNumber(metricasConDiferencia) }}</strong>
+            </article>
+          </div>
+        </section>
+
+        <section class="resumen-alert" *ngIf="resumen?.alerta as alerta" [ngClass]="'is-' + alerta.tipo">
+          <div class="resumen-alert__icon" aria-hidden="true">
+            <svg *ngIf="alerta.tipo === 'warning'" width="20" height="20" viewBox="0 0 24 24" focusable="false">
+              <path d="M12 3 1 21h22L12 3Zm1 14h-2v-2h2v2Zm0-4h-2V9h2v4Z" fill="currentColor" />
+            </svg>
+            <svg *ngIf="alerta.tipo === 'success'" width="20" height="20" viewBox="0 0 24 24" focusable="false">
+              <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm-1.1 14.2L6.7 12l1.4-1.4 2.8 2.8 5-5 1.4 1.4Z" fill="currentColor" />
+            </svg>
+            <svg *ngIf="alerta.tipo === 'info'" width="20" height="20" viewBox="0 0 24 24" focusable="false">
+              <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm1 15h-2v-6h2Zm0-8h-2V7h2Z" fill="currentColor" />
+            </svg>
+          </div>
+          <div class="resumen-alert__content">
+            <strong>{{ alerta.titulo }}</strong>
+            <span>{{ alerta.mensaje }}</span>
+          </div>
+        </section>
+
+        <section class="resumen-error sipro-card" *ngIf="!loading && errorMessage">
+          <h2 class="sipro-card__title">No fue posible cargar el resumen</h2>
+          <p class="sipro-card__text">{{ errorMessage }}</p>
+        </section>
+
+        <ng-container *ngIf="!loading && !errorMessage">
+          <section class="resumen-empty sipro-card" *ngIf="!resumen?.hayDatos">
+            <h2 class="sipro-card__title">Sin información para mostrar</h2>
+            <p class="sipro-card__text">
+              Cuando exista una consolidación completada, este tablero mostrará el resumen por producto,
+              la lectura del archivo CREFFSOS y la conciliación de diferencias del periodo.
+            </p>
+          </section>
+
+          <section class="resumen-layout" *ngIf="resumen?.hayDatos">
+            <article class="resumen-card resumen-card--contrast">
+              <div class="resumen-card__header">
+                <div>
+                  <span class="eyebrow">Tabla 1</span>
+                  <h2>Productos consolidados</h2>
+                  <p>{{ formatNumber(totalProductos) }} producto(s) agrupados para {{ resumen?.periodoEtiqueta?.toLowerCase() }}.</p>
+                </div>
+
+                <span class="table-context" *ngIf="resumen">
+                  {{ formatNumber(resumen.productosObservados) }} producto(s) con observaciones de calidad
+                  <ng-container *ngIf="resumen.registrosObservados > 0">
+                    · {{ formatNumber(resumen.registrosObservados) }} registro(s) con campos pendientes
+                  </ng-container>
+                </span>
+              </div>
+
+              <div class="resumen-table-shell">
+                <table class="resumen-table resumen-table--summary">
+                  <colgroup>
+                    <col class="summary-col summary-col--label">
+                    <col class="summary-col summary-col--metric">
+                    <col class="summary-col summary-col--metric">
+                    <col class="summary-col summary-col--metric">
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th rowspan="2" class="resumen-th-label">Producto</th>
+                      <th colspan="2" class="resumen-th-colgaap">Colgaap/Modificado</th>
+                      <th class="resumen-th-ifrs">Full IFRS</th>
+                    </tr>
+                    <tr>
+                      <th class="numeric resumen-th-colgaap-sub">Cantidad de registros</th>
+                      <th class="numeric resumen-th-colgaap-sub">Suma VLRINIOBL</th>
+                      <th class="numeric resumen-th-ifrs-sub">Cantidad de registros</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let producto of productos; trackBy: trackByProducto">
+                      <td>{{ producto.nombreProducto }}</td>
+                      <td class="numeric">{{ formatSegmentoUnoCantidad(producto) }}</td>
+                      <td class="numeric">{{ formatSegmentoUnoValor(producto) }}</td>
+                      <td class="numeric">{{ formatSegmentoDosCantidad(producto) }}</td>
+                    </tr>
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td class="total-cell">Totales</td>
+                      <td class="numeric total-cell">{{ formatNumber(totalRegistrosProductos) }}</td>
+                      <td class="numeric total-cell">{{ formatCurrency(totalVlrIniOblProductos) }}</td>
+                      <td class="numeric total-cell">{{ formatNumber(totalRegistrosFullIfrsProductos) }}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </article>
+
+            <article class="resumen-card resumen-card--neutral">
+              <div class="resumen-card__header">
+                <div>
+                  <span class="eyebrow">Tabla 2</span>
+                  <h2>Archivo CREFFSOS</h2>
+                  <p>{{ creffos?.nombreArchivo || 'Archivo del periodo seleccionado.' }}</p>
+                </div>
+
+                <span class="status-pill" [ngClass]="estadoCreffosClase">{{ estadoCreffosEtiqueta }}</span>
+              </div>
+
+              <div class="resumen-table-shell">
+                <table class="resumen-table resumen-table--summary">
+                  <colgroup>
+                    <col class="summary-col summary-col--label">
+                    <col class="summary-col summary-col--metric">
+                    <col class="summary-col summary-col--metric">
+                    <col class="summary-col summary-col--metric">
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th rowspan="2" class="resumen-th-label">Archivo CREFFSOS</th>
+                      <th colspan="2" class="resumen-th-colgaap">Archivo Consolidación CREFFSOS</th>
+                      <th class="resumen-th-ifrs">Archivo Control</th>
+                    </tr>
+                    <tr>
+                      <th class="numeric resumen-th-colgaap-sub">Cantidad de registros</th>
+                      <th class="numeric resumen-th-colgaap-sub">Suma VLRINIOBL</th>
+                      <th class="numeric resumen-th-ifrs-sub">Cantidad de registros</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="total-cell">Totales</td>
+                      <td class="numeric">{{ formatNumber(totalRegistrosCreffos) }}</td>
+                      <td class="numeric">{{ formatCurrency(totalVlrIniOblCreffos) }}</td>
+                      <td class="numeric">{{ formatNumber(totalRegistrosArchivoControl) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <p class="comparison-note">{{ creffos?.detalle || 'Lectura masiva del archivo publicado para el periodo seleccionado.' }}</p>
+            </article>
+
+            <article class="resumen-card resumen-card--contrast">
+              <div class="resumen-card__header">
+                <div>
+                  <span class="eyebrow">Tabla 3</span>
+                  <h2>Diferencias</h2>
+                  <p>Se muestran únicamente las diferencias totales entre PostgreSQL y CREFFSOS.</p>
+                </div>
+
+                <span class="table-context" *ngIf="hayComparacionVisible">
+                  {{ formatNumber(metricasConDiferencia) }} diferencia(s)
+                </span>
+              </div>
+
+              <div class="resumen-table-shell" *ngIf="hayComparacionVisible; else sinComparacionTabla">
+                <table class="resumen-table resumen-table--summary resumen-table--diff-summary">
+                  <colgroup>
+                    <col class="summary-col summary-col--label">
+                    <col class="summary-col summary-col--metric">
+                    <col class="summary-col summary-col--metric">
+                    <col class="summary-col summary-col--metric">
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th class="resumen-th-label">Diferencia</th>
+                      <th class="numeric resumen-th-colgaap">Cantidad de registros</th>
+                      <th class="numeric resumen-th-colgaap">Diferencia valores</th>
+                      <th class="numeric resumen-th-ifrs">Cantidad de registros</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr [class.is-different]="metricasConDiferencia > 0 || diferenciaRegistrosFullIfrsControl !== 0">
+                      <td class="total-cell">Totales</td>
+                      <td class="numeric total-cell diff-cell" [class.is-different]="diferenciaRegistros !== 0">
+                        {{ formatMetricDifference(diferenciaRegistros, 'integer') }}
+                      </td>
+                      <td class="numeric total-cell diff-cell" [class.is-different]="diferenciaVlrIniObl !== 0">
+                        {{ formatMetricDifference(diferenciaVlrIniObl, 'currency') }}
+                      </td>
+                      <td class="numeric total-cell diff-cell" [class.is-different]="diferenciaRegistrosFullIfrsControl !== 0">
+                        {{ formatMetricDifference(diferenciaRegistrosFullIfrsControl, 'integer') }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <ng-template #sinComparacionTabla>
+                <div class="comparison-empty comparison-empty--compact">
+                  <strong>No hay comparación disponible.</strong>
+                  <span>Cuando exista un archivo CREFFSOS legible para el periodo, aquí aparecerán las diferencias frente a PostgreSQL.</span>
+                </div>
+              </ng-template>
+            </article>
+          </section>
+        </ng-container>
+      </div>
+    </main>
+
+    <footer class="sipro-footer">
+      <div class="sipro-footer__left">
+        <img src="/assets/images/LogoBancolombia.svg" alt="Bancolombia" class="sipro-footer__logo">
+        <img src="/assets/images/vigiladoHorizontal.svg" alt="Vigilado" class="sipro-footer__vigilado">
+      </div>
+      <div class="sipro-footer__right">
+        <span class="sipro-footer__meta">Dirección IP: <span>{{ currentIp }}</span></span>
+        <span class="sipro-footer__meta">{{ currentDateTime }}</span>
+      </div>
+    </footer>
+  </div>
+</div>

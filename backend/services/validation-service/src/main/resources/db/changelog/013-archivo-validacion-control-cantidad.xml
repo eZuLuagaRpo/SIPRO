@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.24.xsd">
+
+    <!-- ================================================================
+         013: Agregar soporte para archivo control Full IFRS
+         - Tabla sipro_detalle_archivo_validacion
+         - Nueva columna: cantidad_registros_control
+         - Almacena el número del archivo .txt (validación Full IFRS)
+         ================================================================ -->
+
+    <changeSet id="013-001" author="sipro">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="sipro_detalle_archivo_validacion" columnName="cantidad_registros_control"/>
+            </not>
+        </preConditions>
+        <comment>Agregar columna para almacenar cantidad de registros esperados (archivo control Full IFRS)</comment>
+        <addColumn tableName="sipro_detalle_archivo_validacion">
+            <column name="cantidad_registros_control" type="integer" remarks="Número del archivo control (.txt) para Full IFRS segmento 2">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>

@@ -1,0 +1,973 @@
+<!-- ─── Layout principal (mismo patrón que cargar.component.html) ────────────── -->
+
+<!-- TOPBAR -->
+<header class="sipro-topbar">
+  <div class="sipro-topbar__left">
+    <button class="sipro-topbar__menu" type="button" aria-label="Menú" (click)="toggleSidebar()">
+      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M4 6.5h16v2H4v-2Zm0 5h16v2H4v-2Zm0 5h16v2H4v-2Z" fill="currentColor" />
+      </svg>
+    </button>
+    <img class="sipro-topbar__logo" src="/assets/images/LogoBancolombia.svg" alt="Bancolombia">
+    <span class="sipro-topbar__title">SIPRO (Sistema Integral de Provisiones y Procesos Contables)</span>
+  </div>
+  <div class="sipro-topbar__right">
+    <span class="sipro-topbar__user">{{ userName }}</span>
+    <button type="button" class="sipro-topbar__logout" (click)="logout()">Salir</button>
+  </div>
+</header>
+
+<div class="sipro-shell">
+  <!-- SIDEBAR -->
+  <aside class="sipro-sidebar" [class.is-open]="sidebarOpen" aria-label="Menú">
+    <nav class="sipro-nav">
+      <a routerLink="/inicio">
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 3 3 10v11h6v-7h6v7h6V10l-9-7Z" fill="currentColor" />
+        </svg>
+        <span class="label">Inicio</span>
+      </a>
+
+      <button class="sipro-nav__btn active" type="button" [attr.aria-expanded]="subMenuOpen" (click)="toggleSubMenu()">
+        <span class="sipro-nav__btn-left">
+          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.4 7.4 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 1h-3.8a.5.5 0 0 0-.49.42l-.36 2.54c-.58.23-1.12.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 7.48a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L2.83 14.52a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.3.6.22l2.39-.96c.5.4 1.05.72 1.63.94l.36 2.54c.04.24.25.42.49.42h3.8c.24 0 .45-.18.49-.42l.36-2.54c.58-.23 1.12-.54 1.63-.94l2.39.96c.22.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z" fill="currentColor" />
+          </svg>
+          <span class="label">Opciones</span>
+        </span>
+        <svg class="sipro-nav__chev" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+
+      <div class="sipro-subnav" [class.hidden]="!subMenuOpen">
+        <a *ngIf="puedeCargar" routerLink="/cargar" [title]="tooltipCargar">Carga archivos manuales</a>
+        <span *ngIf="!puedeCargar" class="sipro-subnav__disabled" [title]="tooltipCargar">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Carga archivos manuales</span>
+        </span>
+
+        <a *ngIf="puedeAprobar" routerLink="/aprobacion" [title]="tooltipAprobar">Aprobación archivos manuales</a>
+        <span *ngIf="!puedeAprobar" class="sipro-subnav__disabled" [title]="tooltipAprobar">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Aprobación archivos manuales</span>
+        </span>
+
+        <a *ngIf="puedeVerResumen" routerLink="/resumen" [title]="tooltipResumen">Resumen consolidado</a>
+        <span *ngIf="!puedeVerResumen" class="sipro-subnav__disabled" [title]="tooltipResumen">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Resumen consolidado</span>
+        </span>
+
+        <a *ngIf="puedeVerResumen" routerLink="/tablero" [title]="tooltipTablero">Tablero de Control</a>
+        <span *ngIf="!puedeVerResumen" class="sipro-subnav__disabled" [title]="tooltipTablero">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Tablero de Control</span>
+        </span>
+
+        <a *ngIf="puedeVerAdmin" routerLink="/admin" [title]="tooltipAdmin">Panel de administrador</a>
+        <span *ngIf="!puedeVerAdmin" class="sipro-subnav__disabled" [title]="tooltipAdmin">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Panel de administrador</span>
+        </span>
+
+        <a class="active" routerLink="/parametros" [title]="tooltipParametros">Cambio de parámetros</a>
+
+        <span class="sipro-subnav__disabled" [title]="tooltipModuloNoDisponible">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Simulación de provisión</span>
+        </span>
+        <span class="sipro-subnav__disabled" [title]="tooltipModuloNoDisponible">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Aprobación de contabilidad</span>
+        </span>
+        <span class="sipro-subnav__disabled" [title]="tooltipModuloNoDisponible">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Asignación de roles</span>
+        </span>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- CONTENIDO PRINCIPAL -->
+  <div class="sipro-content">
+  <main class="sipro-main parametros-main">
+    <div class="parametros-shell">
+
+      <header class="page-main-header">
+        <h1 class="page-main-title">Cambio de Parámetros</h1>
+        <p class="page-main-subtitle">Gestión operativa del sistema e infraestructura de accesos para usuarios funcionales.</p>
+      </header>
+
+    <!-- Banner de carga inicial -->
+    <div *ngIf="cargandoInicial" class="param-loading">
+      <div class="param-loading__spinner"></div>
+      <p>Cargando módulo de parámetros…</p>
+    </div>
+
+    <!-- Mensaje global flash -->
+    <div *ngIf="mensajeGlobal" class="param-alert" [class.param-alert--success]="mensajeGlobalTipo === 'success'" [class.param-alert--error]="mensajeGlobalTipo === 'error'">
+      {{ mensajeGlobal }}
+    </div>
+
+    <ng-container *ngIf="!cargandoInicial">
+      <!-- ═══════════════════════════════════════════════════════════════════ -->
+      <!-- SECCIÓN 1 — Ventana de Carga                                       -->
+      <!-- ═══════════════════════════════════════════════════════════════════ -->
+      <section class="card">
+        <div class="card-header">
+          <h2 class="card-title">1. Gestión de Ventana de Carga</h2>
+          <p class="card-subtitle">Configure el rango base y gestione excepciones vigentes por período de valoración.</p>
+        </div>
+        <div class="card-body param-window-card__body">
+          <div class="grid-2-col param-grid-tight param-ventana-grid">
+            <div class="param-window-column">
+              <h3 class="form-section-title">Rango habilitado para cargar y aprobar archivos</h3>
+              <p class="form-section-subtitle">Se muestra con fechas reales para el período de corte de referencia: {{ periodoReferenciaReglaBaseLabel }}.</p>
+
+              <div class="form-group">
+                <label class="form-label">Inicio de Carga</label>
+                <input type="text" class="form-input form-input--solid" [value]="reglaInicioLabel" readonly>
+                <span class="param-field-help">{{ reglaInicioAyuda }}</span>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Fin de Carga</label>
+                <input type="text" class="form-input form-input--solid" [value]="reglaFinLabel" readonly>
+                <span class="param-field-help">{{ reglaFinAyuda }}</span>
+              </div>
+            </div>
+
+            <div class="param-window-column" id="excepcionCard">
+              <h3 class="form-section-title">{{ excepcionFormTitulo }}</h3>
+              <p class="form-section-subtitle">Seleccione el período para definir una excepción de fechas.</p>
+
+              <div class="grid-2-col param-grid-tight">
+                <div class="form-group">
+                  <label class="form-label">Año de Corte <span class="required">*</span></label>
+                  <select class="form-select" [ngModel]="excepcionForm.anioCorte" (ngModelChange)="onAnioCorteChange($event)" [disabled]="!!excepcionEditandoPeriodo">
+                    <option [ngValue]="null">Seleccionar año</option>
+                    <option *ngFor="let anio of aniosCorteDisponibles" [ngValue]="anio">{{ anio }}</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Mes de Corte <span class="required">*</span></label>
+                  <select class="form-select" [ngModel]="excepcionForm.mesCorte" (ngModelChange)="onMesCorteChange($event)" [disabled]="!!excepcionEditandoPeriodo || !excepcionForm.anioCorte">
+                    <option [ngValue]="null">Seleccionar mes</option>
+                    <option *ngFor="let mes of mesesCorteDisponibles" [ngValue]="mes.valor">{{ mes.etiqueta }}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="grid-2-col param-grid-tight param-date-grid">
+                <div class="form-group param-date-field">
+                  <label class="form-label">Nueva Fecha Inicio <span class="required">*</span></label>
+                  <div class="datetime-picker-combo">
+                    <input type="date" class="form-input date-input" [(ngModel)]="excepcionForm.fechaAperturaOverride" [min]="minFechaInicio" [max]="maxFechaInicio" [disabled]="!excepcionForm.mesCorte" />
+                    <input type="time" class="form-input time-input" [(ngModel)]="excepcionForm.horaAperturaOverride" />
+                  </div>
+                </div>
+
+                <div class="form-group param-date-field">
+                  <label class="form-label">Nueva Fecha Fin <span class="required">*</span></label>
+                  <div class="datetime-picker-combo">
+                    <input type="date" class="form-input date-input" [(ngModel)]="excepcionForm.fechaCierreOverride" [min]="minFechaFin" [max]="maxFechaFin" [disabled]="!excepcionForm.mesCorte" />
+                    <input type="time" class="form-input time-input" [(ngModel)]="excepcionForm.horaCierreOverride" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Justificación <span class="required">*</span></label>
+                <textarea class="form-textarea form-input form-input--solid" rows="3" [(ngModel)]="excepcionForm.motivo" placeholder="Describa el motivo de la excepción"></textarea>
+              </div>
+
+              <div class="btn-action-container btn-action-container--stacked">
+                <button class="btn-pill btn-secondary btn-pill--block" type="button" *ngIf="excepcionEditandoPeriodo" (click)="cancelarEdicionExcepcion()">Cancelar</button>
+                <button class="btn-pill btn-primary btn-pill--block" type="button" (click)="guardarExcepcion()" [disabled]="guardandoExcepcion || !puedeGuardarExcepcion">
+                  {{ guardandoExcepcion ? 'Guardando…' : (excepcionEditandoPeriodo ? 'Actualizar Excepción' : 'Guardar Excepción') }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="param-section-block">
+            <div class="param-inline-header">
+              <div>
+                <h3 class="form-section-title">Excepciones Activas</h3>
+                <p class="form-section-subtitle">Lista de excepciones vigentes que reemplazan la regla base.</p>
+              </div>
+            </div>
+
+            <div class="table-container table-container--excepciones" [class.table-container--internal-scroll]="excepciones.length > 3">
+              <div *ngIf="excepciones.length === 0" class="param-empty">No hay excepciones registradas para mostrar.</div>
+              <table *ngIf="excepciones.length > 0" class="param-table">
+                <thead>
+                  <tr>
+                    <th>Mes de Corte</th>
+                    <th>Fecha Inicio</th>
+                    <th>Fecha Fin</th>
+                    <th>Tipo</th>
+                    <th>Justificación</th>
+                    <th>Creado Por</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let exc of excepciones">
+                    <td><strong>{{ exc.periodoLabel ?? exc.periodoValoracion }}</strong></td>
+                    <td>{{ formatFechaHora(exc.fechaAperturaOverride, exc.horaAperturaOverride) }}</td>
+                    <td>{{ formatFechaHora(exc.fechaCierreOverride, exc.horaCierreOverride) }}</td>
+                    <td>
+                      <span class="param-badge" [class.param-badge--green]="tipoExcepcion(exc) === 'Ampliación'" [class.param-badge--red]="tipoExcepcion(exc) === 'Reducción'">
+                        {{ tipoExcepcion(exc) }}
+                      </span>
+                    </td>
+                    <td>{{ exc.motivo }}</td>
+                    <td>{{ usuarioCreacion(exc.creadoPorId, exc.creadoPorUsuario) }}</td>
+                    <td><span class="badge success">Activa</span></td>
+                    <td class="param-table__actions">
+                      <button class="btn-icon" (click)="editarExcepcion(exc)" title="Editar">
+                        <img [src]="modifyIcon" class="action-icon" alt="Editar" />
+                      </button>
+                      <button class="btn-icon" (click)="eliminarExcepcion(exc)" title="Eliminar">
+                        <img [src]="eraseIcon" class="action-icon" alt="Eliminar" />
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════════════════════════════ -->
+      <!-- SECCIÓN 2 — Asignación de Productos y Roles                        -->
+      <!-- ═══════════════════════════════════════════════════════════════════ -->
+      <section class="card">
+        <div class="card-header">
+          <h2 class="card-title">2. Asignación de Productos y Segmentos</h2>
+          <p class="card-subtitle">Gestione los productos y segmentos permitidos del usuario. El rol es asignado automáticamente desde <strong>Azure Entra ID</strong>.</p>
+        </div>
+        <div class="card-body">
+          <div class="grid-2-col param-asignacion-grid">
+            <div class="param-side-panel">
+              <div class="form-group">
+                <label class="form-label">Seleccionar Usuario</label>
+                <div class="param-entity-control param-entity-control--user">
+                  <span class="param-entity-control__icon" aria-hidden="true">
+                    <img [src]="userIcon" alt="" />
+                  </span>
+
+                  <div class="param-user-combobox">
+                    <input
+                      type="text"
+                      class="form-input param-user-combobox__input"
+                      [ngModel]="busquedaUsuarioAsignacion"
+                      (ngModelChange)="actualizarBusquedaUsuarioAsignacion($event)"
+                      (focus)="mostrarOpcionesUsuarioAsignacion = true"
+                      (blur)="restaurarBusquedaUsuarioAsignacion()"
+                      placeholder="Buscar por nombre o usuario"
+                    />
+
+                    <div *ngIf="mostrarOpcionesUsuarioAsignacion" class="param-user-combobox__menu">
+                      <button
+                        *ngFor="let u of usuariosAsignacionFiltrados"
+                        type="button"
+                        class="param-user-combobox__option"
+                        [class.is-active]="u.idUsuario === usuarioSeleccionadoId"
+                        (mousedown)="seleccionarUsuarioAsignacion(u)"
+                      >
+                        <span class="param-user-combobox__name">{{ textoUsuario(u.nombreCompleto, '') }}</span>
+                        <span class="param-user-combobox__meta">{{ textoUsuario(u.usuario, '') }}</span>
+                      </button>
+
+                      <div *ngIf="usuariosAsignacionFiltrados.length === 0" class="param-user-combobox__empty">
+                        No se encontraron usuarios con ese criterio.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div *ngIf="!usuarioSeleccionado" class="param-empty param-empty--soft">Seleccione un usuario para ver la configuración actual.</div>
+
+              <ng-container *ngIf="usuarioSeleccionado">
+                <div class="user-info-readout">
+                  <div class="user-info-readout__row">
+                    <span class="user-info-readout__label">Área</span>
+                    <strong class="user-info-readout__value">{{ textoUsuario(usuarioSeleccionado.areaNombre) }}</strong>
+                  </div>
+                  <div class="user-info-readout__row">
+                    <span class="user-info-readout__label">Líder</span>
+                    <strong class="user-info-readout__value">{{ textoUsuario(usuarioSeleccionado.nombreLider) }}</strong>
+                  </div>
+                  <div class="user-info-readout__row">
+                    <span class="user-info-readout__label">Correo</span>
+                    <strong class="user-info-readout__value user-info-readout__value--email">{{ textoUsuario(usuarioSeleccionado.correo) }}</strong>
+                  </div>
+                  <div class="user-info-readout__row">
+                    <span class="user-info-readout__label">Rol (Azure)</span>
+                    <strong class="user-info-readout__value">
+                      <em *ngIf="rolAzureCargando" class="param-empty-small">Consultando Azure Entra ID…</em>
+                      <span *ngIf="!rolAzureCargando && rolSeleccionadoActual">{{ nombreRolVisual(rolSeleccionadoActual) }}</span>
+                      <em *ngIf="!rolAzureCargando && !rolSeleccionadoActual" class="param-empty-small">Sin rol en Azure Entra ID.</em>
+                    </strong>
+                  </div>
+                  <div *ngIf="!rolAzureCargando && rolAzureMensaje" class="user-info-readout__row">
+                    <span class="user-info-readout__label"></span>
+                    <span class="param-empty-small param-warning-inline">{{ rolAzureMensaje }}</span>
+                  </div>
+                </div>
+
+                <div class="form-group form-group--spaced">
+                  <label class="form-label param-form-label-inline">Segmentos Asignados</label>
+                  <div class="segment-pills-row">
+                    <span *ngFor="let seg of segmentosUsuarioSeleccionado" class="segment-pill-badge" [class.colgaap]="seg.id === 1" [class.ifrs]="seg.id !== 1" [hidden]="!puedeConfigurarProductosPorSegmento">
+                      {{ nombreSegmentoVisual(seg) }}
+                      <span>▶</span>
+                    </span>
+                    <span *ngIf="!puedeConfigurarProductosPorSegmento" class="param-empty-small">No aplica para este rol.</span>
+                    <span *ngIf="puedeConfigurarProductosPorSegmento && segmentosUsuarioSeleccionado.length === 0" class="param-empty-small">Sin segmentos asociados.</span>
+                  </div>
+                </div>
+              </ng-container>
+            </div>
+
+            <div class="param-main-panel">
+              <ng-container *ngIf="usuarioSeleccionado; else seleccionUsuarioPendiente">
+                <div class="param-inline-header param-inline-header--compact">
+                  <h3 class="form-section-title">Productos Disponibles por Segmento</h3>
+                  <div class="param-matrix-legend">
+                    <span><input type="checkbox" checked disabled> Permitido</span>
+                    <span><input type="checkbox" disabled> No permitido</span>
+                  </div>
+                </div>
+
+                <ng-container *ngIf="puedeConfigurarProductosPorSegmento; else productosPorSegmentoBloqueado">
+                  <div class="grid-2-col param-segment-grid">
+                    <div *ngFor="let seg of segmentos" class="segment-card">
+                      <div class="segment-header" [class.colgaap]="seg.id === 1" [class.ifrs]="seg.id !== 1">{{ nombreSegmentoVisual(seg) }}</div>
+                      <div class="segment-body">
+                        <label *ngFor="let item of checkboxesPorSegmento.get(seg.id)" class="checkbox-item">
+                          <input type="checkbox" [(ngModel)]="item.permitido">
+                          <span>{{ item.titulo }}</span>
+                        </label>
+                        <span *ngIf="(checkboxesPorSegmento.get(seg.id) ?? []).length === 0" class="param-empty-small">Sin productos en este segmento.</span>
+                      </div>
+                      <div class="segment-card__actions">
+                        <button class="util-link util-link--button" type="button" (click)="seleccionarProductosSegmento(seg.id, true)">Seleccionar todos</button>
+                        <button class="util-link util-link--button" type="button" (click)="seleccionarProductosSegmento(seg.id, false)">Deseleccionar todos</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div *ngIf="asignacionExito" class="param-alert param-alert--success">{{ asignacionExito }}</div>
+                  <div *ngIf="asignacionError" class="param-alert param-alert--error">{{ asignacionError }}</div>
+                </ng-container>
+
+                <ng-template #productosPorSegmentoBloqueado>
+                  <div class="param-info-box param-info-box--info">
+                    <span class="param-info-box__icon">ⓘ</span>
+                    <span>La matriz de productos solo aplica para el rol <strong>cargador</strong>. Este usuario tiene un rol asignado por Azure Entra ID que no requiere gestión de productos ni segmentos.</span>
+                  </div>
+
+                  <div *ngIf="asignacionExito" class="param-alert param-alert--success">{{ asignacionExito }}</div>
+                  <div *ngIf="asignacionError" class="param-alert param-alert--error">{{ asignacionError }}</div>
+                </ng-template>
+
+                <div class="btn-action-container btn-action-container--right">
+                  <button class="btn-pill btn-primary" (click)="solicitarGuardarAsignacion()" [disabled]="guardandoAsignacion || !puedeGuardarAsignacion">
+                    {{ guardandoAsignacion ? 'Guardando…' : 'Guardar Asignación' }}
+                  </button>
+                </div>
+              </ng-container>
+
+              <ng-template #seleccionUsuarioPendiente>
+                <div class="param-empty">No hay datos de usuario para mostrar en la matriz.</div>
+              </ng-template>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════════════════════════════ -->
+      <!-- SECCIÓN 3 — Cambio de Líder                                        -->
+      <!-- ═══════════════════════════════════════════════════════════════════ -->
+      <section class="card">
+        <div class="card-header">
+          <h2 class="card-title">3. Cambio Masivo de Líder Aprobador</h2>
+          <p class="card-subtitle">Reasigne el líder aprobador actual por usuario o de forma masiva.</p>
+        </div>
+        <div class="card-body card-body--compact">
+          <div class="leader-change-grid">
+            <div class="param-panel param-panel--fullheight">
+              <h3 class="form-section-title">Usuarios Cargadores</h3>
+
+              <div class="search-input-wrapper" style="margin-bottom:8px">
+                <span class="search-icon-inline">
+                  <img [src]="searchIcon" alt="Buscar" class="action-icon-sm">
+                </span>
+                <input type="text" class="form-input form-input--pill" [(ngModel)]="busquedaUsuario" placeholder="Buscar por nombre o usuario...">
+              </div>
+
+              <!-- Botón de verificación Azure -->
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+                <button
+                  class="btn-pill btn-secondary btn-pill--small"
+                  type="button"
+                  (click)="verificarRolesAzureCargadores()"
+                  [disabled]="validandoAzureCargadores"
+                  title="Consulta Azure Entra ID para confirmar que cada cargador tiene su grupo SIPRO activo">
+                  <span *ngIf="!validandoAzureCargadores">☁ Verificar con Azure</span>
+                  <span *ngIf="validandoAzureCargadores">Verificando…</span>
+                </button>
+                <span *ngIf="validacionAzureCompletada && !validandoAzureCargadores" class="param-badge param-badge--success" style="font-size:11px">
+                  Verificado
+                </span>
+              </div>
+
+              <div class="table-container table-container--fixed">
+                <table class="param-table">
+                  <thead>
+                    <tr>
+                      <th class="param-col-check"><input type="checkbox" [checked]="seleccionarTodosLider" (change)="toggleSeleccionarTodos()" title="Seleccionar todos"></th>
+                      <th>Usuario</th>
+                      <th>Líder Actual</th>
+                      <th title="Estado del grupo en Azure Entra ID">Azure</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let u of usuariosFiltrados" [class.param-table__row--selected]="isUsuarioSeleccionado(u.idUsuario)" (click)="toggleSeleccionUsuario(u.idUsuario)" style="cursor:pointer">
+                      <td><input type="checkbox" [checked]="isUsuarioSeleccionado(u.idUsuario)" (change)="toggleSeleccionUsuario(u.idUsuario)" (click)="$event.stopPropagation()"></td>
+                      <td>
+                        <div class="param-cell-user">
+                          <strong>{{ u.nombreCompleto }}</strong>
+                          <span>{{ u.usuario }}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="param-cell-user">
+                          <strong>{{ u.nombreLider || '—' }}</strong>
+                          <span *ngIf="u.idLider">{{ usuarioLiderLogin(u.idLider) }}</span>
+                        </div>
+                      </td>
+                      <td (click)="$event.stopPropagation()">
+                        <!-- Badge de estado Azure: solo visible después de verificar -->
+                        <span *ngIf="validacionAzureCompletada"
+                          class="param-badge"
+                          [class.param-badge--success]="estadoBadgeAzure(u.idUsuario) === 'ok'"
+                          [class.param-badge--error]="estadoBadgeAzure(u.idUsuario) === 'sin-grupo'"
+                          [class.param-badge--warning]="estadoBadgeAzure(u.idUsuario) === 'discrepancia'"
+                          [title]="tooltipBadgeAzure(u.idUsuario)">
+                          <span *ngIf="estadoBadgeAzure(u.idUsuario) === 'ok'">✓</span>
+                          <span *ngIf="estadoBadgeAzure(u.idUsuario) === 'discrepancia'">⚠</span>
+                          <span *ngIf="estadoBadgeAzure(u.idUsuario) === 'sin-grupo'">✗</span>
+                        </span>
+                        <span *ngIf="!validacionAzureCompletada" class="param-badge param-badge--neutral" title="Sin verificar">—</span>
+                      </td>
+                    </tr>
+                    <tr *ngIf="usuariosFiltrados.length === 0">
+                      <td colspan="4" class="param-empty">No se encontraron usuarios.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="param-arrow-connector">»</div>
+
+            <div class="param-panel param-panel--fullheight">
+              <h3 class="form-section-title">Nuevo Líder Aprobador</h3>
+
+              <div class="param-entity-control param-entity-control--user">
+                  <span class="param-entity-control__icon" aria-hidden="true">
+                    <img [src]="userIcon" alt="" />
+                  </span>
+                  <div class="param-user-combobox">
+                    <input
+                      type="text"
+                      class="form-input param-user-combobox__input"
+                      [ngModel]="busquedaLider"
+                      (ngModelChange)="actualizarBusquedaLider($event)"
+                      (focus)="mostrarOpcionesLider = true"
+                      (blur)="restaurarBusquedaLider()"
+                      placeholder="Buscar por nombre o usuario"
+                    />
+                    <div *ngIf="mostrarOpcionesLider" class="param-user-combobox__menu">
+                      <button
+                        *ngFor="let u of usuariosLiderFiltrados"
+                        type="button"
+                        class="param-user-combobox__option"
+                        [class.is-active]="u.idUsuario === nuevoLiderId"
+                        (mousedown)="seleccionarLider(u)"
+                      >
+                        <span class="param-user-combobox__name">{{ textoUsuario(u.nombreCompleto, '') }}</span>
+                        <span class="param-user-combobox__meta">{{ textoUsuario(u.usuario, '') }}</span>
+                      </button>
+                      <div *ngIf="usuariosLiderFiltrados.length === 0" class="param-user-combobox__empty">
+                        No se encontraron líderes con ese criterio.
+                      </div>
+                    </div>
+                  </div>
+              </div>
+
+              <div class="param-info-box param-info-box--info" style="margin-top:16px">
+                <span class="param-info-box__icon">ⓘ</span>
+                <span>Se reasignará el líder para los <strong>{{ seleccionadosCount }}</strong> usuario(s) seleccionados.</span>
+              </div>
+
+              <div *ngIf="liderExito" class="param-alert param-alert--success">
+                {{ liderExito }}
+                <span *ngIf="liderTransferidas > 0" class="param-badge param-badge--warning" style="margin-left: 8px;">
+                  {{ liderTransferidas }} planilla(s) transferida(s)
+                </span>
+              </div>
+              <div *ngIf="liderError" class="param-alert param-alert--error">{{ liderError }}</div>
+
+              <div class="btn-action-container btn-action-container--bottom">
+                <button class="btn-pill btn-primary" (click)="abrirConfirmacionLider()" [disabled]="guardandoCambioLider || seleccionadosCount === 0 || !nuevoLiderId">
+                  Aplicar Cambio
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════════════════════════════ -->
+      <!-- SECCIÓN 4 — Crear Usuario                                          -->
+      <!-- ═══════════════════════════════════════════════════════════════════ -->
+      <section class="card">
+        <div class="card-header">
+          <h2 class="card-title">4. Registro Unificado de Nuevos Usuarios</h2>
+          <p class="card-subtitle">Registre un nuevo usuario y configure su área y permisos iniciales. El rol definitivo lo determina <strong>Azure Entra ID</strong> al momento del primer inicio de sesión.</p>
+        </div>
+        <div class="card-body card-body--compact card-body--s4">
+          <div class="grid-3-col">
+            <div class="form-group">
+              <label class="form-label">Nombres <span class="required">*</span></label>
+              <input type="text" class="form-input" [(ngModel)]="nuevoUsuario.nombres" placeholder="NOMBRES EN MAYÚSCULAS">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Apellidos <span class="required">*</span></label>
+              <input type="text" class="form-input" [(ngModel)]="nuevoUsuario.apellidos" placeholder="APELLIDOS EN MAYÚSCULAS">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Correo Corporativo <span class="required">*</span></label>
+              <input type="email" class="form-input" [ngModel]="nuevoUsuario.correo" (ngModelChange)="onCorreoNuevoUsuarioChange($event)" placeholder="usuario@bancolombia.com.co">
+            </div>
+          </div>
+
+          <div class="grid-3-col">
+            <div class="form-group">
+              <label class="form-label">Usuario (clave) <span class="required">*</span></label>
+              <input type="text" class="form-input form-input--derived" [ngModel]="nuevoUsuario.usuario" readonly placeholder="Se deriva del correo">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Área <span class="required">*</span></label>
+              <input type="text" class="form-input" [(ngModel)]="nuevoUsuario.areaNombre" placeholder="Nombre del área">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Perfil Esperado</label>
+              <select class="form-select" [(ngModel)]="nuevoUsuario.idRol">
+                <option [ngValue]="0">Seleccionar perfil</option>
+                <option *ngFor="let r of roles" [ngValue]="r.idRol">{{ nombreRolVisual(r) }}</option>
+              </select>
+              <small class="form-hint">Referencial: el rol definitivo lo asigna Azure Entra ID.</small>
+            </div>
+          </div>
+
+          <!-- Líder aprobador: obligatorio solo para cargadores -->
+          <div class="form-group form-group--spaced" *ngIf="rolNuevoUsuarioEsCargador">
+            <label class="form-label">Líder Aprobador <span class="required">*</span></label>
+            <div class="param-entity-control param-entity-control--user">
+              <span class="param-entity-control__icon" aria-hidden="true">
+                <img [src]="userIcon" alt="" />
+              </span>
+              <div class="param-user-combobox">
+                <input
+                  type="text"
+                  class="form-input param-user-combobox__input"
+                  [ngModel]="busquedaLiderNuevoUsuario"
+                  (ngModelChange)="onBusquedaLiderNuevoUsuarioChange($event)"
+                  (focus)="mostrarOpcionesLiderNuevoUsuarioFlag = true"
+                  (blur)="restaurarBusquedaLiderNuevoUsuario()"
+                  placeholder="Buscar por nombre o usuario"
+                  autocomplete="off"
+                />
+                <div *ngIf="mostrarOpcionesLiderNuevoUsuarioFlag" class="param-user-combobox__menu">
+                  <button
+                    *ngFor="let ldr of lideresDisponiblesNuevoUsuarioFiltrados"
+                    type="button"
+                    class="param-user-combobox__option"
+                    [class.is-active]="ldr.idUsuario === nuevoUsuario.idLider"
+                    (mousedown)="seleccionarLiderNuevoUsuario(ldr)"
+                  >
+                    <span class="param-user-combobox__name">{{ textoUsuario(ldr.nombreCompleto, '') }}</span>
+                    <span class="param-user-combobox__meta">{{ textoUsuario(ldr.usuario, '') }}</span>
+                  </button>
+                  <div *ngIf="lideresDisponiblesNuevoUsuarioFiltrados.length === 0" class="param-user-combobox__empty">
+                    No se encontraron líderes con ese criterio.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Segmentos: solo para cargadores -->
+          <div class="form-group form-group--spaced" *ngIf="rolNuevoUsuarioEsCargador">
+            <label class="form-label">Segmentos Permitidos <span class="required">*</span></label>
+            <div class="param-segment-toggles">
+              <button *ngFor="let seg of segmentos" type="button"
+                class="param-segment-toggle"
+                [class.active]="isSegmentoSeleccionado(seg.id)"
+                (click)="toggleSegmentoNuevoUsuario(seg.id)">
+                {{ seg.nombre }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Productos: solo para cargadores -->
+          <div class="grid-2-col param-grid-tight" *ngIf="rolNuevoUsuarioEsCargador">
+            <div class="form-group">
+              <label class="form-label">Productos Permitidos <span class="required">*</span></label>
+              <div class="param-producto-add">
+                <select class="form-select" [(ngModel)]="productoParaAgregar">
+                  <option [ngValue]="null">Selecciona productos...</option>
+                  <option *ngFor="let producto of productosDisponiblesNuevoUsuario" [ngValue]="producto.idProducto">{{ productoNuevoUsuarioLabel(producto) }}</option>
+                </select>
+                <button class="btn-pill btn-primary" type="button" (click)="agregarProductoNuevoUsuario()" [disabled]="productoParaAgregar === null">Agregar</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Productos Seleccionados ({{ productosSeleccionadosNuevo.length }})</label>
+              <div class="param-selected-box">
+                <div *ngIf="productosSeleccionadosNuevo.length === 0" class="param-selected-box__empty">No hay productos seleccionados.</div>
+                <div *ngIf="productosSeleccionadosNuevo.length > 0" class="param-selected-list">
+                  <div *ngFor="let p of productosSeleccionadosNuevo" class="param-product-tag">
+                    {{ productoNuevoUsuarioLabel(p) }}
+                    <button class="param-product-tag__remove" type="button" (click)="quitarProductoNuevoUsuario(p.idProducto)" title="Quitar">
+                      <img [src]="eraseIcon" class="action-icon-sm" alt="Quitar" />
+                    </button>
+                  </div>
+                </div>
+                <button class="util-link util-link--button" type="button" (click)="limpiarProductosNuevoUsuario()">Limpiar</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mensaje informativo para roles que no requieren productos -->
+          <div class="param-alert param-alert--info" *ngIf="nuevoUsuario.idRol && !rolNuevoUsuarioEsCargador">
+            Este rol no requiere la asignación de segmentos ni productos específicos.
+          </div>
+
+          <div *ngIf="nuevoUsuarioExito" class="param-alert param-alert--success">{{ nuevoUsuarioExito }}</div>
+          <div *ngIf="nuevoUsuarioError" class="param-alert param-alert--error">{{ nuevoUsuarioError }}</div>
+
+          <div class="btn-action-container">
+            <button class="btn-pill btn-primary btn-registrar-usuario" (click)="registrarNuevoUsuario()" [disabled]="guardandoNuevoUsuario">
+              {{ guardandoNuevoUsuario ? 'Registrando…' : 'Registrar Usuario' }}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════════════════════════════ -->
+      <!-- SECCIÓN 5 — Catálogo de Productos                                  -->
+      <!-- ═══════════════════════════════════════════════════════════════════ -->
+      <section class="card">
+        <div class="card-header">
+          <h2 class="card-title">5. Catálogo de Estructura de Productos</h2>
+          <p class="card-subtitle">Gestione los productos del sistema y sus parámetros asociados.</p>
+        </div>
+        <div class="card-body">
+          <div class="grid-2-col param-catalog-split">
+            <div class="param-panel param-panel--catalog-list">
+              <div class="param-inline-header param-inline-header--compact">
+                <h3 class="form-section-title">Productos Existentes</h3>
+                <button class="btn-pill btn-primary btn-pill--small" type="button" (click)="cancelarEdicionProducto()">+ Nuevo Producto</button>
+              </div>
+
+              <div class="form-group form-group--compact" style="margin-bottom: 8px;">
+                <div class="param-search-box">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  <input type="text" class="form-input form-input--compact param-search-box__input" [(ngModel)]="busquedaProducto" placeholder="Buscar por título o nombre de archivo…" autocomplete="off">
+                  <button *ngIf="busquedaProducto" class="param-search-box__clear" type="button" (click)="busquedaProducto = ''" aria-label="Limpiar búsqueda">&times;</button>
+                </div>
+              </div>
+
+              <div class="table-container table-container--fixed-lg table-container--h-scroll">
+                <div *ngIf="productos.length === 0" class="param-empty">Sin productos registrados.</div>
+                <div *ngIf="productos.length > 0 && productosFiltrados.length === 0" class="param-empty">Ningún producto coincide con la búsqueda.</div>
+                <table *ngIf="productosFiltrados.length > 0" class="param-table compact-table">
+                  <thead>
+                    <tr>
+                      <th>Título</th>
+                      <th>Segmento</th>
+                      <th>Archivo</th>
+                      <th>Control</th>
+                      <th>Estado</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let p of productosFiltrados">
+                      <td><strong>{{ p.titulo }}</strong></td>
+                      <td>{{ nombreSegmento(p.idSegmento) }}</td>
+                      <td class="td-nowrap">{{ p.nombreArchivoPermitido }}</td>
+                      <td class="td-nowrap">{{ p.nombreControlPermitido || '—' }}</td>
+                      <td>
+                        <span class="badge" [class.success]="p.activo" [class.warning]="!p.activo">{{ p.activo ? 'Activo' : 'Inactivo' }}</span>
+                      </td>
+                      <td>
+                        <div class="action-icons">
+                          <button class="btn-icon" type="button" (click)="editarProducto(p)" title="Editar">
+                            <img [src]="modifyIcon" class="action-icon" alt="Editar" />
+                          </button>
+                          <button class="btn-icon" type="button" (click)="solicitarDesactivarProducto(p)" [title]="p.activo ? 'Desactivar (apagar)' : 'Activar'">
+                            <img [src]="p.activo ? eraseIcon : okIcon" class="action-icon" [alt]="p.activo ? 'Desactivar' : 'Activar'" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="param-panel param-panel--catalog-form" id="productoAssistant">
+              <h3 class="form-section-title">{{ productoFormTitulo }}</h3>
+
+              <div *ngIf="productoExito" class="param-alert param-alert--success">{{ productoExito }}</div>
+              <div *ngIf="productoError" class="param-alert param-alert--error">{{ productoError }}</div>
+
+              <div class="form-group form-group--compact">
+                <label class="form-label">Título del Producto <span class="required">*</span></label>
+                <input type="text" class="form-input form-input--compact" [ngModel]="productoForm.titulo" (ngModelChange)="onTituloProductoChange($event)" placeholder="Ej.: Cartera moneda legal">
+              </div>
+
+              <div class="form-group form-group--compact">
+                <label class="form-label">Segmento <span class="required">*</span></label>
+                <select class="form-select form-select--compact" [ngModel]="productoForm.idSegmento" (ngModelChange)="onSegmentoProductoChange($event)">
+                  <option [ngValue]="0">Seleccionar segmento</option>
+                  <option *ngFor="let s of segmentos" [ngValue]="s.id">{{ s.nombre }}</option>
+                </select>
+              </div>
+
+              <div class="form-group form-group--compact">
+                <label class="form-label">Nombre Archivo Permitido <span class="required">*</span></label>
+                <input type="text" class="form-input form-input--compact" [ngModel]="productoForm.nombreArchivoPermitido" (ngModelChange)="onNombreArchivoPermitidoChange($event)" placeholder="Ej.: FACTORING_AAAAMMDD">
+                <span class="param-field-help">Debe terminar estrictamente en _AAAAMMDD.</span>
+              </div>
+
+              <div class="form-group form-group--compact" *ngIf="requiereNombreControlProducto">
+                <label class="form-label">Nombre Control Permitido <span class="required">*</span></label>
+                <input type="text" class="form-input form-input--compact" [ngModel]="productoForm.nombreControlPermitido" (ngModelChange)="onNombreControlPermitidoChange($event)" placeholder="Ej.: CTRL-FACTORING_AAAAMMDD">
+                <span class="param-field-help">Solo aplica para Full IFRS, debe iniciar con CTRL- y terminar estrictamente en _AAAAMMDD.</span>
+              </div>
+
+              <div class="form-group form-group--compact">
+                <label class="form-label">Estado <span class="required">*</span></label>
+                <select class="form-select form-select--compact" [(ngModel)]="productoForm.activo">
+                  <option [ngValue]="true">Activo</option>
+                  <option [ngValue]="false">Inactivo</option>
+                </select>
+              </div>
+
+              <div class="btn-action-container btn-action-container--stacked">
+                <button class="btn-pill btn-primary btn-pill--block" (click)="solicitarGuardarProducto()" [disabled]="guardandoProducto || !productoFormCompleto">
+                  {{ guardandoProducto ? 'Guardando…' : (productoEditandoId ? 'Guardar Producto' : 'Crear Producto') }}
+                </button>
+                <button *ngIf="productoEditandoId" class="btn-pill btn-secondary btn-pill--block" type="button" (click)="cancelarEdicionProducto()">
+                  Cancelar edición
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <article class="bc-modal-active" role="dialog" aria-modal="true" *ngIf="confirmacionLiderVisible">
+        <div class="bc-modal-backdrop" (click)="cerrarConfirmacionLider()"></div>
+
+        <section class="bc-modal-container param-confirm-modal">
+          <section class="bc-modal-header centered-column">
+            <img [src]="okIcon" alt="Confirmación" class="param-confirm-modal__icon">
+            <h4 class="modal-title-label">Confirmar cambio de líder</h4>
+          </section>
+
+          <section class="param-confirm-modal__body centered-column">
+            <p>Va a reasignar el líder aprobador de <strong>{{ seleccionadosCount }}</strong> usuario(s) al nuevo líder <strong>{{ busquedaLider }}</strong>.</p>
+            <p class="param-confirm-modal__note" style="margin-top: 12px;">
+              Las planillas pendientes o rechazadas asignadas a estos usuarios serán transferidas automáticamente al nuevo líder.
+              Las planillas ya aprobadas o consolidadas se conservan sin cambios.
+            </p>
+            <p style="margin-top: 10px;">Esta acción solo se puede revertir realizando un nuevo cambio manual.</p>
+          </section>
+
+          <section class="bc-modal-footer param-confirm-modal__footer">
+            <button class="btn-pill btn-secondary" type="button" (click)="cerrarConfirmacionLider()" [disabled]="guardandoCambioLider">
+              Cancelar
+            </button>
+            <button class="btn-pill btn-primary" type="button" (click)="aplicarCambioLider()" [disabled]="guardandoCambioLider">
+              {{ guardandoCambioLider ? 'Aplicando…' : 'Confirmar y aplicar' }}
+            </button>
+          </section>
+        </section>
+      </article>
+
+      <article class="bc-modal-active" role="dialog" aria-modal="true" *ngIf="confirmacionAsignacionVisible">
+        <div class="bc-modal-backdrop" (click)="cerrarConfirmacionAsignacion()"></div>
+
+        <section class="bc-modal-container param-confirm-modal">
+          <section class="bc-modal-header centered-column">
+            <img [src]="okIcon" alt="Confirmación" class="param-confirm-modal__icon">
+            <h4 class="modal-title-label" id="param-save-assignment-modal-title">Confirmar asignación</h4>
+          </section>
+
+          <section class="param-confirm-modal__body centered-column">
+            <p>Va a actualizar los productos asignados a <strong>{{ textoUsuario(usuarioSeleccionado?.nombreCompleto) }}</strong>.</p>
+            <p>Rol: <strong>{{ nombreRolVisual(rolSeleccionadoActual) }}</strong> (asignado por Azure Entra ID).</p>
+            <p *ngIf="puedeConfigurarProductosPorSegmento">Se aplicarán <strong>{{ totalProductosPermitidosSeleccionados }}</strong> producto(s) permitidos por segmento.</p>
+            <p *ngIf="!puedeConfigurarProductosPorSegmento">Este usuario tiene un rol no-cargador. No se modificarán productos.</p>
+          </section>
+
+          <section class="bc-modal-footer param-confirm-modal__footer">
+            <button class="btn-pill btn-secondary" type="button" (click)="cerrarConfirmacionAsignacion()" [disabled]="guardandoAsignacion">
+              Cancelar
+            </button>
+            <button class="btn-pill btn-primary" type="button" (click)="confirmarGuardarAsignacion()" [disabled]="guardandoAsignacion">
+              {{ guardandoAsignacion ? 'Guardando…' : 'Confirmar y guardar' }}
+            </button>
+          </section>
+        </section>
+      </article>
+
+      <article class="bc-modal-active" role="dialog" aria-modal="true" *ngIf="excepcionPendienteEliminar as excAEliminar">
+        <div class="bc-modal-backdrop" (click)="cerrarModalEliminarExcepcion()"></div>
+
+        <section class="bc-modal-container param-confirm-modal">
+          <section class="bc-modal-header centered-column">
+            <img [src]="alertIcon" alt="Confirmación" class="param-confirm-modal__icon">
+            <h4 class="modal-title-label" id="param-delete-modal-title">Confirmar eliminación</h4>
+          </section>
+
+          <section class="param-confirm-modal__body centered-column">
+            <p>Va a eliminar la excepción configurada para <strong>{{ excAEliminar.periodoLabel ?? excAEliminar.periodoValoracion }}</strong>.</p>
+            <p>Al continuar, se volverá a aplicar el rango base estándar de carga y aprobación.</p>
+          </section>
+
+          <section class="bc-modal-footer param-confirm-modal__footer">
+            <button class="btn-pill btn-secondary" type="button" (click)="cerrarModalEliminarExcepcion()" [disabled]="eliminandoExcepcion">
+              Cancelar
+            </button>
+            <button class="btn-pill btn-primary" type="button" (click)="confirmarEliminarExcepcion()" [disabled]="eliminandoExcepcion">
+              {{ eliminandoExcepcion ? 'Eliminando…' : 'Eliminar excepción' }}
+            </button>
+          </section>
+        </section>
+      </article>
+
+    </ng-container><!-- /!cargandoInicial -->
+
+      <!-- Modal confirmación operación sobre Producto -->
+      <article class="bc-modal-active" role="dialog" aria-modal="true" *ngIf="confirmacionProductoVisible">
+        <div class="bc-modal-backdrop" (click)="cerrarConfirmacionProducto()"></div>
+
+        <section class="bc-modal-container param-confirm-modal">
+          <section class="bc-modal-header centered-column">
+            <img [src]="confirmacionProductoAccion === 'desactivar' ? alertIcon : okIcon" alt="Confirmación" class="param-confirm-modal__icon">
+            <h4 class="modal-title-label">
+              <ng-container *ngIf="confirmacionProductoAccion === 'crear'">Confirmar creación de producto</ng-container>
+              <ng-container *ngIf="confirmacionProductoAccion === 'editar'">Confirmar cambios en producto</ng-container>
+              <ng-container *ngIf="confirmacionProductoAccion === 'desactivar'">Confirmar desactivación de producto</ng-container>
+              <ng-container *ngIf="confirmacionProductoAccion === 'activar'">Confirmar activación de producto</ng-container>
+            </h4>
+          </section>
+
+          <section class="param-confirm-modal__body centered-column">
+            <p *ngIf="confirmacionProductoAccion === 'crear'">
+              Va a crear el producto <strong>{{ confirmacionProductoNombre }}</strong>.
+              Esta acción agrega el producto al catálogo del sistema.
+            </p>
+            <p *ngIf="confirmacionProductoAccion === 'editar'">
+              Va a guardar los cambios en <strong>{{ confirmacionProductoNombre }}</strong>.
+              La modificación afectará el comportamiento de carga de archivos asociados.
+            </p>
+            <p *ngIf="confirmacionProductoAccion === 'desactivar'">
+              Va a <strong>desactivar</strong> el producto <strong>{{ confirmacionProductoNombre }}</strong>.
+            </p>
+            <p *ngIf="confirmacionProductoAccion === 'desactivar'" class="param-confirm-modal__note">
+              El registro no se elimina de la base de datos. Solo se marca como inactivo y ya no estará disponible para carga de archivos.
+            </p>
+            <p *ngIf="confirmacionProductoAccion === 'activar'">
+              Va a <strong>activar</strong> nuevamente el producto <strong>{{ confirmacionProductoNombre }}</strong>.
+            </p>
+            <p *ngIf="confirmacionProductoAccion === 'activar'" class="param-confirm-modal__note">
+              El producto volverá a estar disponible para la carga de archivos una vez activado.
+            </p>
+          </section>
+
+          <section class="bc-modal-footer param-confirm-modal__footer">
+            <button class="btn-pill btn-secondary" type="button" (click)="cerrarConfirmacionProducto()" [disabled]="guardandoProducto">
+              Cancelar
+            </button>
+            <button class="btn-pill btn-primary" type="button" (click)="confirmarOperacionProducto()" [disabled]="guardandoProducto">
+              <ng-container *ngIf="!guardandoProducto">
+                <ng-container *ngIf="confirmacionProductoAccion === 'crear'">Crear producto</ng-container>
+                <ng-container *ngIf="confirmacionProductoAccion === 'editar'">Guardar cambios</ng-container>
+                <ng-container *ngIf="confirmacionProductoAccion === 'desactivar'">Desactivar producto</ng-container>
+                <ng-container *ngIf="confirmacionProductoAccion === 'activar'">Activar producto</ng-container>
+              </ng-container>
+              <ng-container *ngIf="guardandoProducto">Procesando…</ng-container>
+            </button>
+          </section>
+        </section>
+      </article>
+
+    <!-- Toast de notificación -->
+    <div *ngIf="toastMensaje" class="param-toast" [class.param-toast--success]="toastTipo === 'success'" [class.param-toast--error]="toastTipo === 'error'">
+      <div class="param-toast__content">
+        <svg *ngIf="toastTipo === 'success'" class="param-toast__icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 6L9 17l-5-5"/>
+        </svg>
+        <svg *ngIf="toastTipo === 'error'" class="param-toast__icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="15" y1="9" x2="9" y2="15"/>
+          <line x1="9" y1="9" x2="15" y2="15"/>
+        </svg>
+        <span class="param-toast__text">{{ toastMensaje }}</span>
+      </div>
+      <button class="param-toast__close" (click)="cerrarToast()" type="button" aria-label="Cerrar notificación">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    </div><!-- /parametros-shell -->
+  </main>
+  </div><!-- /sipro-content -->
+</div><!-- /sipro-shell -->

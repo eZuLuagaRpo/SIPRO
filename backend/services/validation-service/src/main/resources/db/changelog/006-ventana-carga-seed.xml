@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.24.xsd">
+
+    <!-- ================================================================
+         006: Seed data para ventana de carga
+         - Regla general por defecto (offset -1 día apertura, +2 días cierre)
+         - Excepciones de ejemplo para 2026
+         Las tablas ya existen en la BD (creadas manualmente).
+         ================================================================ -->
+
+    <!-- 006-001: Insertar regla general de ventana de carga -->
+    <changeSet id="006-001" author="sipro">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM sipro_parametros_reglaventanacarga WHERE activa = true
+            </sqlCheck>
+        </preConditions>
+        <comment>Regla general: apertura = periodo - 1 día a las 00:01, cierre = periodo + 2 días a las 14:00</comment>
+        <insert tableName="sipro_parametros_reglaventanacarga">
+            <column name="offset_dias_apertura" valueNumeric="-1"/>
+            <column name="hora_apertura" value="00:01:00"/>
+            <column name="offset_dias_cierre" valueNumeric="2"/>
+            <column name="hora_cierre" value="14:00:00"/>
+            <column name="vigente_desde" valueDate="2026-01-01"/>
+            <column name="activa" valueBoolean="true"/>
+            <column name="creado_en" valueComputed="now()"/>
+            <column name="modificado_en" valueComputed="now()"/>
+            <column name="creado_por_id" valueNumeric="1"/>
+            <column name="motivo_cambio" value="Regla inicial de ventana de carga"/>
+        </insert>
+    </changeSet>
+
+    <!-- 006-002: Insertar excepción para febrero 2026 (cierre extendido al 06/03) -->
+    <changeSet id="006-002" author="sipro">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM sipro_parametros_excepcionventanacarga
+                WHERE periodo_valoracion = '2026-02-28'
+            </sqlCheck>
+        </preConditions>
+        <comment>Excepción febrero 2026: cierre extendido del 03/03 al 06/03</comment>
+        <insert tableName="sipro_parametros_excepcionventanacarga">
+            <column name="periodo_valoracion" valueDate="2026-02-28"/>
+            <column name="fecha_apertura_override" valueDate="2026-02-27"/>
+            <column name="hora_apertura_override" value="00:01:00"/>
+            <column name="fecha_cierre_override" valueDate="2026-03-06"/>
+            <column name="hora_cierre_override" value="14:00:00"/>
+            <column name="motivo" value="Actualización mes 2: inicio 27-02, fin 06-03"/>
+            <column name="creado_por_id" valueNumeric="1"/>
+            <column name="creado_en" valueComputed="now()"/>
+            <column name="modificado_por_id" valueNumeric="1"/>
+            <column name="modificado_en" valueComputed="now()"/>
+        </insert>
+    </changeSet>
+
+</databaseChangeLog>

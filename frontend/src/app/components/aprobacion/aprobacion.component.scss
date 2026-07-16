@@ -1,0 +1,782 @@
+// Approval Screen Styles - Bancolombia Theme
+// FIXES: #1, #4, #5, #6, #11, #12
+
+// Status Bar (horizontal like Aprobacion.html reference)
+.status-bar {
+    background: var(--bc-white);
+    padding: 15px 24px;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+
+    .sb-left {
+        display: flex;
+        align-items: center;
+        gap: 30px;
+    }
+
+    .stat-item {
+        font-size: 14px;
+        color: var(--bc-text-gray);
+
+        strong {
+            color: var(--bc-black);
+            margin-right: 4px;
+        }
+    }
+
+    .sb-right {
+        font-size: 14px;
+        color: var(--bc-text-gray);
+    }
+}
+
+// Search Bar (style like Buscador.html)
+.input-search {
+    width: 100%;
+    max-width: 500px;
+    margin-bottom: 20px;
+}
+
+.bc-card-search {
+    background: white;
+    border-radius: 50px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    position: relative;
+}
+
+.input-card {
+    width: 100%;
+    height: 52px;
+    padding: 0 60px 0 24px;
+    border: none;
+    border-radius: 50px;
+    font-size: 15px;
+    font-family: inherit;
+    color: #454648;
+    outline: none;
+    background: white;
+
+    &::placeholder {
+        color: #999;
+    }
+}
+
+.search-button {
+    position: absolute;
+    right: 10px;
+    background-color: white;
+    border: none;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: all 0.2s ease;
+    padding: 0;
+
+    &:hover {
+        background-color: #f5f5f5;
+    }
+
+    .search-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        svg {
+            width: 18px;
+            height: 18px;
+            fill: rgb(69, 70, 72);
+        }
+    }
+}
+
+// Filter Tabs - #1, #12: border-radius 25px, border 0
+.filter-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+
+    button {
+        background: var(--bc-white);
+        border: 0;
+        border-radius: 25px;
+        padding: 8px 20px;
+        font-size: 14px;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.2s;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+        &:hover {
+            background: var(--bc-gray-bg);
+        }
+
+        &.active {
+            background: var(--bc-yellow);
+            font-weight: 700;
+        }
+    }
+}
+
+// Table Card - #11: sin border
+.table-card {
+    overflow: hidden;
+    border: 0 !important;
+}
+
+// Table header with title styling - #6
+.table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+
+    h3 {
+        font-size: 18px;
+        color: var(--bc-black);
+
+        .title-text {
+            font-weight: 700;
+        }
+
+        .title-count {
+            font-weight: 400;
+        }
+    }
+
+    .table-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 13px;
+        color: var(--bc-text-gray);
+
+        .page-size-select {
+            border: 0;
+            border-bottom: 2px solid var(--bc-black);
+            background: transparent;
+            font-weight: 700;
+            font-size: 13px;
+            padding: 2px 8px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+    }
+}
+
+// Table wrapper with scroll - #4
+.table-wrapper {
+    max-height: 55vh;
+    overflow-y: auto;
+    border-radius: 8px;
+
+    &::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 3px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: #ccc;
+        border-radius: 3px;
+
+        &:hover {
+            background: #aaa;
+        }
+    }
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+
+    // #5: Encabezados con fondo gris
+    th {
+        text-align: left;
+        padding: 9px 10px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #2C2A29 !important;
+        background: var(--bc-gray-bg);
+        border-bottom: 1px solid var(--bc-gray-line);
+        white-space: nowrap;
+        position: sticky;
+        top: 0;
+        z-index: 1;
+    }
+
+    td {
+        text-align: left;
+        padding: 10px 10px;
+        font-size: 14px;
+        border-bottom: 1px solid var(--bc-gray-line);
+        vertical-align: middle;
+    }
+
+    .num-col {
+        text-align: left;
+        font-weight: 500;
+    }
+
+    tbody tr:hover {
+        background: #FAFAFA;
+    }
+}
+
+// Badges - #12: border-radius update
+.badge {
+    display: inline-block;
+    padding: 5px 14px;
+    border-radius: 25px;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+    min-width: 90px;
+    text-transform: none !important;
+}
+
+.segment-badge {
+    min-width: auto;
+    border-radius: 9999px;
+    white-space: nowrap;
+}
+
+.segment-badge--colgaap {
+    background: #FFF9D6;
+    color: #8a6d00;
+    border: 1px solid #ece7cf;
+}
+
+.segment-badge--ifrs {
+    background: #E3F2FD;
+    color: #1565C0;
+    border: 1px solid #90CAF9;
+}
+
+.segment-badge--default {
+    background: #f5f7fa;
+    color: var(--bc-text-gray);
+    border: 1px solid var(--bc-gray-line);
+}
+
+.badge-gray {
+    background: rgba(128, 128, 128, 0.2);
+    color: #555;
+    border: 1px solid #808080;
+}
+
+.badge-green {
+    background: rgba(0, 195, 137, 0.2);
+    color: #00C389;
+    border: 1px solid #00C389;
+}
+
+.sipro-subnav__disabled {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px 10px 36px;
+    color: #BDBDBD;
+    font-size: 14px;
+    cursor: not-allowed;
+    user-select: none;
+    position: relative;
+    transition: color 0.15s ease;
+
+    &:hover {
+        color: #9E9E9E;
+        background: rgba(0, 0, 0, 0.02);
+    }
+}
+
+.sipro-subnav__lock-icon {
+    opacity: 0.6;
+    flex-shrink: 0;
+}
+
+.badge-orange {
+    background: rgba(255, 0, 0, 0.18);
+    color: #000000;
+    border: 1px solid #ff0000;
+}
+
+.badge-button {
+    cursor: pointer;
+    font: inherit;
+    line-height: inherit;
+    outline: none;
+
+    &:hover {
+        filter: brightness(0.96);
+    }
+
+    &:focus-visible {
+        box-shadow: 0 0 0 3px rgba(253, 218, 36, 0.45);
+    }
+}
+
+// Action Button
+.action-btn {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    color: var(--bc-text-gray);
+    transition: all 0.2s;
+
+    &:hover {
+        background: var(--bc-gray-bg);
+        color: var(--bc-black);
+    }
+}
+
+// Loading & Empty States
+.loading-state,
+.empty-state {
+    padding: 60px 20px;
+    text-align: center;
+    color: var(--bc-text-gray);
+
+    .spinner {
+        width: 30px;
+        height: 30px;
+        margin: 0 auto 12px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid var(--bc-yellow);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+// Modal Styles
+.bc-modal-container {
+    max-width: 700px;
+    width: 90%;
+}
+
+.bc-modal-header {
+    position: relative;
+    padding: 10px 24px;
+    border-bottom: 0;
+
+    .bc-modal-header-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding-top: 20px;
+    }
+
+    .bc-modal-icon {
+        width: 90px;
+        height: 90px;
+        margin-bottom: 12px;
+    }
+
+    h2 {
+        font-size: 30px;
+        font-weight: 700;
+        color: var(--bc-black);
+        margin: 0;
+    }
+}
+
+// Instruction text in modal
+.modal-instruction-text {
+    padding: 0 24px 0 24px !important;
+    margin: 0;
+    font-size: 0.9rem;
+    color: #666;
+    text-align: justify;
+    line-height: 1.5;
+}
+
+.bc-modal-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    padding: 4px;
+    color: var(--bc-text-gray);
+
+    &:hover {
+        color: var(--bc-black);
+    }
+}
+
+.bc-modal-close {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    padding: 4px;
+    color: var(--bc-text-gray);
+
+    &:hover {
+        color: var(--bc-black);
+    }
+}
+
+.bc-modal-body {
+    padding: 20px 20px 0 20px !important;
+    margin-bottom: 0;
+    overflow-y: auto;
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+
+    .detail-item {
+        label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--bc-text-gray);
+            margin-bottom: 6px;
+        }
+
+        p {
+            margin: 0;
+            font-size: 15px;
+            color: var(--bc-black);
+        }
+
+        &.full-width {
+            grid-column: 1 / -1;
+        }
+
+        // Description with scroll
+        &.description-item p {
+            max-height: 50px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+    }
+}
+
+.adjunto-input-group {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-top: 8px;
+    padding: 8px;
+    border-radius: 4px;
+    transition: background 0.2s;
+
+    &:hover {
+        background: #F0F0F0;
+    }
+
+    .adjunto-input {
+        flex: 1;
+        height: 44px;
+        padding: 0 16px;
+        border: 0;
+        background: transparent;
+        color: var(--bc-black);
+        font-size: 14px;
+        font-family: inherit;
+        outline: none;
+        cursor: default;
+    }
+
+    .btn-download-square {
+        flex-shrink: 0;
+        width: 44px;
+        height: 44px;
+        background: transparent;
+        border: 0;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        &:hover {
+            background: #E0E0E0;
+        }
+
+        img {
+            width: 24px;
+            height: 24px;
+            object-fit: contain;
+        }
+    }
+}
+
+.bc-modal-footer {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    padding: 0 24px 20px 24px;
+    border-top: 0;
+
+    &--readonly {
+        flex-direction: column;
+        align-items: center;
+
+        .estado-info {
+            margin: 0 0 12px;
+            color: var(--bc-text-gray);
+        }
+    }
+}
+
+// #1, #12: border-radius 25px, border 0
+.btn-aprobar {
+    background: #00C389;
+    color: white;
+    border: 0;
+    border-radius: 25px;
+    padding: 12px 36px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+
+    &:hover:not(:disabled) {
+        background: #00A876;
+        transform: scale(1.02);
+    }
+
+    &:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+}
+
+.btn-rechazar {
+    background: #ff000078;
+    color: #FFF;
+    border: 0;
+    border-radius: 25px;
+    padding: 12px 36px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+
+    &:hover:not(:disabled) {
+        background: #ff0000;
+        transform: scale(1.02);
+    }
+
+    &:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+}
+
+.btn-cerrar {
+    background: var(--bc-white);
+    border: 0;
+    border-radius: 25px;
+    padding: 10px 30px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    box-shadow: inset 0 0 0 1px var(--bc-black);
+
+    &:hover {
+        background: var(--bc-black);
+        color: white;
+    }
+}
+
+// ========== SUCCESS MODAL STYLES ==========
+.success-modal-container {
+    position: relative;
+}
+
+.centered-column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.success-icon {
+    width: 80px;
+    height: 80px;
+    margin-bottom: 16px;
+}
+
+.success-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #2C2A29;
+    margin: 0;
+}
+
+.approval-success-text {
+    text-align: center;
+    padding: 20px;
+
+    p {
+        color: #2C2A29;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        text-align: justify;
+        margin: 0 auto;
+        max-width: 450px;
+    }
+}
+
+.approval-progress {
+    width: 100%;
+    height: 6px;
+    background: #E0E0E0;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+
+.approval-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #00C389, #00A876);
+    transition: width 1s linear;
+}
+
+// ========== REJECTION MODAL STYLES ==========
+.rejection-modal-container {
+    position: relative;
+}
+
+.rejection-icon {
+    width: 80px;
+    height: 80px;
+    margin-bottom: 16px;
+}
+
+.rejection-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #2C2A29;
+    margin: 0;
+}
+
+.rejection-modal-text {
+    text-align: center;
+    padding: 20px;
+
+    p {
+        color: #2C2A29;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        text-align: justify;
+        margin: 0 auto 12px;
+        max-width: 450px;
+    }
+}
+
+.rejection-instruction {
+    font-weight: 600;
+    color: #2C2A29 !important;
+    margin-top: 16px !important;
+}
+
+.rejection-textarea {
+    width: 100%;
+    max-width: 450px;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    resize: vertical;
+    margin: 0 auto;
+    display: block;
+
+    &:focus {
+        outline: none;
+        border-color: #D32F2F;
+    }
+}
+
+.btn-confirm-reject {
+    background: #D32F2F;
+    color: white;
+    border: 0;
+    border-radius: 25px;
+    padding: 12px 32px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    margin-bottom: 12px;
+
+    &:hover:not(:disabled) {
+        background: #B71C1C;
+    }
+
+    &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+}
+
+.rejection-progress-bar {
+    background: linear-gradient(90deg, #D32F2F, #B71C1C) !important;
+}
+
+// ========== SIN DATOS STYLES ==========
+
+.sin-datos-certificacion-area {
+    margin-top: 8px;
+}
+
+.sin-datos-badge-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.sin-datos-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: #FFF8E1;
+    border: 2px solid #FDDA24;
+    border-radius: 8px;
+    color: #2C2A29;
+    font-weight: 600;
+    font-size: 0.9rem;
+
+    svg {
+        color: #F9A825;
+        flex-shrink: 0;
+    }
+}

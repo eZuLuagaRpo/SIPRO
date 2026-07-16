@@ -1,0 +1,59 @@
+# Cantidad de replicas del deployment por defecto.
+replicaCount: 1
+
+# Imagen placeholder. Debe alinearse con el registry y tag publicados por CI/CD.
+image:
+  repository: "registry-corporativo/validation-service"
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+# Servicio interno del cluster. El contenedor escucha en 8080 y el Service publica 80.
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+# Ingress opcional. Cuando esta desactivado, el chart solo expone Service interno.
+ingress:
+  enabled: false
+  className: ""
+  hosts: []
+
+# Variables no sensibles o parametrizadas por ambiente. Las credenciales se consumen via Secret.
+env:
+  SERVER_PORT: "8080"
+  # Perfil de Spring activo para este release: "qa" o "prd" segun el ambiente que se despliegue
+  # con este chart. Sin este valor, el backend arranca sin perfil y usa solo los defaults de
+  # desarrollo de application.yml (localhost, LocalStack, etc.) — NO dejar vacio en un despliegue real.
+  SPRING_PROFILES_ACTIVE: ""
+  JDBC_URL: ""
+  DB_USER: ""
+  DB_PASS: ""
+  AD_URL: ""
+  AD_DOMAIN: ""
+  # Dominio(s) del frontend en este ambiente, separados por coma (ej: https://sipro.bancolombia.com).
+  # Pendiente: lo entrega el equipo de despliegue/provision. Sin este valor, CORS bloquea
+  # toda llamada del frontend real al backend — falla de forma segura, no dejar vacio en PDN.
+  APP_CORS_ALLOWED_ORIGINS: ""
+  # Almacenamiento S3 real de este ambiente. Pendiente: lo entrega el equipo de
+  # despliegue/provision. Sin estos valores, el backend no puede guardar ni leer
+  # archivos (planillas, CREFFSOS, consolidados, etc.) — no dejar vacio en PDN.
+  APP_STORAGE_S3_ENDPOINT: ""
+  APP_STORAGE_S3_REGION: ""
+  APP_STORAGE_S3_BUCKET: ""
+  # Credenciales de S3 (igual que DB_USER/DB_PASS, se consumen via Secret, no ConfigMap).
+  # Los valores reales deben venir de la herramienta corporativa o del pipeline.
+  APP_STORAGE_S3_ACCESS_KEY: ""
+  APP_STORAGE_S3_SECRET_KEY: ""
+  # Notificaciones por correo (aprobacion de solicitudes). enabled sigue en "false" hasta
+  # que el equipo de despliegue confirme el servidor SMTP corporativo real de este ambiente.
+  APP_MAIL_ENABLED: "false"
+  APP_MAIL_TRANSPORT: "smtp"
+  APP_MAIL_FROM: ""
+  APP_MAIL_ACTION_URL: ""
+  APP_MAIL_BANNER_URL: ""
+  MAIL_HOST: ""
+  MAIL_PORT: "587"
+  MAIL_USERNAME: ""
+  # Contrasena del correo (igual que DB_PASS, se consume via Secret, no ConfigMap).
+  MAIL_PASSWORD: ""

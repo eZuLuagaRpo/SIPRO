@@ -1,0 +1,27 @@
+spring:
+  profiles:
+    active: qa
+
+# ── LZ: ambiente preproductivo (mismo que DEV) ───────────────────────────
+# DEV y QA comparten el unico ambiente intermedio de LZ (10.8.85.237).
+# PDN hereda impala.bancolombia.corp desde application.yml — NO tocar.
+# Credenciales: en QA NO hay bypass lz.dev.user/password →
+#   LzSecretsService usa Secrets Manager automaticamente.
+lz:
+  host: ${LZ_HOST:10.8.85.237}
+  port: ${LZ_PORT:21050}
+
+  ssl:
+    truststore-path: ${LZ_TRUSTSTORE_PATH:}
+    truststore-password: ${LZ_TRUSTSTORE_PWD:changeit}
+    truststore-type: ${LZ_TRUSTSTORE_TYPE:JKS}
+
+  ingestion:
+    validate-on-startup: true
+
+# ── Esquema y tablas LZ para ambiente preproductivo ───────────────────────
+app:
+  lz:
+    schema: ${APP_LZ_SCHEMA:default}
+    tables:
+      mdm: ${APP_LZ_TABLE_MDM:sipro_fcr_mdm_datos_generales_clientes}

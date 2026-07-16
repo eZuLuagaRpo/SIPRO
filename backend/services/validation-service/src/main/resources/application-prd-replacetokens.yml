@@ -1,0 +1,102 @@
+# ============================================================================
+# PLANTILLA de referencia para "Replace Tokens" (Azure DevOps).
+#
+# Este archivo NO esta activo hoy. Spring Boot solo lo cargaria si alguien
+# activa explicitamente el perfil "prd-replacetokens" (SPRING_PROFILES_ACTIVE).
+# Mientras eso no pase, este archivo no afecta en nada lo que ya funciona hoy
+# con application-prd.yml (variables de entorno reales, ${VAR:default}).
+#
+# Que es esto:
+#   Una copia de application-prd.yml, pero usando la sintaxis de la tarea
+#   "Replace Tokens" de Azure DevOps ( #{NOMBRE}# ) en vez de la sintaxis
+#   nativa de Spring Boot ( ${NOMBRE:default} ).
+#
+# Cuando se usaria:
+#   Solo si el equipo de provision confirma que su pipeline reemplaza estos
+#   tokens por los valores reales ANTES de compilar. Ver el detalle completo
+#   de como funciona esto en PDN_MECANISMO_VARIABLES.md (raiz del repo).
+#
+# Los nombres de cada token son EXACTAMENTE los mismos que ya estan
+# documentados en PDN_VARIABLES.md — esa es la lista que hay que entregarle
+# al equipo de provision, para que carguen el valor real de cada uno en su
+# Variable Group de Azure DevOps (ellos tienen que crear esa lista de su
+# lado; nosotros no la podemos completar).
+#
+# Un solo archivo alcanza para todos los ambientes: Replace Tokens reemplaza
+# el mismo archivo de forma distinta segun que Variable Group este activo en
+# cada corrida del pipeline (dev/qa/prd) — no hace falta un archivo por
+# ambiente, a diferencia de application-dev.yml / application-qa.yml /
+# application-prd.yml que sí son 3 archivos separados hoy.
+# ============================================================================
+
+spring:
+  datasource:
+    url: '#{JDBC_URL}#'
+    username: '#{DB_USER}#'
+    password: '#{DB_PASS}#'
+
+security:
+  ad:
+    url: '#{AD_URL}#'
+    domain: '#{AD_DOMAIN}#'
+
+app:
+  cors:
+    allowed-origins: '#{APP_CORS_ALLOWED_ORIGINS}#'
+
+  storage:
+    s3:
+      endpoint: '#{APP_STORAGE_S3_ENDPOINT}#'
+      region: '#{APP_STORAGE_S3_REGION}#'
+      bucket: '#{APP_STORAGE_S3_BUCKET}#'
+      access-key: '#{APP_STORAGE_S3_ACCESS_KEY}#'
+      secret-key: '#{APP_STORAGE_S3_SECRET_KEY}#'
+
+  # Esquema y tabla de la LZ — tokenizadas para flexibilidad (mismo valor en PDN, pero reutilizable en QA).
+  lz:
+    schema: '#{APP_LZ_SCHEMA}#'
+    tables:
+      mdm: '#{APP_LZ_TABLE_MDM}#'
+
+  mail:
+    enabled: '#{APP_MAIL_ENABLED}#'
+    transport: '#{APP_MAIL_TRANSPORT}#'
+    from: '#{APP_MAIL_FROM}#'
+    action-url: '#{APP_MAIL_ACTION_URL}#'
+    banner-url: '#{APP_MAIL_BANNER_URL}#'
+    ses:
+      region: '#{APP_MAIL_SES_REGION}#'
+      access-key: '#{APP_MAIL_SES_ACCESS_KEY}#'
+      secret-key: '#{APP_MAIL_SES_SECRET_KEY}#'
+
+# Host/puerto de Impala — ya son los valores reales de PDN, no necesitan token.
+lz:
+  host: impala.bancolombia.corp
+  port: 21050
+
+  # ── Credenciales de la LZ: la forma simple, recomendada si se usa Replace Tokens ──
+  # LzSecretsService ya sabe usar user/password directos sin pasar por AWS Secrets
+  # Manager (hoy ese mecanismo esta pensado solo para bypass de DEV, pero el codigo
+  # no distingue el ambiente — si estos dos campos vienen llenos, los usa, sea cual
+  # sea el perfil activo). Usar esto evita por completo el bug de Secrets Manager
+  # documentado en PDN_MECANISMO_VARIABLES.md seccion 7 (firma AWS falsa/incompleta).
+  dev:
+    user:     '#{LZ_USER}#'
+    password: '#{LZ_PASSWORD}#'
+
+  ssl:
+    truststore-path:     '#{LZ_TRUSTSTORE_PATH}#'
+    truststore-password: '#{LZ_TRUSTSTORE_PWD}#'
+    truststore-type: JKS
+
+  ingestion:
+    validate-on-startup: true
+
+  # ── Alternativa: si en cambio quieren seguir usando AWS Secrets Manager real ──
+  # Dejar "dev.user"/"dev.password" arriba VACIOS (sin token) para que
+  # LzSecretsService caiga a este bloque. Pero esto requiere primero arreglar el
+  # bug de firma AWS descrito en PDN_MECANISMO_VARIABLES.md — no usar sin ese fix.
+  # secrets:
+  #   endpoint: '#{LZ_SECRETS_ENDPOINT}#'
+  #   region:   '#{LZ_SECRETS_REGION}#'
+  #   name:     '#{LZ_SECRETS_NAME}#'

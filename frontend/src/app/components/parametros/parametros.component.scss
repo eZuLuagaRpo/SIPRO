@@ -1,0 +1,189 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+// Botón de registro de usuario — más ancho que los botones estándar
+.btn-registrar-usuario {
+  min-width: 260px;
+  padding: 10px 48px;
+}
+
+// Scroll horizontal en tabla de productos
+.table-container--h-scroll {
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  max-height: 26rem;
+
+  table {
+    min-width: 700px;
+  }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #fff;
+  }
+
+  .td-nowrap {
+    white-space: nowrap;
+  }
+
+  .action-icons {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+}
+
+// Nota informativa dentro del modal de confirmación de producto
+.param-confirm-modal__note {
+  font-size: 12px;
+  color: var(--bc-text-gray);
+  background: var(--bc-gray-bg);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-top: 8px;
+  border-left: 3px solid var(--bc-yellow);
+}
+
+.param-date-grid {
+  margin-top: 1.5rem;
+}
+
+.table-container--excepciones.table-container--internal-scroll {
+  max-height: 22rem;
+  overflow-y: auto;
+}
+
+.table-container--excepciones.table-container--internal-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+// Toast de notificación
+.param-toast {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  min-width: 320px;
+  max-width: 500px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  z-index: 9999;
+  animation: slideInUp 0.3s ease-out;
+
+  &--success {
+    border-left: 4px solid #22c55e;
+    
+    .param-toast__icon {
+      color: #22c55e;
+    }
+  }
+
+  &--error {
+    border-left: 4px solid #ef4444;
+    
+    .param-toast__icon {
+      color: #ef4444;
+    }
+  }
+
+  &__content {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 1;
+  }
+
+  &__icon {
+    flex-shrink: 0;
+  }
+
+  &__text {
+    color: #1f2937;
+    font-size: 0.9375rem;
+    line-height: 1.5;
+  }
+
+  &__close {
+    background: none;
+    border: none;
+    padding: 0.25rem;
+    margin-left: 0.75rem;
+    cursor: pointer;
+    color: #9ca3af;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+
+    &:hover {
+      background-color: #f3f4f6;
+      color: #6b7280;
+    }
+
+    &:active {
+      background-color: #e5e7eb;
+    }
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+// Buscador inline para tablas (ej.: Productos Existentes)
+.param-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  svg {
+    position: absolute;
+    left: 10px;
+    color: var(--bc-text-gray, #888);
+    pointer-events: none;
+    flex-shrink: 0;
+  }
+
+  &__input {
+    padding-left: 30px !important;
+    padding-right: 28px !important;
+    width: 100%;
+  }
+
+  &__clear {
+    position: absolute;
+    right: 6px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    color: var(--bc-text-gray, #888);
+    padding: 0 2px;
+
+    &:hover {
+      color: #333;
+    }
+  }
+}

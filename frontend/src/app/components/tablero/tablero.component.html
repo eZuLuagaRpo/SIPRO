@@ -1,0 +1,254 @@
+<!-- Topbar -->
+<header class="sipro-topbar">
+  <div class="sipro-topbar__left">
+    <button class="sipro-topbar__menu" type="button" aria-label="Menú" (click)="toggleSidebar()">
+      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M4 6.5h16v2H4v-2Zm0 5h16v2H4v-2Zm0 5h16v2H4v-2Z" fill="currentColor" />
+      </svg>
+    </button>
+    <img class="sipro-topbar__logo" src="/assets/images/LogoBancolombia.svg" alt="Bancolombia">
+    <span class="sipro-topbar__title">SIPRO (Sistema Integral de Provisiones y Procesos Contables)</span>
+  </div>
+  <div class="sipro-topbar__right">
+    <span class="sipro-topbar__user">{{ userName }}</span>
+    <button type="button" class="sipro-topbar__logout" (click)="logout()">Salir</button>
+  </div>
+</header>
+
+<app-loading [visible]="loading" message="Cargando tablero de control..."></app-loading>
+
+<div class="sipro-shell">
+  <aside class="sipro-sidebar" [class.is-open]="sidebarOpen" aria-label="Menú">
+    <nav class="sipro-nav">
+      <a routerLink="/inicio">
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 3 3 10v11h6v-7h6v7h6V10l-9-7Z" fill="currentColor" />
+        </svg>
+        <span class="label">Inicio</span>
+      </a>
+
+      <button class="sipro-nav__btn active" type="button" [attr.aria-expanded]="subMenuOpen" (click)="toggleSubMenu()">
+        <span class="sipro-nav__btn-left">
+          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path
+              d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.4 7.4 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 1h-3.8a.5.5 0 0 0-.49.42l-.36 2.54c-.58.23-1.12.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 7.48a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L2.83 14.52a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.3.6.22l2.39-.96c.5.4 1.05.72 1.63.94l.36 2.54c.04.24.25.42.49.42h3.8c.24 0 .45-.18.49-.42l.36-2.54c.58-.23 1.12-.54 1.63-.94l2.39.96c.22.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z"
+              fill="currentColor" />
+          </svg>
+          <span class="label">Opciones</span>
+        </span>
+        <svg class="sipro-nav__chev" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round" />
+        </svg>
+      </button>
+
+      <div class="sipro-subnav" [class.hidden]="!subMenuOpen">
+        <a *ngIf="puedeCargar" routerLink="/cargar" [title]="tooltipCargar">Carga archivos manuales</a>
+        <span *ngIf="!puedeCargar" class="sipro-subnav__disabled" [title]="tooltipCargar"
+          (click)="onDisabledLinkClick($event, 'cargar')">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Carga archivos manuales</span>
+        </span>
+
+        <a *ngIf="puedeAprobar" routerLink="/aprobacion" [title]="tooltipAprobar">Aprobación archivos manuales</a>
+        <span *ngIf="!puedeAprobar" class="sipro-subnav__disabled" [title]="tooltipAprobar"
+          (click)="onDisabledLinkClick($event, 'aprobacion')">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Aprobación archivos manuales</span>
+        </span>
+
+        <a *ngIf="puedeVerResumen" routerLink="/resumen" [title]="tooltipResumen">Resumen consolidado</a>
+        <span *ngIf="!puedeVerResumen" class="sipro-subnav__disabled" [title]="tooltipResumen">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Resumen consolidado</span>
+        </span>
+
+        <a *ngIf="puedeVerResumen" class="active" routerLink="/tablero" [title]="tooltipTablero">Tablero de Control</a>
+        <span *ngIf="!puedeVerResumen" class="sipro-subnav__disabled" [title]="tooltipTablero">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Tablero de Control</span>
+        </span>
+
+        <a *ngIf="puedeVerAdmin" routerLink="/admin" [title]="tooltipAdmin">Panel de administrador</a>
+        <span *ngIf="!puedeVerAdmin" class="sipro-subnav__disabled" [title]="tooltipAdmin">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Panel de administrador</span>
+        </span>
+
+        <a *ngIf="puedeVerParametros" routerLink="/parametros" [title]="tooltipParametros">Cambio de parámetros</a>
+        <span *ngIf="!puedeVerParametros" class="sipro-subnav__disabled" [title]="tooltipParametros">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Cambio de parámetros</span>
+        </span>
+
+        <span class="sipro-subnav__disabled" [title]="tooltipModuloNoDisponible">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Simulación de provisión</span>
+        </span>
+        <span class="sipro-subnav__disabled" [title]="tooltipModuloNoDisponible">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Aprobación de contabilidad</span>
+        </span>
+        <span class="sipro-subnav__disabled" [title]="tooltipModuloNoDisponible">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Asignación de roles</span>
+        </span>
+      </div>
+
+      <a href="#" (click)="$event.preventDefault()">
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path
+            d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 17h-2v-2h2v2Zm1.9-7.5-.9.9c-.6.6-1 1.1-1 2.6h-2v-.5c0-1 .4-1.9 1-2.5l1.2-1.2a2 2 0 1 0-3.4-1.4H7.8a4 4 0 1 1 7.1 2.6Z"
+            fill="currentColor" />
+        </svg>
+        <span class="label">Ayuda</span>
+      </a>
+    </nav>
+  </aside>
+
+  <div class="sipro-content">
+    <main class="sipro-main tablero-main">
+      <div class="tablero-shell">
+        <section class="tablero-page-header">
+          <div>
+            <h1 class="page-title">Tablero de Control</h1>
+            <p class="sipro-welcome-text">Estado de planillas por producto y segmento para el período seleccionado.</p>
+          </div>
+
+          <div class="tablero-page-header__meta" *ngIf="tablero">
+            <span class="tablero-periodo-etiqueta">{{ tablero.periodoEtiqueta }}</span>
+          </div>
+        </section>
+
+        <section class="resumen-toolbar">
+          <div class="filter-row">
+            <div class="filter-group">
+              <span class="filter-group__label">Año</span>
+              <label class="filter-select">
+                <select class="filter-select__control" [value]="selectedYear ?? ''" (change)="onYearChange($any($event.target).value)">
+                  <option value="" disabled>Seleccione año</option>
+                  <option *ngFor="let periodo of periodosDisponibles; trackBy: trackByAnio" [value]="periodo.anio">
+                    {{ periodo.anio }}
+                  </option>
+                </select>
+                <span class="filter-select__chevron" aria-hidden="true">
+                  <svg width="18" height="18" viewBox="0 0 24 24" focusable="false">
+                    <path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </span>
+              </label>
+            </div>
+
+            <div class="filter-group filter-group--months">
+              <span class="filter-group__label">Mes de corte</span>
+              <div class="filter-chip-group filter-chip-group--months">
+                <button
+                  type="button"
+                  class="filter-chip"
+                  *ngFor="let mes of mesesDisponibles; trackBy: trackByMes"
+                  [class.active]="mes.numero === selectedMonth"
+                  (click)="selectMonth(mes.numero)">
+                  {{ mes.abreviatura }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="tablero-error sipro-card" *ngIf="!loading && errorMessage">
+          <h2 class="sipro-card__title">No fue posible cargar el tablero</h2>
+          <p class="sipro-card__text">{{ errorMessage }}</p>
+        </section>
+
+        <ng-container *ngIf="!loading && !errorMessage && tablero">
+          <section class="tablero-empty sipro-card" *ngIf="filas.length === 0">
+            <h2 class="sipro-card__title">Sin información para mostrar</h2>
+            <p class="sipro-card__text">No hay productos configurados para el período seleccionado.</p>
+          </section>
+
+          <article class="resumen-card resumen-card--contrast tablero-card" *ngIf="filas.length > 0">
+            <div class="resumen-card__header">
+              <div>
+                <span class="eyebrow">Período</span>
+                <h2>{{ tablero.periodoEtiqueta }}</h2>
+                <p>Estado de planillas por producto para ambos segmentos.</p>
+              </div>
+            </div>
+
+            <div class="tablero-table-shell">
+              <table class="resumen-table tablero-table">
+                <thead>
+                  <tr>
+                    <th rowspan="2" class="tablero-th-producto">Producto</th>
+                    <th colspan="2" class="tablero-th-segmento tablero-th-colgaap">Segmento Colgaap/Modificado</th>
+                    <th colspan="2" class="tablero-th-segmento tablero-th-ifrs">Segmento Full IFRS</th>
+                  </tr>
+                  <tr>
+                    <th class="tablero-th-sub">Cargado</th>
+                    <th class="tablero-th-sub">Aprobado</th>
+                    <th class="tablero-th-sub">Cargado</th>
+                    <th class="tablero-th-sub">Aprobado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let fila of filas; trackBy: trackByFila">
+                    <td class="tablero-td-producto">{{ fila.nombreProducto }}</td>
+                    <td class="tablero-td-estado">
+                      <span class="tablero-status-pill" [ngClass]="claseCargado(fila.estadoCargadoColgaap)">
+                        {{ etiquetaCargado(fila.estadoCargadoColgaap) }}
+                      </span>
+                    </td>
+                    <td class="tablero-td-estado">
+                      <span class="tablero-status-pill" [ngClass]="claseAprobado(fila.estadoAprobadoColgaap)">
+                        {{ etiquetaAprobado(fila.estadoAprobadoColgaap) }}
+                      </span>
+                    </td>
+                    <td class="tablero-td-estado">
+                      <span class="tablero-status-pill" [ngClass]="claseCargado(fila.estadoCargadoFullIfrs)">
+                        {{ etiquetaCargado(fila.estadoCargadoFullIfrs) }}
+                      </span>
+                    </td>
+                    <td class="tablero-td-estado">
+                      <span class="tablero-status-pill" [ngClass]="claseAprobado(fila.estadoAprobadoFullIfrs)">
+                        {{ etiquetaAprobado(fila.estadoAprobadoFullIfrs) }}
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </ng-container>
+      </div>
+    </main>
+
+    <footer class="sipro-footer">
+      <div class="sipro-footer__left">
+        <img src="/assets/images/LogoBancolombia.svg" alt="Bancolombia" class="sipro-footer__logo">
+        <img src="/assets/images/vigiladoHorizontal.svg" alt="Vigilado" class="sipro-footer__vigilado">
+      </div>
+      <div class="sipro-footer__right">
+        <span class="sipro-footer__meta">Dirección IP: <span>{{ currentIp }}</span></span>
+        <span class="sipro-footer__meta">{{ currentDateTime }}</span>
+      </div>
+    </footer>
+  </div>
+</div>

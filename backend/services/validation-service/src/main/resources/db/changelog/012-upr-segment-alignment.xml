@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.24.xsd">
+
+    <changeSet id="012-001" author="copilot">
+        <comment>Alinea sipro_usuario_producto_rol con el esquema real agregando id_segmento a la PK compuesta.</comment>
+        <sql splitStatements="false">
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'sipro_usuario_producto_rol'
+                      AND column_name = 'id_segmento'
+                ) THEN
+                    ALTER TABLE public.sipro_usuario_producto_rol
+                        ADD COLUMN id_segmento integer;
+                END IF;
+
+                UPDATE public.sipro_usuario_producto_rol upr
+                SET id_segmento = p.id_segmento
+                FROM public.productos p
+                WHERE upr.id_producto = p.id_producto
+                  AND upr.id_segmento IS NULL;
+
+                ALTER TABLE public.sipro_usuario_producto_rol
+                    ALTER COLUMN id_segmento SET NOT NULL;
+
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM pg_constraint
+                    WHERE conname = 'sipro_usuario_producto_rol_id_segmento_fkey'
+                ) THEN
+                    ALTER TABLE public.sipro_usuario_producto_rol
+                        ADD CONSTRAINT sipro_usuario_producto_rol_id_segmento_fkey
+                        FOREIGN KEY (id_segmento) REFERENCES public.segmentos(id);
+                END IF;
+
+                IF EXISTS (
+                    SELECT 1
+                    FROM pg_constraint
+                    WHERE conname = 'pk_sipro_usuario_producto_rol'
+                      AND pg_get_constraintdef(oid) NOT ILIKE '%id_segmento%'
+                ) THEN
+                    ALTER TABLE public.sipro_usuario_producto_rol
+                        DROP CONSTRAINT pk_sipro_usuario_producto_rol;
+                END IF;
+
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM pg_constraint
+                    WHERE conname = 'pk_sipro_usuario_producto_rol'
+                ) THEN
+                    ALTER TABLE public.sipro_usuario_producto_rol
+                        ADD CONSTRAINT pk_sipro_usuario_producto_rol
+                        PRIMARY KEY (id_usuario, id_producto, id_rol, id_segmento);
+                END IF;
+            END $$;
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

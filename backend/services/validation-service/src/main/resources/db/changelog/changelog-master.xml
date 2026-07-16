@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.24.xsd">
+
+    <include file="db/changelog/001-init.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/002-lz-ingestion.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/003-nit-validation.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/004-rbac-usuario-producto-rol.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/005-add-usuario-fk-columns.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/006-ventana-carga-seed.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/007-consolidacion-planillas.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/008-error-cap-parameter.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/009-creffsos-parametrization.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/010-creffsos-homologacion-colgaap.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/011-consolidado-registros-bigint-alignment.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/012-upr-segment-alignment.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/013-archivo-validacion-control-cantidad.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/014-lz-f-ult-actualizacion.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/015-ifrs-planillas-ruta-compartida.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/017-archivos-bloqueados-ruta-salida.xml" relativeToChangelogFile="false"/>
+
+</databaseChangeLog>

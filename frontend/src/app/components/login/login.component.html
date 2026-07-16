@@ -1,0 +1,43 @@
+<ng-container *ngIf="mostrarPantalla">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-logo">
+      <img src="/assets/images/headerIcoBancolombia.svg" alt="Bancolombia">
+    </div>
+  </div>
+
+  <!-- Área principal con trazos decorativos y card centrada -->
+  <div class="main-container">
+    <div class="login-card">
+      <h1 class="login-title">Te damos la bienvenida</h1>
+      <p class="login-subtitle">Inicia sesión con tu cuenta corporativa de Microsoft para acceder a SIPRO.</p>
+
+      <!-- Mensaje de error -->
+      <div *ngIf="errorMessage" class="error-box">
+        <span class="error-box__icon" aria-hidden="true">&#9888;</span>
+        <p class="error-box__text">{{ errorMessage }}</p>
+      </div>
+
+      <!-- Botón principal de acceso -->
+      <button type="button" class="btn-login" (click)="iniciarSesion()" [disabled]="loading">
+        <span class="spinner" *ngIf="loading" aria-hidden="true"></span>
+        <span *ngIf="!loading">Iniciar sesión con Entra ID</span>
+        <span *ngIf="loading">Conectando...</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="footer-left">
+      <img src="/assets/images/LogoBancolombia.svg" alt="Bancolombia" class="footer-logo-small">
+      <img src="/assets/images/vigiladoHorizontal.svg" alt="Vigilado Superintendencia Financiera de Colombia" class="footer-logo-vigilado">
+    </div>
+    <div class="footer-right">
+      <span class="footer-ip">Dirección IP: <strong>{{ currentIp }}</strong></span>
+      <span class="footer-datetime">{{ currentDateTime }}</span>
+    </div>
+  </div>
+
+</ng-container>

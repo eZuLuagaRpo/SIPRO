@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.24.xsd">
+
+    <changeSet id="011-001-consolidado-registros-bigint-alignment" author="copilot">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="sipro_detalle_consolidado_registros"/>
+        </preConditions>
+
+        <modifyDataType tableName="sipro_detalle_consolidado_registros" columnName="nit" newDataType="bigint"/>
+        <modifyDataType tableName="sipro_detalle_consolidado_registros" columnName="oficina" newDataType="bigint"/>
+        <modifyDataType tableName="sipro_detalle_consolidado_registros" columnName="documento" newDataType="bigint"/>
+        <modifyDataType tableName="sipro_detalle_consolidado_registros" columnName="ctapuc" newDataType="bigint"/>
+
+        <modifyDataType tableName="sipro_detalle_consolidado_registros" columnName="vlriniobl" newDataType="numeric(18,2)"/>
+        <modifyDataType tableName="sipro_detalle_consolidado_registros" columnName="saldo" newDataType="numeric(18,2)"/>
+        <modifyDataType tableName="sipro_detalle_consolidado_registros" columnName="sdootrctas" newDataType="numeric(18,2)"/>
+        <modifyDataType tableName="sipro_detalle_consolidado_registros" columnName="intereses" newDataType="numeric(18,2)"/>
+        <modifyDataType tableName="sipro_detalle_consolidado_registros" columnName="sdovencido" newDataType="numeric(18,2)"/>
+        <modifyDataType tableName="sipro_detalle_consolidado_registros" columnName="intctasord" newDataType="numeric(18,2)"/>
+    </changeSet>
+
+</databaseChangeLog>

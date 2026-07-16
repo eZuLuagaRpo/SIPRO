@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.24.xsd">
+
+    <!-- ================================================================
+         003-001: Indice para busqueda de NIT (numeroid_externo) por periodo.
+         Optimiza la validacion de existencia de clientes durante carga
+         de archivos Excel.
+    ================================================================ -->
+    <changeSet id="003-001" author="sipro">
+        <sql>
+            CREATE INDEX IF NOT EXISTS ix_sipro_lz_mdm_clientes_nit
+                ON sipro_lz_mdm_datos_generales_clientes (period_year, period_month, numeroid_externo);
+        </sql>
+        <rollback>
+            DROP INDEX IF EXISTS ix_sipro_lz_mdm_clientes_nit;
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

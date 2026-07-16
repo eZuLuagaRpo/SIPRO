@@ -1,0 +1,65 @@
+spring:
+  profiles:
+    active: prd
+
+# ── LZ: ambiente productivo (impala.bancolombia.corp) ────────────────────────
+# En PDN NO se usan lz.dev.user / lz.dev.password.
+# Las credenciales vienen EXCLUSIVAMENTE de AWS Secrets Manager real.
+# Todas las variables de entorno abajo deben estar definidas en el pipeline CD.
+lz:
+  host: ${LZ_HOST:impala.bancolombia.corp}
+  port: ${LZ_PORT:21050}
+
+  secrets:
+    endpoint: ${LZ_SECRETS_ENDPOINT:}         # vacio → cliente AWS SDK nativo (sin LocalStack)
+    region:   ${LZ_SECRETS_REGION:us-east-1}
+    name:     ${LZ_SECRETS_NAME:lz/creds}
+
+  # En PDN NO configurar lz.dev.user ni lz.dev.password.
+  # Dejarlos ausentes obliga a LzSecretsService a usar Secrets Manager real.
+  dev:
+    user:     ""
+    password: ""
+
+  ssl:
+    truststore-path:     ${LZ_TRUSTSTORE_PATH:}
+    truststore-password: ${LZ_TRUSTSTORE_PWD:changeit}
+    truststore-type:     ${LZ_TRUSTSTORE_TYPE:JKS}
+
+  ingestion:
+    validate-on-startup: ${LZ_VALIDATE_ON_STARTUP:true}
+
+# ── Esquema y tablas LZ productivas ─────────────────────────────────────────
+# PDN: resultados_fcr.fcr_mdm_datos_generales_clientes (tabla real, existe — NO se crea ni se seedea)
+# DEV/QA: LzDevSeedService crea default.sipro_fcr_mdm_datos_generales_clientes con datos dummy
+app:
+  lz:
+    schema: ${APP_LZ_SCHEMA:resultados_fcr}
+    tables:
+      mdm: ${APP_LZ_TABLE_MDM:fcr_mdm_datos_generales_clientes}
+  # ── CORS: dominio real del frontend en PDN ─────────────────────────────────
+  # Pendiente: el equipo de despliegue/provision aun no ha entregado el dominio.
+  # Sin valor, el navegador bloquea toda llamada del frontend real al backend —
+  # falla de forma segura (nadie queda permitido) en vez de dejar algo abierto de mas.
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:}
+  # ── Almacenamiento S3 real de PDN ───────────────────────────────────────────
+  # Pendiente: el equipo de despliegue/provision aun no ha entregado el bucket
+  # ni las credenciales reales. Sin estos valores, el backend no podra guardar
+  # ni leer archivos (planillas, CREFFSOS, consolidados, etc.) — falla de forma
+  # segura en vez de intentar conectarse a LocalStack por error.
+  storage:
+    s3:
+      endpoint: ${APP_STORAGE_S3_ENDPOINT:}
+      region: ${APP_STORAGE_S3_REGION:}
+      bucket: ${APP_STORAGE_S3_BUCKET:}
+      access-key: ${APP_STORAGE_S3_ACCESS_KEY:}
+      secret-key: ${APP_STORAGE_S3_SECRET_KEY:}
+  # ── Notificaciones por correo en PDN ────────────────────────────────────────
+  # En PDN el transporte acordado es AWS SES API (SDK), no SMTP.
+  mail:
+    transport: ${APP_MAIL_TRANSPORT:ses-api}
+    ses:
+      region: ${APP_MAIL_SES_REGION:us-east-1}
+      access-key: ${APP_MAIL_SES_ACCESS_KEY:}
+      secret-key: ${APP_MAIL_SES_SECRET_KEY:}

@@ -1,0 +1,18 @@
+<div class="loading-overlay" *ngIf="visible">
+  <div class="loading-card">
+    <div class="spinner"></div>
+    <p>{{ message }}</p>
+    <div class="loading-progress__meta" *ngIf="progress !== null && !indeterminate">
+      <span>Avance estimado</span>
+      <strong>{{ progress }}%</strong>
+    </div>
+    <div class="loading-progress" *ngIf="progress !== null || indeterminate">
+      <div
+        class="loading-progress__value"
+        [class.loading-progress__value--indeterminate]="indeterminate"
+        [style.width.%]="indeterminate ? null : progress">
+      </div>
+    </div>
+    <small *ngIf="detail" class="loading-detail">{{ detail }}</small>
+  </div>
+</div>

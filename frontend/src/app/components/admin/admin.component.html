@@ -1,0 +1,728 @@
+<header class="sipro-topbar">
+  <div class="sipro-topbar__left">
+    <button class="sipro-topbar__menu" type="button" aria-label="Menú" (click)="toggleSidebar()">
+      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M4 6.5h16v2H4v-2Zm0 5h16v2H4v-2Zm0 5h16v2H4v-2Z" fill="currentColor" />
+      </svg>
+    </button>
+    <img class="sipro-topbar__logo" src="/assets/images/LogoBancolombia.svg" alt="Bancolombia">
+    <span class="sipro-topbar__title">SIPRO (Sistema Integral de Provisiones y Procesos Contables)</span>
+  </div>
+  <div class="sipro-topbar__right">
+    <span class="sipro-topbar__user">{{ userName }}</span>
+    <button type="button" class="sipro-topbar__logout" (click)="logout()">Salir</button>
+  </div>
+</header>
+
+<div class="sipro-shell">
+  <aside class="sipro-sidebar" [class.is-open]="sidebarOpen" aria-label="Menú">
+    <nav class="sipro-nav">
+      <a routerLink="/inicio">
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 3 3 10v11h6v-7h6v7h6V10l-9-7Z" fill="currentColor" />
+        </svg>
+        <span class="label">Inicio</span>
+      </a>
+
+      <button class="sipro-nav__btn" [class.active]="subMenuOpen" type="button"
+        [attr.aria-expanded]="subMenuOpen" (click)="toggleSubMenu()">
+        <span class="sipro-nav__btn-left">
+          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path
+              d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.4 7.4 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 1h-3.8a.5.5 0 0 0-.49.42l-.36 2.54c-.58.23-1.12.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 7.48a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L2.83 14.52a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.3.6.22l2.39-.96c.5.4 1.05.72 1.63.94l.36 2.54c.04.24.25.42.49.42h3.8c.24 0 .45-.18.49-.42l.36-2.54c.58-.23 1.12-.54 1.63-.94l2.39.96c.22.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z"
+              fill="currentColor" />
+          </svg>
+          <span class="label">Opciones</span>
+        </span>
+        <svg class="sipro-nav__chev" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round" />
+        </svg>
+      </button>
+
+      <div class="sipro-subnav" [class.hidden]="!subMenuOpen">
+        <a *ngIf="puedeCargar" routerLink="/cargar" [title]="tooltipCargar">Carga archivos manuales</a>
+        <span *ngIf="!puedeCargar" class="sipro-subnav__disabled" [title]="tooltipCargar">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Carga archivos manuales</span>
+        </span>
+        <a *ngIf="puedeAprobar" routerLink="/aprobacion" [title]="tooltipAprobar">Aprobación archivos manuales</a>
+        <span *ngIf="!puedeAprobar" class="sipro-subnav__disabled" [title]="tooltipAprobar">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Aprobación archivos manuales</span>
+        </span>
+        <a *ngIf="puedeVerResumen" routerLink="/resumen" [title]="tooltipResumen">Resumen consolidado</a>
+        <span *ngIf="!puedeVerResumen" class="sipro-subnav__disabled" [title]="tooltipResumen">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Resumen consolidado</span>
+        </span>
+        <a *ngIf="puedeVerResumen" routerLink="/tablero" [title]="tooltipTablero">Tablero de Control</a>
+        <span *ngIf="!puedeVerResumen" class="sipro-subnav__disabled" [title]="tooltipTablero">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Tablero de Control</span>
+        </span>
+        <a *ngIf="puedeVerAdmin" class="active" routerLink="/admin" [title]="tooltipAdmin">Panel de administrador</a>
+        <span *ngIf="!puedeVerAdmin" class="sipro-subnav__disabled" [title]="tooltipAdmin">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Panel de administrador</span>
+        </span>
+
+        <a *ngIf="puedeVerParametros" routerLink="/parametros" [title]="tooltipParametros">Cambio de parámetros</a>
+        <span *ngIf="!puedeVerParametros" class="sipro-subnav__disabled" [title]="tooltipParametros">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Cambio de parámetros</span>
+        </span>
+
+        <span class="sipro-subnav__disabled" [title]="tooltipModuloNoDisponible">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Simulación de provisión</span>
+        </span>
+        <span class="sipro-subnav__disabled" [title]="tooltipModuloNoDisponible">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Aprobación de contabilidad</span>
+        </span>
+        <span class="sipro-subnav__disabled" [title]="tooltipModuloNoDisponible">
+          <svg class="sipro-subnav__lock-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 8h-1V6a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V6Z" fill="currentColor" />
+          </svg>
+          <span>Asignación de roles</span>
+        </span>
+      </div>
+    </nav>
+  </aside>
+
+  <div class="sipro-content">
+    <main class="sipro-main parametros-main">
+      <div class="admin-shell">
+        <div class="page-header">
+        <h1 class="page-title">Panel de administrador</h1>
+        <p class="page-desc">Administra consolidaciones, consulta SQL y monitorea los logs del sistema.</p>
+      </div>
+
+      <p *ngIf="dashboardError" class="feedback feedback--error">{{ dashboardError }}</p>
+      <p *ngIf="dashboardFeedback" class="feedback" [ngClass]="dashboardFeedbackType === 'success' ? 'feedback--success' : 'feedback--error'">
+        {{ dashboardFeedback }}
+      </p>
+
+      <div class="admin-loading" *ngIf="loadingDashboard && !dashboard">
+        <div class="admin-loading__spinner"></div>
+        <span>Cargando tablero operativo...</span>
+      </div>
+
+      <ng-container *ngIf="dashboard as data">
+        <section class="card">
+          <div class="card-header">
+            <div class="card-title-wrap">
+              <div class="card-icon-box">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                </svg>
+              </div>
+              <span>A. Consolidación y estado</span>
+            </div>
+          </div>
+
+          <div class="card-body">
+            <div class="status-bar" [ngClass]="statusBarClass">
+              <span class="dot" [ngClass]="statusBarClass"></span>
+              <span>{{ statusBarMessage }}</span>
+            </div>
+
+            <div class="tabs-pills">
+              <button type="button" class="btn" [class.active]="vistaArchivoActiva === 'pendientes'"
+                (click)="vistaArchivoActiva = 'pendientes'">
+                Archivos del periodo ({{ archivosPendientesCount }})
+              </button>
+              <button type="button" class="btn" [class.active]="vistaArchivoActiva === 'consolidados'"
+                (click)="vistaArchivoActiva = 'consolidados'">
+                Consolidados ({{ archivosConsolidadosCount }})
+              </button>
+            </div>
+
+            <div class="split-grid">
+              <div>
+                <div class="file-list" *ngIf="archivosVisibles.length; else sinArchivosTpl">
+                  <div class="file-item" *ngFor="let archivo of archivosVisibles"
+                    [ngClass]="{ error: obtenerClaseEstado(archivo.estado) === 'error' }"
+                    [attr.title]="archivo.noReportaDatos ? (archivo.descripcionSinDatos || archivo.detalleEstado || null) : null">
+                    <div class="file-icon">
+                      <img [src]="excelIconPath" alt="Excel">
+                    </div>
+                    <div class="file-main">
+                      <span class="file-name" [class.file-name--error]="obtenerClaseEstado(archivo.estado) === 'error'">
+                        {{ obtenerNombreArchivoVisible(archivo) }}
+                      </span>
+                      <span *ngIf="vistaArchivoActiva !== 'consolidados'" class="file-size">{{ obtenerPesoArchivoVisible(archivo) }}</span>
+                    </div>
+                    <div class="file-badge">
+                      <span class="badge"
+                        [ngClass]="{
+                          'badge-aprobado': normalizarEstadoArchivo(archivo.estado) === 'APROBADO',
+                          'badge-rechazado': normalizarEstadoArchivo(archivo.estado) === 'RECHAZADO',
+                          'badge-pendiente': normalizarEstadoArchivo(archivo.estado) === 'PENDIENTE',
+                          success: normalizarEstadoArchivo(archivo.estado) === 'APROBADO',
+                          error: normalizarEstadoArchivo(archivo.estado) === 'RECHAZADO',
+                          warning: normalizarEstadoArchivo(archivo.estado) === 'PENDIENTE'
+                        }">
+                        {{ normalizarEstadoArchivo(archivo.estado) }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <ng-template #sinArchivosTpl>
+                  <div class="empty-state">
+                    <strong>Sin archivos para mostrar</strong>
+                    <p>No hay registros disponibles para el periodo seleccionado.</p>
+                  </div>
+                </ng-template>
+              </div>
+
+              <div class="confirm-box">
+                <div class="confirm-grid">
+                  <div class="form-group">
+                    <label>Año</label>
+                    <select class="form-select" [ngModel]="selectedYear" (ngModelChange)="onYearChange($event)">
+                      <option *ngFor="let year of yearsDisponibles" [ngValue]="year">{{ year }}</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label>Periodo</label>
+                    <select class="form-select" [ngModel]="selectedMonth" (ngModelChange)="onMonthChange($event)">
+                      <option *ngFor="let month of monthsDisponibles"
+                        [ngValue]="month.mes"
+                        [disabled]="month.consolidado"
+                        [class.option--consolidado]="month.consolidado">
+                        {{ month.etiqueta }}{{ month.consolidado ? ' ✓' : '' }}
+                      </option>
+                    </select>
+                  </div>
+                </div>
+
+                <ng-container *ngIf="esAdminPermisos; else sinPermisoEjecutarTpl">
+                  <div class="confirm-title">Confirmar ejecución</div>
+
+                  <div class="form-group">
+                    <label class="form-label-plain">Motivo de consolidación manual <span class="required">*</span></label>
+                    <textarea class="form-textarea" [(ngModel)]="observacionConsolidacion" [attr.maxlength]="maxObservacionChars"
+                      placeholder="Describe el motivo de esta consolidación manual..."></textarea>
+                    <div class="field-counter">{{ observacionConsolidacionCount }}/{{ maxObservacionChars }}</div>
+                  </div>
+
+                  <label class="consent-label">
+                    <input type="checkbox" [(ngModel)]="confirmacionConsolidacion">
+                    <span>Confirmo que tengo permisos para ejecutar esta consolidación manual. Entiendo que solo se permite una consolidación por período y que no se reutilizarán XLSX ya consolidados.</span>
+                  </label>
+
+                  <label class="consent-label consent-label--warning" *ngIf="requiereConfirmacionConsolidacionParcial">
+                    <input type="checkbox" [(ngModel)]="confirmacionConsolidacionParcial">
+                    <span>{{ confirmacionConsolidacionParcialTexto }}</span>
+                  </label>
+
+                  <div class="confirm-actions">
+                    <button type="button" class="btn btn-lg" [disabled]="!puedeEjecutarConsolidacion"
+                      (click)="ejecutarConsolidacion()">
+                      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                      <span *ngIf="!consolidacionEnCurso">Ejecutar consolidación</span>
+                      <span *ngIf="consolidacionEnCurso">Ejecutando consolidación...</span>
+                    </button>
+                    <span class="helper-caption">{{ confirmacionAyudaTexto }}</span>
+                  </div>
+
+                  <p *ngIf="consolidacionRespuesta" class="feedback feedback--success">{{ consolidacionRespuesta }}</p>
+                  <p *ngIf="consolidacionError" class="feedback feedback--error">{{ consolidacionError }}</p>
+                </ng-container>
+
+                <ng-template #sinPermisoEjecutarTpl>
+                  <div class="empty-state">
+                    <strong>Ejecución no disponible</strong>
+                    <p>Tu perfil puede consultar archivos y consolidaciones anteriores, pero ejecutar una consolidación manual está reservado al perfil Admin_Permisos.</p>
+                  </div>
+                </ng-template>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <div class="table-title">Consolidaciones anteriores</div>
+
+              <div class="table-scroll-wrapper" [class.expanded]="historicoExpandido">
+                <table class="compact-table">
+                  <thead>
+                    <tr>
+                      <th>Periodo</th>
+                      <th>Fecha</th>
+                      <th>Estado</th>
+                      <th>Ruta archivo</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let item of historico">
+                      <td>{{ item.periodo || 'Sin periodo' }}</td>
+                      <td>{{ formatDateTime(item.fechaHoraFin || item.fechaHoraInicio) }}</td>
+                      <td>
+                        <span class="badge" [ngClass]="obtenerClaseEstado(item.estado)">
+                          {{ item.estado }}
+                        </span>
+                      </td>
+                      <td class="table-path">{{ getHistoricoRuta(item) }}</td>
+                      <td class="table-actions">
+                        <button *ngIf="puedeEliminarHistorico(item)"
+                          type="button"
+                          class="table-icon-btn table-icon-btn--danger"
+                          (click)="abrirModalEliminarConsolidacion(item)"
+                          [attr.aria-label]="'Eliminar consolidación de ' + (item.periodo || 'sin periodo')"
+                          [title]="'Eliminar consolidación de ' + (item.periodo || 'sin periodo')">
+                          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"></path>
+                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                            <line x1="14" y1="11" x2="14" y2="17"></line>
+                          </svg>
+                        </button>
+                        <span *ngIf="!puedeEliminarHistorico(item)" class="table-action-placeholder">—</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="table-more">
+                <button type="button" class="table-link" (click)="toggleHistorico()">
+                  {{ historicoExpandido ? 'Ocultar ←' : 'Ver todas →' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-header card-header--stacked">
+            <div class="card-title-wrap">
+              <div class="card-icon-box">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+              </div>
+              <span>B. SQL Maestras</span>
+            </div>
+          </div>
+
+          <div class="tabs-underline tabs-underline--single">
+            <button type="button" class="active">SQL Maestras</button>
+          </div>
+
+          <div class="card-body card-body--tight">
+            <div class="scope-banner">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              <span>
+                Alcance: solo tablas maestras y de parámetros permitidas.
+              </span>
+            </div>
+            <div class="sql-toolbar">
+              <span class="toolbar-label">Tipo de operación:</span>
+              <button type="button" class="btn sql-btn" *ngFor="let operation of operacionesSqlDisponibles"
+                [class.active]="sqlOperacion === operation"
+                (click)="cambiarOperacionSql(operation)">
+                {{ getSqlOperationLabel(operation) }}
+              </button>
+            </div>
+
+            <div class="sql-grid">
+              <div>
+                <label class="editor-label">Consulta SQL <span class="required">*</span></label>
+                <div class="sql-editor-container">
+                  <div class="sql-editor">
+                    <div class="sql-line-numbers" aria-hidden="true">
+                      <span *ngFor="let line of sqlLineNumbers">{{ line }}</span>
+                    </div>
+                    <textarea class="sql-input" [(ngModel)]="sqlTexto" spellcheck="false"></textarea>
+                  </div>
+                  <div class="sql-footer">
+                    <button type="button" class="sql-clear" (click)="clearSql()">Limpiar</button>
+                    <span>{{ sqlCharacterCount }} / {{ maxSqlChars }} caracteres</span>
+                  </div>
+                </div>
+
+                <div class="sql-actions">
+                  <button type="button" class="btn btn-lg sql-run-btn" [disabled]="!puedeEjecutarSql" (click)="ejecutarSql()">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                    <span *ngIf="!sqlLoading">Ejecutar consulta</span>
+                    <span *ngIf="sqlLoading">Ejecutando...</span>
+                  </button>
+                </div>
+
+                <div class="sql-note">
+                  <span class="sql-note__row sql-note__row--ok">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    Trazabilidad: usuario · fecha · módulo se registran automáticamente.
+                  </span>
+                  <span class="sql-note__row">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    {{ sqlWhereNote }}
+                  </span>
+                  <span class="sql-note__row sql-note__row--warn" *ngIf="sqlEscritura && !sqlJustificacion.trim()">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                    Para ejecutar UPDATE / INSERT escribe la <strong>Justificación del cambio</strong>.
+                  </span>
+                </div>
+              </div>
+
+              <div class="info-box" [class.warning]="sqlEscritura">
+                <div class="info-box__title">
+                  <span class="dot" [ngClass]="sqlEscritura ? 'warning' : 'neutral'"></span>
+                  <span>{{ sqlInfoTitle }}</span>
+                </div>
+                <p class="info-box__desc">{{ sqlInfoDescription }}</p>
+
+                <div class="form-group" *ngIf="sqlEscritura">
+                  <label>Justificación del cambio <span class="required">*</span></label>
+                  <textarea class="form-textarea" [(ngModel)]="sqlJustificacion"
+                    placeholder="Ingresa ticket o motivo de la modificación obligatoria..."></textarea>
+                </div>
+
+                <button type="button" class="sql-link-btn" (click)="toggleSqlTablesMenu()">
+                  {{ showSqlTablesMenu ? 'Ocultar tablas permitidas' : 'Ver tablas permitidas' }}
+                </button>
+
+                <ng-container *ngIf="showSqlTablesMenu">
+                  <div class="sql-table-tools">
+                    <span class="helper-caption">Haz clic sobre una tabla para copiar su nombre.</span>
+                    <button type="button" class="sql-link-btn sql-link-btn--secondary" (click)="copiarTablasPermitidas()">
+                      Copiar lista completa
+                    </button>
+                  </div>
+
+                  <div class="sql-table-panel">
+                    <div class="sql-table-menu">
+                      <button type="button" class="sql-table-chip" *ngFor="let table of tablasPermitidas"
+                        (click)="copiarTablaPermitida(table)"
+                        [title]="'Copiar ' + table"
+                        [attr.aria-label]="'Copiar tabla ' + table">
+                        <span>{{ table }}</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  <p *ngIf="sqlTablesCopyFeedback" class="sql-copy-feedback"
+                    [ngClass]="sqlTablesCopyFeedbackType === 'success' ? 'sql-copy-feedback--success' : 'sql-copy-feedback--error'">
+                    {{ sqlTablesCopyFeedback }}
+                  </p>
+                </ng-container>
+              </div>
+            </div>
+
+            <p *ngIf="sqlError" class="feedback feedback--error">{{ sqlError }}</p>
+            <p *ngIf="sqlResultado?.exito && sqlResultado?.mensaje" class="feedback feedback--success">{{ sqlResultado?.mensaje }}</p>
+
+            <div class="table-container sql-result" *ngIf="sqlResultado as result">
+              <div class="sql-result-header">
+                <div class="table-title status-inline">
+                  <span class="dot" [ngClass]="result.exito ? 'green' : 'orange'"></span>
+                  <span>Resultado ({{ result.tipoOperacion }})</span>
+                </div>
+
+                <button type="button" class="btn sql-download-btn" *ngIf="result.tipoOperacion?.toUpperCase() === 'SELECT'"
+                  [disabled]="!puedeDescargarResultadoSqlCsv"
+                  (click)="descargarResultadoSqlCsv()">
+                  <img class="sql-download-btn__icon" [src]="downloadIconPath" alt="" aria-hidden="true">
+                  <span>Descargar CSV</span>
+                </button>
+              </div>
+
+              <div class="sql-result-summary">
+                <div>
+                  <span>{{ result.tipoOperacion?.toUpperCase() === 'SELECT' ? 'Filas devueltas' : 'Filas afectadas' }}</span>
+                  <strong>{{ formatNumber(result.tipoOperacion?.toUpperCase() === 'SELECT' ? result.filas.length : result.filasAfectadas) }}</strong>
+                </div>
+                <div>
+                  <span>Resultado truncado</span>
+                  <strong>{{ result.resultadoTruncado ? 'Sí' : 'No' }}</strong>
+                </div>
+              </div>
+
+              <div class="table-scroll-wrapper expanded" *ngIf="result.filas?.length">
+                <table class="compact-table">
+                  <thead>
+                    <tr>
+                      <th *ngFor="let column of sqlColumns">{{ column }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let row of result.filas">
+                      <td *ngFor="let column of sqlColumns">{{ formatSqlValue(row[column]) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card logs-card">
+          <div class="card-header">
+            <div class="card-title-wrap">
+              <div class="card-icon-box">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+              </div>
+              <span>C. Alertas y Logs del sistema</span>
+            </div>
+
+            <div class="toggle-wrap">
+              <span>Registrar logs</span>
+              <label class="switch">
+                <input type="checkbox" [checked]="logsStreamingEnabled" disabled>
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="card-body">
+            <div class="logs-filter-bar">
+              <div class="logs-filter-controls">
+                <div class="form-group form-group--date">
+                  <label class="form-label-plain">Desde:</label>
+                  <input type="date" class="form-input" [(ngModel)]="logsFromDate" (ngModelChange)="aplicarFiltroLogs()">
+                </div>
+
+                <div class="form-group form-group--date">
+                  <label class="form-label-plain">Hasta:</label>
+                  <input type="date" class="form-input" [(ngModel)]="logsToDate" (ngModelChange)="aplicarFiltroLogs()">
+                </div>
+
+                <div class="form-group form-group--action">
+                  <label class="form-label-plain form-label-plain--ghost">Acción</label>
+                  <button type="button" class="btn logs-download-btn" [disabled]="!logsDownloadEnabled" (click)="descargarLogs()">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    Descargar .log
+                  </button>
+                </div>
+              </div>
+
+              <div class="logs-filter-summary">
+                <span class="badge error logs-error-badge"><span class="dot red"></span>{{ logErrorSummaryText }}</span>
+              </div>
+            </div>
+
+            <p *ngIf="logsError" class="feedback feedback--error">{{ logsError }}</p>
+
+            <div class="terminal">
+              <div class="terminal-header">
+                <div class="terminal-head-left">
+                  <span class="terminal-brand">TERMINAL</span>
+                  <div class="terminal-pills">
+                    <button type="button" *ngFor="let filter of logTerminalFilters" class="terminal-pill"
+                      [class.active]="logLevel === filter.value"
+                      [ngClass]="getTerminalPillClass(filter.value)"
+                      (click)="cambiarNivelLog(filter.value)">
+                      {{ filter.label }}
+                    </button>
+                  </div>
+                </div>
+                <button type="button" class="btn terminal-btn" [disabled]="!logsStreamingEnabled" (click)="toggleLogsPause()">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="6" y="4" width="4" height="16"></rect>
+                    <rect x="14" y="4" width="4" height="16"></rect>
+                  </svg>
+                  {{ logsPaused ? 'Reanudar' : 'Pausar' }}
+                </button>
+              </div>
+              <div class="terminal-body dark-scroll" id="adminLogsBody">
+                <div class="terminal-empty" *ngIf="logsLoading && !visibleLogEntries.length">Cargando logs del sistema...</div>
+                <div class="terminal-empty" *ngIf="!logsLoading && !visibleLogEntries.length">{{ logsEmptyStateText }}</div>
+
+                <div class="terminal-line" *ngFor="let log of visibleLogEntries">
+                  <div class="terminal-line__meta">
+                    <span class="terminal-level" [ngClass]="obtenerClaseLog(log.level)">[{{ log.level }}]</span>
+                    <span class="terminal-time" [title]="log.timestamp">{{ log.timestamp }}</span>
+                    <span class="terminal-source" [title]="log.logger">{{ log.logger }}</span>
+                    <span class="terminal-thread" [title]="log.thread">{{ log.thread }}</span>
+                  </div>
+                  <div class="terminal-message">{{ log.message }}</div>
+                </div>
+              </div>
+              <div class="terminal-footer">
+                <span>{{ logCounterText }}</span>
+                <span class="terminal-scope">Buffer global del backend • todas las sesiones de esta instancia</span>
+                <button type="button" class="terminal-link" (click)="scrollLogsToEnd()">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+                  Ir al final
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div class="modal-overlay" *ngIf="consolidacionModalVisible">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h3>
+                <svg *ngIf="!modalConsolidacionTerminada" class="icon animate-spin" viewBox="0 0 24 24" aria-hidden="true">
+                  <line x1="12" y1="2" x2="12" y2="6"></line>
+                  <line x1="12" y1="18" x2="12" y2="22"></line>
+                  <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+                  <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+                  <line x1="2" y1="12" x2="6" y2="12"></line>
+                  <line x1="18" y1="12" x2="22" y2="12"></line>
+                  <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
+                  <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+                </svg>
+                <svg *ngIf="modalConsolidacionTerminada && modalConsolidacionEstado === 'success'" class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+                <svg *ngIf="modalConsolidacionTerminada && modalConsolidacionEstado === 'error'" class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <span>{{ modalConsolidacionTitulo }}</span>
+              </h3>
+            </div>
+            <div class="modal-body">
+              <div class="progress-bar-container">
+                <div class="progress-bar"
+                  [class.progress-bar--running]="!modalConsolidacionTerminada"
+                  [class.progress-bar--success]="modalConsolidacionTerminada && modalConsolidacionEstado === 'success'"
+                  [class.progress-bar--error]="modalConsolidacionTerminada && modalConsolidacionEstado === 'error'"
+                  [style.width]="modalConsolidacionTerminada ? '100%' : null"></div>
+              </div>
+              <p class="modal-status">{{ modalConsolidacionMensaje }}</p>
+
+              <div class="terminal modal-terminal">
+                <div class="terminal-body dark-scroll modal-terminal-body">
+                  <div class="terminal-empty" *ngIf="!modalLogEntries.length">Inicializando validación de archivos...</div>
+                  <div class="terminal-line terminal-line--modal" *ngFor="let log of modalLogEntries">
+                    <div class="terminal-line__meta">
+                      <span class="terminal-level" [ngClass]="obtenerClaseLog(log.level)">[{{ log.level }}]</span>
+                      <span class="terminal-time" [title]="log.timestamp">{{ log.timestamp }}</span>
+                      <span class="terminal-source" [title]="log.logger">{{ log.logger }}</span>
+                    </div>
+                    <div class="terminal-message">{{ log.message }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="modal-actions" *ngIf="modalConsolidacionTerminada">
+                <button type="button" class="btn" (click)="descargarLogConsolidacion()">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  Descargar log
+                </button>
+                <button type="button" class="btn" (click)="cerrarModalConsolidacion()">Aceptar y cerrar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-overlay" *ngIf="eliminacionModalVisible">
+          <div class="modal-content modal-content--danger">
+            <div class="modal-header">
+              <h3>
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 9v4"></path>
+                  <path d="M12 17h.01"></path>
+                  <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                </svg>
+                <span>Eliminar consolidación</span>
+              </h3>
+            </div>
+            <div class="modal-body">
+              <div class="progress-bar-container" *ngIf="eliminacionProgressVisible">
+                <div class="progress-bar progress-bar--running progress-bar--danger"></div>
+              </div>
+
+              <div class="delete-modal__copy">
+                <p>Está a punto de eliminar permanentemente la consolidación del periodo <strong>{{ eliminacionConsolidacionPeriodo }}</strong>.</p>
+                <p>Esta acción eliminará:</p>
+                <ul class="danger-list">
+                  <li>Los registros consolidados de la base de datos</li>
+                  <li>Los archivos generados (CONSOLIDADO y CREFFSOS)</li>
+                  <li>El historial de esta consolidación</li>
+                </ul>
+                <p class="delete-modal__note">Los archivos originales aprobados no se eliminan y quedarán disponibles para una nueva consolidación.</p>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label-plain">Motivo de la eliminación <span class="required">*</span></label>
+                <textarea class="form-textarea"
+                  [(ngModel)]="eliminacionMotivo"
+                  placeholder="Describe por qué debe eliminarse esta consolidación..."></textarea>
+              </div>
+
+              <label class="consent-label consent-label--danger">
+                <input type="checkbox" [(ngModel)]="eliminacionResponsabilidadConfirmada">
+                <span>Confirmo que soy responsable de esta eliminación y entiendo que no se puede deshacer.</span>
+              </label>
+
+              <div class="form-group">
+                <label class="form-label-plain">Para confirmar, escriba <span class="confirm-keyword">"{{ deleteConfirmKeyword }}"</span> en el campo</label>
+                <input class="form-input"
+                  [(ngModel)]="eliminacionConfirmacionTexto"
+                  [placeholder]="deleteConfirmKeyword"
+                  autocomplete="off">
+              </div>
+
+              <p *ngIf="eliminacionError" class="feedback feedback--error">{{ eliminacionError }}</p>
+
+              <div class="modal-actions modal-actions--spread">
+                <button type="button" class="btn" [disabled]="eliminacionEnCurso" (click)="cerrarModalEliminarConsolidacion()">
+                  Cancelar
+                </button>
+                <button type="button" class="btn btn-danger"
+                  [disabled]="!puedeConfirmarEliminacionConsolidacion"
+                  (click)="confirmarEliminacionConsolidacion()">
+                  <svg *ngIf="eliminacionEnCurso" class="icon animate-spin" viewBox="0 0 24 24" aria-hidden="true">
+                    <line x1="12" y1="2" x2="12" y2="6"></line>
+                    <line x1="12" y1="18" x2="12" y2="22"></line>
+                    <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+                    <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+                    <line x1="2" y1="12" x2="6" y2="12"></line>
+                    <line x1="18" y1="12" x2="22" y2="12"></line>
+                    <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
+                    <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+                  </svg>
+                  <span>{{ eliminacionEnCurso ? 'Eliminando...' : 'Eliminar consolidación' }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+      </div><!-- /admin-shell -->
+    </main>
+
+    <footer class="sipro-footer">
+      <div class="sipro-footer__left">
+        <img src="/assets/images/LogoBancolombia.svg" alt="Bancolombia" class="sipro-footer__logo">
+        <img src="/assets/images/vigiladoHorizontal.svg" alt="Vigilado" class="sipro-footer__vigilado">
+      </div>
+      <div class="sipro-footer__right">
+        <span class="sipro-footer__meta">Dirección IP: <span>{{ currentIp }}</span></span>
+        <span class="sipro-footer__meta">{{ currentDateTime }}</span>
+      </div>
+    </footer>
+  </div>
+</div>

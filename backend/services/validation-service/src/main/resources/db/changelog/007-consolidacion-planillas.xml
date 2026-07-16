@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.24.xsd">
+
+    <changeSet id="007-001" author="copilot">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="sipro_detalle_carga_planillas" columnName="id_usuario_aprobador"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="sipro_detalle_carga_planillas">
+            <column name="id_usuario_aprobador" type="bigint"/>
+            <column name="usuario_aprobador" type="varchar(255)"/>
+            <column name="fecha_aprobacion" type="timestamp with time zone"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="007-002" author="copilot">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="sipro_detalle_consolidaciones_planillas"/>
+            </not>
+        </preConditions>
+        <createTable tableName="sipro_detalle_consolidaciones_planillas">
+            <column name="id_consolidacion" type="bigserial" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="periodo_valoracion" type="date">
+                <constraints nullable="false"/>
+            </column>
+            <column name="fecha_hora_inicio" type="timestamp with time zone"/>
+            <column name="fecha_hora_fin" type="timestamp with time zone"/>
+            <column name="duracion_minutos" type="numeric(10,2)"/>
+            <column name="estado_consolidacion" type="varchar(50)" defaultValue="INICIADO">
+                <constraints nullable="false"/>
+            </column>
+            <column name="cantidad_archivos_consolidados" type="integer" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="cantidad_registros_consolidados" type="integer" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="nombres_archivos_consolidados" type="text"/>
+            <column name="fuente_ventana" type="varchar(20)"/>
+            <column name="id_regla_ventana" type="bigint"/>
+            <column name="periodo_excepcion_ventana" type="date"/>
+            <column name="fecha_hora_apertura_efectiva" type="timestamp with time zone"/>
+            <column name="fecha_hora_cierre_efectiva" type="timestamp with time zone"/>
+            <column name="creado_por_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="creado_en" type="timestamp with time zone" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="modificado_por_id" type="bigint"/>
+            <column name="modificado_en" type="timestamp with time zone" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="observacion" type="text"/>
+            <column name="mensaje_error" type="text"/>
+        </createTable>
+        <createIndex tableName="sipro_detalle_consolidaciones_planillas" indexName="idx_consol_estado">
+            <column name="estado_consolidacion"/>
+        </createIndex>
+        <createIndex tableName="sipro_detalle_consolidaciones_planillas" indexName="idx_consol_periodo">
+            <column name="periodo_valoracion"/>
+        </createIndex>
+        <addCheckConstraint tableName="sipro_detalle_consolidaciones_planillas"
+                            constraintName="chk_consol_estado"
+                            checkConstraint="estado_consolidacion IN ('INICIADO', 'EN_PROCESO', 'COMPLETADO', 'ERROR')"/>
+        <addCheckConstraint tableName="sipro_detalle_consolidaciones_planillas"
+                            constraintName="chk_consol_fuente_ventana"
+                            checkConstraint="fuente_ventana IS NULL OR fuente_ventana IN ('REGLA_GENERAL', 'EXCEPCION')"/>
+        <addForeignKeyConstraint baseTableName="sipro_detalle_consolidaciones_planillas"
+                                 baseColumnNames="creado_por_id"
+                                 referencedTableName="usuario_persona"
+                                 referencedColumnNames="id_usuario"
+                                 constraintName="fk_consol_creado_por"/>
+        <addForeignKeyConstraint baseTableName="sipro_detalle_consolidaciones_planillas"
+                                 baseColumnNames="modificado_por_id"
+                                 referencedTableName="usuario_persona"
+                                 referencedColumnNames="id_usuario"
+                                 constraintName="fk_consol_modificado_por"/>
+        <addForeignKeyConstraint baseTableName="sipro_detalle_consolidaciones_planillas"
+                                 baseColumnNames="id_regla_ventana"
+                                 referencedTableName="sipro_parametros_reglaventanacarga"
+                                 referencedColumnNames="regla_id"
+                                 constraintName="fk_consol_regla_ventana"/>
+        <addForeignKeyConstraint baseTableName="sipro_detalle_consolidaciones_planillas"
+                                 baseColumnNames="periodo_excepcion_ventana"
+                                 referencedTableName="sipro_parametros_excepcionventanacarga"
+                                 referencedColumnNames="periodo_valoracion"
+                                 constraintName="fk_consol_excepcion_ventana"/>
+    </changeSet>
+
+    <changeSet id="007-003" author="copilot">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="sipro_detalle_consolidacion_archivos"/>
+            </not>
+        </preConditions>
+        <createTable tableName="sipro_detalle_consolidacion_archivos">
+            <column name="id_consolidacion_archivo" type="bigserial" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="id_consolidacion" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="id_carga_planilla" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="id_validacion_archivo" type="integer"/>
+            <column name="archivo_uid" type="text"/>
+            <column name="nombre_archivo" type="varchar(500)"/>
+            <column name="ruta_archivo" type="varchar(500)"/>
+            <column name="fecha_corte" type="date"/>
+            <column name="id_producto_origen" type="bigint"/>
+            <column name="producto_origen" type="varchar(255)"/>
+            <column name="id_segmento" type="integer"/>
+            <column name="segmento" type="varchar(255)"/>
+            <column name="descripcion" type="text"/>
+            <column name="id_usuario_cargador" type="bigint"/>
+            <column name="usuario_cargador" type="varchar(255)"/>
+            <column name="id_usuario_aprobador" type="bigint"/>
+            <column name="usuario_aprobador" type="varchar(255)"/>
+            <column name="cantidad_registros_archivo" type="integer"/>
+            <column name="fecha_validacion" type="timestamp without time zone"/>
+            <column name="creado_en" type="timestamp with time zone" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createIndex tableName="sipro_detalle_consolidacion_archivos" indexName="idx_consol_arch_carga">
+            <column name="id_carga_planilla"/>
+        </createIndex>
+        <createIndex tableName="sipro_detalle_consolidacion_archivos" indexName="idx_consol_arch_consolidacion">
+            <column name="id_consolidacion"/>
+        </createIndex>
+        <addForeignKeyConstraint baseTableName="sipro_detalle_consolidacion_archivos"
+                                 baseColumnNames="id_consolidacion"
+                                 referencedTableName="sipro_detalle_consolidaciones_planillas"
+                                 referencedColumnNames="id_consolidacion"
+                                 onDelete="CASCADE"
+                                 constraintName="fk_consol_arch_consolidacion"/>
+        <addForeignKeyConstraint baseTableName="sipro_detalle_consolidacion_archivos"
+                                 baseColumnNames="id_carga_planilla"
+                                 referencedTableName="sipro_detalle_carga_planillas"
+                                 referencedColumnNames="id"
+                                 onUpdate="CASCADE"
+                                 constraintName="fk_consol_arch_carga"/>
+        <addForeignKeyConstraint baseTableName="sipro_detalle_consolidacion_archivos"
+                                 baseColumnNames="id_validacion_archivo"
+                                 referencedTableName="sipro_detalle_archivo_validacion"
+                                 referencedColumnNames="id"
+                                 onUpdate="CASCADE"
+                                 constraintName="fk_consol_arch_validacion"/>
+        <addForeignKeyConstraint baseTableName="sipro_detalle_consolidacion_archivos"
+                                 baseColumnNames="id_producto_origen"
+                                 referencedTableName="productos"
+                                 referencedColumnNames="id_producto"
+                                 constraintName="fk_consol_arch_producto"/>
+        <addForeignKeyConstraint baseTableName="sipro_detalle_consolidacion_archivos"
+                                 baseColumnNames="id_segmento"
+                                 referencedTableName="segmentos"
+                                 referencedColumnNames="id"
+                                 constraintName="fk_consol_arch_segmento"/>
+        <addForeignKeyConstraint baseTableName="sipro_detalle_consolidacion_archivos"
+                                 baseColumnNames="id_usuario_cargador"
+                                 referencedTableName="usuario_persona"
+                                 referencedColumnNames="id_usuario"
+                                 constraintName="fk_consol_arch_cargador"/>
+        <addForeignKeyConstraint baseTableName="sipro_detalle_consolidacion_archivos"
+                                 baseColumnNames="id_usuario_aprobador"
+                                 referencedTableName="usuario_persona"
+                                 referencedColumnNames="id_usuario"
+                                 constraintName="fk_consol_arch_aprobador"/>
+    </changeSet>
+
+    <changeSet id="007-004" author="copilot">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="sipro_detalle_consolidado_registros"/>
+            </not>
+        </preConditions>
+        <createTable tableName="sipro_detalle_consolidado_registros">
+            <column name="id_consolidado_registro" type="bigserial" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="id_consolidacion" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="id_consolidacion_archivo" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="id_carga_planilla" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="tipo_id" type="varchar(50)"/>
+            <column name="id_producto_origen" type="bigint"/>
+            <column name="producto_origen" type="varchar(255)"/>
+            <column name="id_segmento" type="integer"/>
+            <column name="segmento" type="varchar(255)"/>
+            <column name="fecha_corte" type="date"/>
+            <column name="descripcion" type="text"/>
+            <column name="id_usuario_cargador" type="bigint"/>
+            <column name="usuario_cargador" type="varchar(255)"/>
+            <column name="id_usuario_aprobador" type="bigint"/>
+            <column name="usuario_aprobador" type="varchar(255)"/>
+            <column name="nit" type="integer"/>
+            <column name="oficina" type="integer"/>
+            <column name="documento" type="integer"/>
+            <column name="moneda" type="integer"/>
+            <column name="modalidad" type="varchar(255)"/>
+            <column name="anoiniobl" type="integer"/>
+            <column name="mesiniobl" type="integer"/>
+            <column name="diainiobl" type="integer"/>
+            <column name="anovcto" type="integer"/>
+            <column name="mesvcto" type="integer"/>
+            <column name="diavcto" type="integer"/>
+            <column name="anovctofin" type="integer"/>
+            <column name="mesvctofin" type="integer"/>
+            <column name="diavctofin" type="integer"/>
+            <column name="ctapuc" type="integer"/>
+            <column name="vlriniobl" type="numeric(15,2)"/>
+            <column name="saldo" type="numeric(15,2)"/>
+            <column name="sdootrctas" type="numeric(15,2)"/>
+            <column name="intereses" type="numeric(15,2)"/>
+            <column name="sdovencido" type="numeric(15,2)"/>
+            <column name="intctasord" type="numeric(15,2)"/>
+            <column name="usuario" type="varchar(255)"/>
+            <column name="producto" type="varchar(255)"/>
+            <column name="clasificacion" type="smallint"/>
+        </createTable>
+        <createIndex tableName="sipro_detalle_consolidado_registros" indexName="idx_consreg_archivo">
+            <column name="id_consolidacion_archivo"/>
+        </createIndex>
+        <createIndex tableName="sipro_detalle_consolidado_registros" indexName="idx_consreg_carga">
+            <column name="id_carga_planilla"/>
+        </createIndex>
+        <createIndex tableName="sipro_detalle_consolidado_registros" indexName="idx_consreg_consolidacion">
+            <column name="id_consolidacion"/>
+        </createIndex>
+        <createIndex tableName="sipro_detalle_consolidado_registros" indexName="idx_consreg_nit_corte">
+            <column name="nit"/>
+            <column name="fecha_corte"/>
+        </createIndex>
+        <addCheckConstraint tableName="sipro_detalle_consolidado_registros"
+                            constraintName="chk_consreg_clasificacion"
+                            checkConstraint="clasificacion IS NULL OR clasificacion IN (1, 2, 3, 4)"/>
+        <addForeignKeyConstraint baseTableName="sipro_detalle_consolidado_registros"
+                                 baseColumnNames="id_consolidacion"
+                                 referencedTableName="sipro_detalle_consolidaciones_planillas"
+                                 referencedColumnNames="id_consolidacion"
+                                 onDelete="CASCADE"
+                                 constraintName="fk_consreg_consolidacion"/>
+        <addForeignKeyConstraint baseTableName="sipro_detalle_consolidado_registros"
+                                 baseColumnNames="id_consolidacion_archivo"
+                                 referencedTableName="sipro_detalle_consolidacion_archivos"
+                                 referencedColumnNames="id_consolidacion_archivo"
+                                 onDelete="CASCADE"
+                                 constraintName="fk_consreg_consolidacion_archivo"/>
+        <addForeignKeyConstraint baseTableName="sipro_detalle_consolidado_registros"
+                                 baseColumnNames="id_carga_planilla"
+                                 referencedTableName="sipro_detalle_carga_planillas"
+                                 referencedColumnNames="id"
+                                 onUpdate="CASCADE"
+                                 constraintName="fk_consreg_carga"/>
+        <addForeignKeyConstraint baseTableName="sipro_detalle_consolidado_registros"
+                                 baseColumnNames="id_producto_origen"
+                                 referencedTableName="productos"
+                                 referencedColumnNames="id_producto"
+                                 constraintName="fk_consreg_producto"/>
+        <addForeignKeyConstraint baseTableName="sipro_detalle_consolidado_registros"
+                                 baseColumnNames="id_segmento"
+                                 referencedTableName="segmentos"
+                                 referencedColumnNames="id"
+                                 constraintName="fk_consreg_segmento"/>
+        <addForeignKeyConstraint baseTableName="sipro_detalle_consolidado_registros"
+                                 baseColumnNames="id_usuario_cargador"
+                                 referencedTableName="usuario_persona"
+                                 referencedColumnNames="id_usuario"
+                                 constraintName="fk_consreg_cargador"/>
+        <addForeignKeyConstraint baseTableName="sipro_detalle_consolidado_registros"
+                                 baseColumnNames="id_usuario_aprobador"
+                                 referencedTableName="usuario_persona"
+                                 referencedColumnNames="id_usuario"
+                                 constraintName="fk_consreg_aprobador"/>
+    </changeSet>
+
+</databaseChangeLog>

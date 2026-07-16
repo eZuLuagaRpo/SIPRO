@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.24.xsd">
+
+    <!-- ================================================================
+         004: RBAC por Producto — sipro_usuario_producto_rol
+         Tabla puente que asocia usuarios con roles específicos por producto.
+         ================================================================ -->
+
+    <!-- 004-001: Crear tabla sipro_usuario_producto_rol -->
+    <changeSet id="004-001" author="sipro">
+        <comment>Crear tabla RBAC: sipro_usuario_producto_rol (quién-dónde-qué hace)</comment>
+        <createTable tableName="sipro_usuario_producto_rol">
+            <column name="id_usuario" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="id_producto" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="id_rol" type="integer">
+                <constraints nullable="false"/>
+            </column>
+            <column name="orden_flujo" type="smallint" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+            <column name="activo" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="creado_en" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP"/>
+            <column name="actualizado_en" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP"/>
+        </createTable>
+    </changeSet>
+
+    <!-- 004-002: PK compuesta (id_usuario, id_producto, id_rol) -->
+    <changeSet id="004-002" author="sipro">
+        <addPrimaryKey
+                tableName="sipro_usuario_producto_rol"
+                columnNames="id_usuario, id_producto, id_rol"
+                constraintName="pk_sipro_usuario_producto_rol"/>
+    </changeSet>
+
+    <!-- 004-003: FK hacia usuario_persona (RESTRICT) -->
+    <changeSet id="004-003" author="sipro">
+        <addForeignKeyConstraint
+                baseTableName="sipro_usuario_producto_rol"
+                baseColumnNames="id_usuario"
+                referencedTableName="usuario_persona"
+                referencedColumnNames="id_usuario"
+                constraintName="fk_upr_usuario"
+                onDelete="RESTRICT"/>
+    </changeSet>
+
+    <!-- 004-004: FK hacia productos (CASCADE) -->
+    <changeSet id="004-004" author="sipro">
+        <addForeignKeyConstraint
+                baseTableName="sipro_usuario_producto_rol"
+                baseColumnNames="id_producto"
+                referencedTableName="productos"
+                referencedColumnNames="id_producto"
+                constraintName="fk_upr_producto"
+                onDelete="CASCADE"/>
+    </changeSet>
+
+    <!-- 004-005: FK hacia sipro_roles_permisos (RESTRICT) -->
+    <changeSet id="004-005" author="sipro">
+        <addForeignKeyConstraint
+                baseTableName="sipro_usuario_producto_rol"
+                baseColumnNames="id_rol"
+                referencedTableName="sipro_roles_permisos"
+                referencedColumnNames="id_rol"
+                constraintName="fk_upr_rol"
+                onDelete="RESTRICT"/>
+    </changeSet>
+
+    <!-- 004-006: CHECK constraint para orden_flujo IN (1, 2) -->
+    <changeSet id="004-006" author="sipro">
+        <sql>
+            ALTER TABLE sipro_usuario_producto_rol
+            ADD CONSTRAINT chk_orden_flujo CHECK (orden_flujo IN (1, 2));
+        </sql>
+    </changeSet>
+
+    <!-- 004-007: Índices para consultas frecuentes -->
+    <changeSet id="004-007" author="sipro">
+        <createIndex tableName="sipro_usuario_producto_rol" indexName="idx_upr_usuario">
+            <column name="id_usuario"/>
+        </createIndex>
+        <createIndex tableName="sipro_usuario_producto_rol" indexName="idx_upr_producto">
+            <column name="id_producto"/>
+        </createIndex>
+        <createIndex tableName="sipro_usuario_producto_rol" indexName="idx_upr_rol">
+            <column name="id_rol"/>
+        </createIndex>
+        <createIndex tableName="sipro_usuario_producto_rol" indexName="idx_upr_activo">
+            <column name="id_usuario"/>
+            <column name="activo"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- 004-008: Datos iniciales de prueba (DEV) - Roles SIPRO esperados:
+         - "SIPRO_Usuario_Cargador" → rol con cargar_archivos=1 (id_rol según sipro_roles_permisos)
+         - "SIPRO_Usuario_Aprobador" → rol con aprobar=1 (id_rol según sipro_roles_permisos)
+         IMPORTANTE: id_usuario referencia usuario_persona.id_usuario
+         Ajustar id_rol según los registros reales en sipro_roles_permisos -->
+    <changeSet id="004-008" author="sipro" context="dev">
+        <comment>Datos seed RBAC para desarrollo — ajustar id_rol según los roles SIPRO_Usuario_Cargador y SIPRO_Usuario_Aprobador en sipro_roles_permisos</comment>
+        <sql>
+            -- Usuario 1 (junortiz) es Cargador del producto 17 (Nequi) y Aprobador del producto 18
+            INSERT INTO sipro_usuario_producto_rol (id_usuario, id_producto, id_rol, orden_flujo, activo)
+            SELECT 1, p.id_producto, 1, 1, true
+            FROM productos p
+            WHERE p.id_producto = (SELECT MIN(id_producto) FROM productos)
+            AND EXISTS (SELECT 1 FROM usuario_persona WHERE id_usuario = 1)
+            AND EXISTS (SELECT 1 FROM sipro_roles_permisos WHERE id_rol = 1)
+            ON CONFLICT DO NOTHING;
+
+            INSERT INTO sipro_usuario_producto_rol (id_usuario, id_producto, id_rol, orden_flujo, activo)
+            SELECT 1, p.id_producto, 2, 1, true
+            FROM productos p
+            WHERE p.id_producto = (SELECT MIN(id_producto) FROM productos)
+            AND EXISTS (SELECT 1 FROM usuario_persona WHERE id_usuario = 1)
+            AND EXISTS (SELECT 1 FROM sipro_roles_permisos WHERE id_rol = 2)
+            ON CONFLICT DO NOTHING;
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

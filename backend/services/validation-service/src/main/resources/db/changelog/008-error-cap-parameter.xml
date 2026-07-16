@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.24.xsd">
+
+    <!-- ================================================================
+         008: Parámetro para limitar errores de validación por columna/tipo
+         Optimización de rendimiento para archivos grandes (150K+ filas).
+         ================================================================ -->
+
+    <changeSet id="008-001" author="sipro">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM sipro_parametros_unico WHERE clave = 'MAX_FIELD_ERRORS_PER_COLUMN'
+            </sqlCheck>
+        </preConditions>
+        <comment>Límite de errores por columna/tipo en validación dinámica (TOP N por tipo de error)</comment>
+        <insert tableName="sipro_parametros_unico">
+            <column name="clave" value="MAX_FIELD_ERRORS_PER_COLUMN"/>
+            <column name="valor" value="50"/>
+            <column name="tipo" value="INTEGER"/>
+            <column name="descripcion" value="Cantidad maxima de errores a reportar por cada columna/tipo de error en la validacion de archivos. Errores adicionales se omiten con resumen."/>
+            <column name="creado_en" valueComputed="now()"/>
+            <column name="modificado_en" valueComputed="now()"/>
+        </insert>
+    </changeSet>
+
+</databaseChangeLog>

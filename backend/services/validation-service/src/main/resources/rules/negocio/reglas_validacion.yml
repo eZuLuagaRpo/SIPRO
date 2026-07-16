@@ -1,0 +1,17 @@
+versionCatalogo: "0.1.0"
+firmas:
+  hashCatalogo: ""
+
+reglas: []
+
+# Estructura esperada de una regla (placeholder):
+# - id: "R-0001"
+#   nombre: "Saldo no negativo"
+#   descripcion: "Valida que saldo >= 0"
+#   severidad: "MAJOR"  # BLOCKER|MAJOR|MINOR
+#   condicion: "saldo >= 0"  # placeholder (DSL por definir)
+#   version: "1.0.0"
+#   vigencia:
+#     desde: "2025-01-01"
+#     hasta: null
+#   fuente: "SARC/SIF"

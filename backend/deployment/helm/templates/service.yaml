@@ -1,0 +1,13 @@
+# Service interno del cluster que expone el puerto HTTP del validation-service.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    app: {{ .Release.Name }}
+  ports:
+    # port es el puerto visible para otros clientes del cluster; targetPort apunta al contenedor.
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}

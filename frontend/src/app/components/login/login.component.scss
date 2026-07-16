@@ -1,0 +1,261 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* Variables locales */
+$negro: #2C2A29;
+$blanco: #FFFFFF;
+$amarillo: #FDDA24;
+$amarillo-hover: #FCD015;
+$gris-texto: #666666;
+$gris-borde: #B2B2B2;
+$gris-bg: #F4F4F4;
+$rojo: #D32F2F;
+
+/* ─── Header ─────────────────────────────────────────── */
+.header {
+  background-color: $blanco;
+  padding: 6px 40px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 10;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.header-logo {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.header img {
+  height: auto;
+  max-height: 44px;
+  width: auto;
+}
+
+/* ─── Área principal ──────────────────────────────────── */
+.main-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  position: relative;
+  z-index: 1;
+  background-color: $gris-bg;
+}
+
+/* Trazos decorativos Bancolombia como fondo */
+.main-container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url('/assets/images/trazo.svg');
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center;
+  opacity: 1;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ─── Card de login ───────────────────────────────────── */
+.login-card {
+  background-color: $blanco;
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.10);
+  padding: 48px;
+  width: 100%;
+  max-width: 480px;
+  animation: fadeInUp 0.5s ease-out;
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+.login-title {
+  text-align: center;
+  color: $negro;
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0 0 12px;
+}
+
+.login-subtitle {
+  text-align: center;
+  color: $gris-texto;
+  font-size: 15px;
+  margin: 0 0 28px;
+  line-height: 1.5;
+}
+
+/* ─── Caja de error ───────────────────────────────────── */
+.error-box {
+  background-color: #FFF0F0;
+  border-left: 4px solid $rojo;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.error-box__icon {
+  color: $rojo;
+  font-size: 18px;
+  flex-shrink: 0;
+  line-height: 1.4;
+}
+
+.error-box__text {
+  color: $rojo;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+  /* Previene desbordamiento con textos largos (e.g. UPNs de Entra ID) */
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+/* ─── Botón principal ─────────────────────────────────── */
+.btn-login {
+  width: 100%;
+  padding: 14px;
+  background-color: $amarillo;
+  color: $negro;
+  border: none;
+  border-radius: 50px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+}
+
+.btn-login:hover:not(:disabled) {
+  background-color: $amarillo-hover;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(253, 218, 36, 0.4);
+}
+
+.btn-login:active {
+  transform: translateY(0);
+}
+
+.btn-login:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ─── Spinner de carga ────────────────────────────────── */
+.spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 3px solid $negro;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Footer ──────────────────────────────────────────── */
+.footer {
+  background-color: $gris-bg;
+  border-top: 1px solid #EFEFEF;
+  padding: 14px 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  z-index: 10;
+  font-size: 11px;
+  color: $gris-texto;
+}
+
+.footer-left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.footer-logo-small {
+  height: 16px;
+  filter: grayscale(1);
+}
+
+.footer-logo-vigilado {
+  height: 13px;
+}
+
+.footer-right {
+  text-align: right;
+}
+
+.footer-ip,
+.footer-datetime {
+  display: block;
+  line-height: 1.7;
+}
+
+/* ─── Responsive ──────────────────────────────────────── */
+@media (max-width: 768px) {
+  .login-card {
+    padding: 32px 24px;
+    margin: 0 10px;
+  }
+
+  .login-title {
+    font-size: 24px;
+  }
+
+  .footer {
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+    padding: 12px 20px;
+  }
+
+  .footer-left {
+    align-items: center;
+  }
+
+  .footer-right {
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-card {
+    padding: 24px 20px;
+  }
+}

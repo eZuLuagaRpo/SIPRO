@@ -1,0 +1,5 @@
+catalogo:
+  - codigo: "VAL-0000"
+    severidad: "MINOR"
+    mensaje: "Placeholder de catálogo de errores"
+    accion: "Revisar configuración"

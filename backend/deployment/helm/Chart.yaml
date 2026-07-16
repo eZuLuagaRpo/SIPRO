@@ -1,0 +1,9 @@
+# Metadata minima del chart Helm para empaquetar el deployment base del validation-service.
+apiVersion: v2
+name: validation-service
+description: SIPRO validation-service (placeholder)
+type: application
+# Version del chart: cambia cuando se versiona la plantilla de despliegue.
+version: 0.1.0
+# Version funcional de la aplicacion desplegada por defecto.
+appVersion: "0.1.0"

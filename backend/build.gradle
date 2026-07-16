@@ -1,0 +1,17 @@
+plugins {
+    id 'base'
+}
+
+allprojects {
+    group = 'com.bancolombia.sipro'
+    version = '0.1.0-SNAPSHOT'
+}
+
+subprojects {
+    repositories {
+        maven {
+            url = uri('https://artifactory.apps.bancolombia.com/maven-bancolombia/')
+        }
+        mavenCentral()
+    }
+}

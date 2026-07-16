@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.24.xsd">
+
+    <!-- ================================================================
+         014: Agregar f_ult_actualizacion en tablas LZ MDM clientes
+         - Tabla final:   sipro_lz_mdm_datos_generales_clientes
+         - Tabla staging: sipro_lz_mdm_datos_generales_clientes_stg
+         ================================================================ -->
+
+    <changeSet id="014-001" author="sipro">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="sipro_lz_mdm_datos_generales_clientes" columnName="f_ult_actualizacion"/>
+            </not>
+        </preConditions>
+        <comment>Agregar columna f_ult_actualizacion en tabla final de clientes LZ</comment>
+        <addColumn tableName="sipro_lz_mdm_datos_generales_clientes">
+            <column name="f_ult_actualizacion" type="varchar" remarks="Fecha de ultima actualizacion recibida desde la fuente LZ"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="sipro_lz_mdm_datos_generales_clientes" columnName="f_ult_actualizacion"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="014-002" author="sipro">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="sipro_lz_mdm_datos_generales_clientes_stg" columnName="f_ult_actualizacion"/>
+            </not>
+        </preConditions>
+        <comment>Agregar columna f_ult_actualizacion en tabla staging de clientes LZ</comment>
+        <addColumn tableName="sipro_lz_mdm_datos_generales_clientes_stg">
+            <column name="f_ult_actualizacion" type="varchar" remarks="Fecha de ultima actualizacion recibida desde la fuente LZ"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="sipro_lz_mdm_datos_generales_clientes_stg" columnName="f_ult_actualizacion"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

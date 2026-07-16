@@ -1,0 +1,111 @@
+# ============================================
+# Java / Gradle
+# ============================================
+
+# Gradle
+.gradle/
+**/build/
+**/bin/
+**/out/
+!**/adapters/out/
+
+# Archivos compilados
+*.class
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# Logs y temp
+*.log
+.gradletasknamecache
+
+# ============================================
+# IDEs y Editores
+# ============================================
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# VS Code
+.vscode/
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+
+# NetBeans
+nbproject/
+
+# ============================================
+# Sistemas Operativos
+# ============================================
+
+# Windows
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux
+*~
+
+# ============================================
+# Seguridad y Certificados
+# ============================================
+
+# Certificados privados (IMPORTANTE: revisar antes de commitear)
+*.pem
+*.pfx
+*.key
+*.p12
+!**/certificates/README.md
+
+# Keystores sensibles
+*.jks
+*.keystore
+!**/test-data/**/*.jks
+
+# Variables de entorno
+.env
+.env.local
+.env.*.local
+
+# ============================================
+# Datos y Archivos Temporales
+# ============================================
+
+# Excel/CSV de prueba
+*.xlsx
+*.xls
+*.csv
+!**/test-data/**/*.xlsx
+!**/test-data/**/*.csv
+
+# Backups
+*.bak
+*.swp
+*.swo
+
+# ============================================
+# SIPRO - Archivos locales no versionables
+# ============================================
+
+# Keystores de produccion (Impala truststore)
+# Se versionan SOLO los de test-data
+services/validation-service/src/main/resources/certificates/*.jks
+services/validation-service/bin/main/certificates/*.jks
+
+# Archivos temporales de Claude / agentes
+tmpclaude-*

@@ -1,0 +1,189 @@
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+spring:
+  application:
+    name: sipro-validation-service
+  main:
+    banner-mode: console
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS:true}
+  servlet:
+    multipart:
+      max-file-size: 300MB
+      max-request-size: 300MB
+  datasource:
+    url: ${JDBC_URL:jdbc:postgresql://localhost:5433/appdb?characterEncoding=UTF-8}
+    username: ${DB_USER:appuser}
+    password: ${DB_PASS:12345}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        temp:
+          use_jdbc_metadata_defaults: false
+      # Forzar UTF-8 en la conexión
+      connection.characterEncoding: utf-8
+      hibernate.connection.charSet: utf-8
+      hibernate.connection.useUnicode: true
+  http:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  tracing:
+    enabled: true
+
+security:
+  ad:
+    url: ${AD_URL:}
+    domain: ${AD_DOMAIN:}
+    groupsMapping: classpath:security/roles.yml
+
+# ============================================================================
+# Basado en lineamientos EUC Nivel 2 y formato real de LZ.java (VSC_EUC00015)
+
+# 1. PARAMETRIZACIÓN DE NEGOCIO (Esquemas y Tablas)
+#    Permite cambiar tablas sin modificar código Java
+app:
+  # Origenes permitidos para CORS, separados por coma. En PDN debe venir del
+  # equipo de despliegue con el dominio real del frontend (APP_CORS_ALLOWED_ORIGINS).
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:4200,http://localhost:8080}
+  storage:
+    type: ${STORAGE_TYPE:s3}
+    s3:
+      # Valores por defecto = LocalStack (simulacion de S3 en desarrollo).
+      # En PDN, el equipo de despliegue/provision debe inyectar el bucket y las
+      # credenciales reales via variables de entorno (ver application-prd.yml).
+      endpoint: ${APP_STORAGE_S3_ENDPOINT:http://localhost:4566}
+      region: ${APP_STORAGE_S3_REGION:us-east-1}
+      bucket: ${APP_STORAGE_S3_BUCKET:sipro-bucket}
+      access-key: ${APP_STORAGE_S3_ACCESS_KEY:test}
+      secret-key: ${APP_STORAGE_S3_SECRET_KEY:test}
+  lz:
+    # Tabla MDM completa por ambiente:
+    #   DEV/QA : default.sipro_fcr_mdm_datos_generales_clientes
+    #   PDN    : resultados_fcr.fcr_mdm_datos_generales_clientes
+    schema: ${APP_LZ_SCHEMA:resultados_fcr}
+    tables:
+      mdm: ${APP_LZ_TABLE_MDM:fcr_mdm_datos_generales_clientes}
+  mail:
+    enabled: ${APP_MAIL_ENABLED:false}
+    transport: ${APP_MAIL_TRANSPORT:outlook-win32}
+    from: ${APP_MAIL_FROM:no-reply-sipro@bancolombia.com.co}
+    action-url: ${APP_MAIL_ACTION_URL:http://localhost:4200/aprobacion}
+    banner-url: ${APP_MAIL_BANNER_URL:http://localhost:8080/email-assets/SIPRO_BannerCorreo.png}
+    banner-resource-path: ${APP_MAIL_BANNER_RESOURCE_PATH:classpath:static/email-assets/SIPRO_BannerCorreo.png}
+    outlook-powershell-path: ${APP_MAIL_OUTLOOK_POWERSHELL:powershell.exe}
+    log-preview: ${APP_MAIL_LOG_PREVIEW:true}
+    ses:
+      region: ${APP_MAIL_SES_REGION:us-east-1}
+      access-key: ${APP_MAIL_SES_ACCESS_KEY:}
+      secret-key: ${APP_MAIL_SES_SECRET_KEY:}
+  excel:
+    poi-byte-array-max-override: ${APP_EXCEL_POI_BYTE_ARRAY_MAX_OVERRIDE:250000000}
+  validation:
+    cached-upload-ttl-minutes: ${APP_VALIDATION_CACHED_UPLOAD_TTL_MINUTES:120}
+    async:
+      core-pool-size: ${APP_VALIDATION_ASYNC_CORE_POOL_SIZE:2}
+      max-pool-size: ${APP_VALIDATION_ASYNC_MAX_POOL_SIZE:4}
+      queue-capacity: ${APP_VALIDATION_ASYNC_QUEUE_CAPACITY:16}
+      thread-name-prefix: ${APP_VALIDATION_ASYNC_THREAD_NAME_PREFIX:validation-job-}
+  admin:
+    sql:
+      max-select-rows: ${APP_ADMIN_SQL_MAX_SELECT_ROWS:200}
+      require-where-on-select: ${APP_ADMIN_SQL_REQUIRE_WHERE_ON_SELECT:false}
+      require-where-on-update: ${APP_ADMIN_SQL_REQUIRE_WHERE_ON_UPDATE:true}
+      enabled-operations:
+        - ${APP_ADMIN_SQL_OPERATION_1:SELECT}
+        - ${APP_ADMIN_SQL_OPERATION_2:UPDATE}
+        - ${APP_ADMIN_SQL_OPERATION_3:INSERT}
+      allowed-tables:
+        - ${APP_ADMIN_SQL_TABLE_1:data_validation_rule}
+        - ${APP_ADMIN_SQL_TABLE_2:productos}
+        - ${APP_ADMIN_SQL_TABLE_3:segmentos}
+        - ${APP_ADMIN_SQL_TABLE_4:sipro_lz_catalogo_tablas}
+        - ${APP_ADMIN_SQL_TABLE_5:sipro_lz_ingestion_run}
+        - ${APP_ADMIN_SQL_TABLE_6:sipro_lz_ingestion_run_default}
+        - ${APP_ADMIN_SQL_TABLE_7:sipro_lz_mdm_datos_generales_clientes}
+        - ${APP_ADMIN_SQL_TABLE_8:sipro_lz_mdm_datos_generales_clientes_default}
+        - ${APP_ADMIN_SQL_TABLE_9:sipro_lz_mdm_datos_generales_clientes_stg}
+        - ${APP_ADMIN_SQL_TABLE_10:sipro_lz_mdm_datos_generales_clientes_stg_default}
+        - ${APP_ADMIN_SQL_TABLE_11:sipro_parametros_columnas}
+        - ${APP_ADMIN_SQL_TABLE_12:sipro_parametros_columnas_creffsos}
+        - ${APP_ADMIN_SQL_TABLE_13:sipro_parametros_excepcionventanacarga}
+        - ${APP_ADMIN_SQL_TABLE_14:sipro_parametros_homologacion_colgaap}
+        - ${APP_ADMIN_SQL_TABLE_15:sipro_parametros_rango_habilitado}
+        - ${APP_ADMIN_SQL_TABLE_16:sipro_parametros_reglaventanacarga}
+        - ${APP_ADMIN_SQL_TABLE_17:sipro_parametros_tablas_lz}
+        - ${APP_ADMIN_SQL_TABLE_18:sipro_parametros_unico}
+        - ${APP_ADMIN_SQL_TABLE_19:sipro_resumen_por_moneda}
+      forbidden-tokens:
+        - ${APP_ADMIN_SQL_FORBIDDEN_1:delete}
+        - ${APP_ADMIN_SQL_FORBIDDEN_2:truncate}
+        - ${APP_ADMIN_SQL_FORBIDDEN_3:drop}
+        - ${APP_ADMIN_SQL_FORBIDDEN_4:alter}
+        - ${APP_ADMIN_SQL_FORBIDDEN_5:create}
+        - ${APP_ADMIN_SQL_FORBIDDEN_6:grant}
+        - ${APP_ADMIN_SQL_FORBIDDEN_7:revoke}
+        - ${APP_ADMIN_SQL_FORBIDDEN_8:comment}
+        - ${APP_ADMIN_SQL_FORBIDDEN_9:copy}
+    logs:
+      streaming-enabled: ${APP_ADMIN_LOGS_STREAMING_ENABLED:true}
+      download-enabled: ${APP_ADMIN_LOGS_DOWNLOAD_ENABLED:true}
+      max-buffered-entries: ${APP_ADMIN_LOGS_MAX_BUFFERED_ENTRIES:5000}
+      default-query-limit: ${APP_ADMIN_LOGS_DEFAULT_QUERY_LIMIT:500}
+      max-query-limit: ${APP_ADMIN_LOGS_MAX_QUERY_LIMIT:5000}
+
+
+# 2. CONFIGURACIÓN TÉCNICA DE CONEXIÓN LZ (Impala On-Prem - Solo Lectura)
+#    LzJdbcService construye la URL JDBC dinamicamente:
+#      jdbc:impala://host:port;AuthMech=3;KrbHostFQDN=host;...
+#    Patron calcado de LzMinimalTest.java ("Conectar a LZ")
+lz:
+  # Host y puerto de Impala (On-Prem Bancolombia)
+  host: ${LZ_HOST:impala.bancolombia.corp}
+  port: ${LZ_PORT:21050}
+
+  # ── Secrets Manager (LocalStack en DEV, AWS real en PDN) ─────────────────
+  secrets:
+    # DEV local: http://localhost:4567 (LocalStack)
+    # PDN: dejar vacio → usa endpoint AWS real con credenciales del entorno
+    endpoint: ${LZ_SECRETS_ENDPOINT:http://localhost:4567}
+    region:   ${LZ_SECRETS_REGION:us-east-1}
+    # Nombre del secreto. JSON esperado: {"user":"...","password":"..."}
+    name:     ${LZ_SECRETS_NAME:lz/creds}
+
+  ingestion:
+    # Ejecutar validacion de secrets al arrancar el backend.
+    validate-on-startup: ${LZ_VALIDATE_ON_STARTUP:true}
+
+sipro:
+  param:
+    APP_ADMIN_CONSOLIDACION_BYPASS_WINDOW: ${APP_ADMIN_CONSOLIDACION_BYPASS_WINDOW:false}

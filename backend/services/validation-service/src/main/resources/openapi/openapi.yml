@@ -1,0 +1,23 @@
+openapi: 3.0.3
+info:
+  title: SIPRO Validation Service
+  version: 0.1.0
+paths:
+  /validations:
+    post:
+      summary: Ejecuta validaciones sobre un lote
+      responses:
+        '200':
+          description: OK
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+  /acta:
+    get:
+      summary: Obtiene acta de validación
+      responses:
+        '200':
+          description: OK
