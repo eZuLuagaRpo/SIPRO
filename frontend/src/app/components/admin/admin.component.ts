@@ -527,6 +527,10 @@ export class AdminComponent implements OnInit, OnDestroy {
     );
   }
 
+  get fase2EnCurso(): boolean {
+    return !!this.dashboard?.estadoConsolidacion?.fase2EnCurso;
+  }
+
   get modalConsolidacionTerminada(): boolean {
     return this.consolidacionModalVisible && !this.consolidacionEnCurso;
   }
@@ -549,11 +553,10 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   get modalConsolidacionTitulo(): string {
     if (!this.modalConsolidacionTerminada) {
+      if (this.fase2EnCurso) {
+        return 'Publicando archivos bloqueados en segundo plano...';
+      }
       return 'Ejecutando consolidación...';
-    }
-
-    if (this.dashboard?.estadoConsolidacion?.fase2EnCurso && this.modalConsolidacionEstado !== 'error') {
-      return 'Consolidación completada — publicando archivos bloqueados...';
     }
 
     return this.modalConsolidacionEstado === 'error'
@@ -562,9 +565,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   get modalConsolidacionMensaje(): string {
-    if (this.dashboard?.estadoConsolidacion?.fase2EnCurso
-      && this.modalConsolidacionTerminada
-      && this.modalConsolidacionEstado !== 'error') {
+    if (this.fase2EnCurso && !this.modalConsolidacionTerminada && this.modalConsolidacionEstado !== 'error') {
       return 'El consolidado y el CREFFSOS ya están disponibles. Los archivos bloqueados se están publicando en segundo plano. Puedes cerrar esta ventana y navegar libremente.';
     }
 
@@ -818,12 +819,13 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   cerrarModalConsolidacion(): void {
-    if (this.consolidacionEnCurso) {
+    if (this.consolidacionEnCurso && !this.fase2EnCurso) {
       return;
     }
 
-    if (this.dashboard?.estadoConsolidacion?.fase2EnCurso) {
+    if (this.fase2EnCurso) {
       this.fase2ModalCerradoPorUsuario = true;
+      this.finalizarActividadProtegidaConsolidacion();
     }
 
     this.cargarDashboard(this.periodoSeleccionado?.valor ?? undefined, true);
@@ -1224,14 +1226,14 @@ export class AdminComponent implements OnInit, OnDestroy {
           }
           this.iniciarPollingDashboard(this.periodoSeleccionado.valor);
         } else if (response.estadoConsolidacion?.fase2EnCurso && this.periodoSeleccionado?.valor) {
-          this.consolidacionEnCurso = false;
+          this.consolidacionEnCurso = true;
           if (!this.fase2ModalCerradoPorUsuario) {
             this.consolidacionModalVisible = true;
             if (!this.consolidacionLogEntries.length) {
               this.consultarLogs(true, 'CONSOLIDACION');
             }
+            this.iniciarActividadProtegidaConsolidacion();
           }
-          this.finalizarActividadProtegidaConsolidacion();
           this.iniciarPollingDashboard(this.periodoSeleccionado.valor);
         } else {
           this.consolidacionEnCurso = false;

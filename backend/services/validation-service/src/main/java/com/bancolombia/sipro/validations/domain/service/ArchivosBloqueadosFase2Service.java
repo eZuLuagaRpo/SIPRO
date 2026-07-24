@@ -2,6 +2,7 @@ package com.bancolombia.sipro.validations.domain.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
@@ -39,6 +40,7 @@ public class ArchivosBloqueadosFase2Service {
         }
         estadoFase2PorPeriodo.put(fechaCorte, "EN_PROCESO");
         validationTaskExecutor.execute(() -> {
+            MDC.put(AdminLogBufferService.MDC_SCOPE_KEY, AdminLogBufferService.CONSOLIDACION_SCOPE);
             try {
                 logger.info("[Fase 2] Iniciando publicación de archivos bloqueados para periodo {}.", fechaCorte);
                 creffosConsolidationService.procesarArchivosBloqueados(fechaCorte);
@@ -48,6 +50,8 @@ public class ArchivosBloqueadosFase2Service {
                 estadoFase2PorPeriodo.put(fechaCorte, "ERROR");
                 logger.error("[Fase 2] Error procesando archivos bloqueados para periodo {}: {}",
                         fechaCorte, ex.getMessage(), ex);
+            } finally {
+                MDC.remove(AdminLogBufferService.MDC_SCOPE_KEY);
             }
         });
     }
