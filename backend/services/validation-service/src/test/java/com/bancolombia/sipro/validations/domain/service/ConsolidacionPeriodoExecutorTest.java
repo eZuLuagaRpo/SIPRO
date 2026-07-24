@@ -100,6 +100,9 @@ class ConsolidacionPeriodoExecutorTest {
     @Mock
     private Environment environment;
 
+    @Mock
+    private ArchivosBloqueadosFase2Service archivosBloqueadosFase2Service;
+
     private ConsolidacionPeriodoExecutor service;
 
     @BeforeEach
@@ -119,7 +122,8 @@ class ConsolidacionPeriodoExecutorTest {
                 notificacionConsolidacionService,
                 parametroUnicoService,
                 entityManager,
-                environment
+                environment,
+                archivosBloqueadosFase2Service
         );
 
             lenient().when(parametroUnicoService.getLong("APP_CONSOLIDACION_POST_CLOSE_DELAY_HOURS", 1L))
