@@ -27,15 +27,18 @@ public class ConsolidacionManualAsyncService {
     private final ConsolidacionPlanillasService consolidacionPlanillasService;
     private final SiproDetalleConsolidacionesPlanillasRepository consolidacionRepository;
     private final Executor validationTaskExecutor;
+    private final ArchivosBloqueadosFase2Service archivosBloqueadosFase2Service;
     private final Map<LocalDate, ConsolidacionManualStatusResponse> estadoTemporalPorPeriodo = new ConcurrentHashMap<>();
 
     public ConsolidacionManualAsyncService(
             ConsolidacionPlanillasService consolidacionPlanillasService,
             SiproDetalleConsolidacionesPlanillasRepository consolidacionRepository,
-            @Qualifier("validationTaskExecutor") Executor validationTaskExecutor) {
+            @Qualifier("validationTaskExecutor") Executor validationTaskExecutor,
+            ArchivosBloqueadosFase2Service archivosBloqueadosFase2Service) {
         this.consolidacionPlanillasService = consolidacionPlanillasService;
         this.consolidacionRepository = consolidacionRepository;
         this.validationTaskExecutor = validationTaskExecutor;
+        this.archivosBloqueadosFase2Service = archivosBloqueadosFase2Service;
     }
 
     /**
@@ -153,10 +156,12 @@ public class ConsolidacionManualAsyncService {
             response.setTerminal(true);
             response.setExito(true);
             response.setMensaje("Consolidación completada para el periodo " + response.getPeriodo() + ".");
+            response.setFase2EnCurso(archivosBloqueadosFase2Service.estaEnCurso(cabecera.getPeriodoValoracion()));
         } else if ("COMPLETADO_CON_ADVERTENCIAS".equalsIgnoreCase(estado)) {
             response.setTerminal(true);
             response.setExito(true);
             response.setMensaje("Consolidación completada con advertencias para el periodo " + response.getPeriodo() + ".");
+            response.setFase2EnCurso(archivosBloqueadosFase2Service.estaEnCurso(cabecera.getPeriodoValoracion()));
         } else if ("ERROR".equalsIgnoreCase(estado)) {
             response.setTerminal(true);
             response.setExito(false);

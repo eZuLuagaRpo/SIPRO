@@ -17,6 +17,7 @@ public class ConsolidacionManualStatusResponse {
     private OffsetDateTime fechaHoraInicio;
     private OffsetDateTime fechaHoraFin;
     private String mensajeError;
+    private boolean fase2EnCurso;
 
     public String getPeriodo() {
         return periodo;
@@ -96,5 +97,13 @@ public class ConsolidacionManualStatusResponse {
 
     public void setMensajeError(String mensajeError) {
         this.mensajeError = mensajeError;
+    }
+
+    public boolean isFase2EnCurso() {
+        return fase2EnCurso;
+    }
+
+    public void setFase2EnCurso(boolean fase2EnCurso) {
+        this.fase2EnCurso = fase2EnCurso;
     }
 }

@@ -47,6 +47,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   private eliminacionProgressTimeout: ReturnType<typeof setTimeout> | null = null;
   private sqlCopyFeedbackTimeout: ReturnType<typeof setTimeout> | null = null;
   private consolidacionActividadProtegida = false;
+  private fase2ModalCerradoPorUsuario = false;
   private readonly defaultSqlOperations: AdminSqlOperation[] = ['SELECT', 'UPDATE', 'INSERT'];
 
   readonly excelIconPath = '/assets/images/icoExcel.png';
@@ -551,12 +552,22 @@ export class AdminComponent implements OnInit, OnDestroy {
       return 'Ejecutando consolidación...';
     }
 
+    if (this.dashboard?.estadoConsolidacion?.fase2EnCurso && this.modalConsolidacionEstado !== 'error') {
+      return 'Consolidación completada — publicando archivos bloqueados...';
+    }
+
     return this.modalConsolidacionEstado === 'error'
       ? 'Consolidación finalizada con error'
       : 'Consolidación completada';
   }
 
   get modalConsolidacionMensaje(): string {
+    if (this.dashboard?.estadoConsolidacion?.fase2EnCurso
+      && this.modalConsolidacionTerminada
+      && this.modalConsolidacionEstado !== 'error') {
+      return 'El consolidado y el CREFFSOS ya están disponibles. Los archivos bloqueados se están publicando en segundo plano. Puedes cerrar esta ventana y navegar libremente.';
+    }
+
     return this.consolidacionError
       || this.dashboard?.estadoConsolidacion?.mensajeError
       || this.dashboard?.estadoConsolidacion?.mensaje
@@ -809,6 +820,10 @@ export class AdminComponent implements OnInit, OnDestroy {
   cerrarModalConsolidacion(): void {
     if (this.consolidacionEnCurso) {
       return;
+    }
+
+    if (this.dashboard?.estadoConsolidacion?.fase2EnCurso) {
+      this.fase2ModalCerradoPorUsuario = true;
     }
 
     this.cargarDashboard(this.periodoSeleccionado?.valor ?? undefined, true);
@@ -1208,8 +1223,19 @@ export class AdminComponent implements OnInit, OnDestroy {
             this.consultarLogs(true, 'CONSOLIDACION');
           }
           this.iniciarPollingDashboard(this.periodoSeleccionado.valor);
+        } else if (response.estadoConsolidacion?.fase2EnCurso && this.periodoSeleccionado?.valor) {
+          this.consolidacionEnCurso = false;
+          if (!this.fase2ModalCerradoPorUsuario) {
+            this.consolidacionModalVisible = true;
+            if (!this.consolidacionLogEntries.length) {
+              this.consultarLogs(true, 'CONSOLIDACION');
+            }
+          }
+          this.finalizarActividadProtegidaConsolidacion();
+          this.iniciarPollingDashboard(this.periodoSeleccionado.valor);
         } else {
           this.consolidacionEnCurso = false;
+          this.fase2ModalCerradoPorUsuario = false;
           this.detenerPollingDashboard();
           this.finalizarActividadProtegidaConsolidacion();
         }

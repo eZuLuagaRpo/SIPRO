@@ -113,6 +113,68 @@ public class CreffosConsolidationService {
         }
     }
 
+    /**
+     * Solo genera y publica el CREFFSOS en S3 y ruta compartida.
+     * Los archivos bloqueados se procesan después en {@link #procesarArchivosBloqueados}.
+     */
+    public PublicationResult generarYPublicarCreffsos(LocalDate fechaCorte) {
+        List<SiproDetalleConsolidadoRegistro> registros = consolidadoRegistroRepository
+                .findByFechaCorteOrderByIdConsolidadoRegistroAsc(fechaCorte);
+
+        if (registros.isEmpty()) {
+            logger.warn("[CREFFSOS] No hay registros consolidados para fecha={}. No se genera archivo.", fechaCorte);
+            return PublicationResult.notGenerated();
+        }
+
+        CreffosParametricGenerator.GeneratedCreffosFile generatedFile =
+                creffosParametricGenerator.generate(fechaCorte, registros);
+
+        String fechaStr = fechaCorte.format(FECHA_FMT);
+        String storageKey = CONSOLIDADOS_PREFIX + fechaStr + "/" + generatedFile.fileName();
+
+        try {
+            fileStorageService.storeBytes(generatedFile.content(), storageKey, generatedFile.contentType());
+            String sharedCopyWarning = publicarEnRutaCompartida(generatedFile);
+            logger.info("[CREFFSOS] Archivo paramétrico generado: {} (filas={}, formato={})",
+                    storageKey, generatedFile.rowCount(), generatedFile.format());
+            return PublicationResult.generated(storageKey, generatedFile.fileName(), sharedCopyWarning);
+        } catch (Exception ex) {
+            throw new IllegalStateException("No se pudo publicar el archivo CREFFSOS paramétrico: " + ex.getMessage(), ex);
+        }
+    }
+
+    /**
+     * Publica los archivos bloqueados del periodo: copia protegida del CREFFSOS,
+     * planillas Full IFRS, Excel de conciliación y ZIP final.
+     * Diseñado para ejecutarse en segundo plano después de que la Fase 1 haya completado.
+     */
+    public void procesarArchivosBloqueados(LocalDate fechaCorte) {
+        List<SiproDetalleConsolidadoRegistro> registros = consolidadoRegistroRepository
+                .findByFechaCorteOrderByIdConsolidadoRegistroAsc(fechaCorte);
+
+        if (!registros.isEmpty()) {
+            CreffosParametricGenerator.GeneratedCreffosFile generatedFile =
+                    creffosParametricGenerator.generate(fechaCorte, registros);
+            archivosBloqueadosService.publicarArchivo(fechaCorte, generatedFile.protectedFileName(),
+                    generatedFile.protectedContent());
+        }
+
+        fullIfrsBloqueadosConsolidacionService.publicarPeriodo(fechaCorte);
+
+        if (!registros.isEmpty()) {
+            try {
+                ConciliacionArchivosBloqueadosService.GeneratedConciliacion conciliacion =
+                        conciliacionArchivosBloqueadosService.generar(fechaCorte, registros);
+                archivosBloqueadosService.publicarArchivo(fechaCorte, conciliacion.fileName(), conciliacion.content());
+            } catch (Exception ex) {
+                logger.warn("[CREFFSOS] No se pudo generar el Excel de conciliacion de archivos bloqueados para '{}': {}",
+                        fechaCorte, ex.getMessage());
+            }
+        }
+
+        archivosBloqueadosService.comprimirYFinalizarPeriodo(fechaCorte);
+    }
+
     private String publicarEnRutaCompartida(CreffosParametricGenerator.GeneratedCreffosFile generatedFile) {
         String outputDir = parametroUnicoService.getString("CREFFSOS_RUTA_SALIDA", "");
         if (outputDir == null || outputDir.isBlank()) {
