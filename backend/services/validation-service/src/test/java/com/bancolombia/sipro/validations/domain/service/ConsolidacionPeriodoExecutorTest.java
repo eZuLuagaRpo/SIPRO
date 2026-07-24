@@ -27,6 +27,7 @@ import org.springframework.core.env.Environment;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -167,7 +168,7 @@ class ConsolidacionPeriodoExecutorTest {
         when(validacionRepository.findByIdCargaPlanillaIn(List.of(96L, 97L))).thenReturn(List.of(validacion));
         byte[] excelBytes = crearExcelBytes(
             List.of(
-                List.of("9001", "101", "12345", "1", "MOD1", "2026", "1", "1", "2026", "12", "31", "2026", "12", "31", "140405", "100.50", "80.10", "1.25", "2.50", "0", "0", "4", "usuario1", "Producto A"),
+                List.of("9001", "101", "12345", "1", "MOD1", "2026", "1", "1", "2026", "12", "31", "2026", "12", "31", "140405", "$ 100.50", "80.10", "1.25", "2.50", "0", "0", "4", "usuario1", "Producto A"),
                 List.of("9002", "102", "67890", "1", "MOD2", "2026", "2", "2", "2026", "11", "30", "2026", "11", "30", "140406", "200.00", "150.00", "3.00", "4.00", "0", "0", "5", "usuario2", "Producto A")
             ));
         when(fileStorageService.openStream("aprobados/2026-05-31/archivo-a.xlsx"))
@@ -234,6 +235,9 @@ class ConsolidacionPeriodoExecutorTest {
         SiproDetalleConsolidadoRegistro primerRegistro = savedBatches.get(0).get(0);
         assertEquals("CC", primerRegistro.getTipoId(), "tipoId del primer registro (documento 12345)");
         assertEquals("NIT", savedBatches.get(1).get(0).getTipoId(), "tipoId del segundo registro (documento 67890)");
+        assertNotNull(primerRegistro.getVlriniobl(), "vlriniobl del primer registro no debe ser null");
+        assertEquals(0, primerRegistro.getVlriniobl().compareTo(new BigDecimal("100.50")),
+            "vlriniobl del primer registro debe conservar el valor numérico");
         assertEquals(Integer.valueOf(1), primerRegistro.getIdSegmento(), "idSegmento del primer registro");
         assertEquals("Colgaap/Modificado", primerRegistro.getSegmento(), "segmento del primer registro");
         assertEquals("Cargador 96", primerRegistro.getUsuarioCargador(),

@@ -3,6 +3,7 @@ package com.bancolombia.sipro.validations.shared.utils;
 import org.apache.poi.openxml4j.exceptions.OpenXML4JException;
 import org.apache.poi.openxml4j.opc.OPCPackage;
 import org.apache.poi.ss.usermodel.DataFormatter;
+import java.util.Locale;
 import org.apache.poi.ss.util.CellReference;
 import org.apache.poi.util.XMLHelper;
 import org.apache.poi.xssf.eventusermodel.ReadOnlySharedStringsTable;
@@ -59,7 +60,7 @@ public final class XlsxStreamingReader {
                         null,
                         sharedStrings,
                         sheetHandler,
-                        new DataFormatter(),
+                        new DataFormatter(Locale.US),
                         false));
                 parser.parse(new InputSource(sheetStream));
             }

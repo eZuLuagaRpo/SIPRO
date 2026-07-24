@@ -15,7 +15,7 @@ app:
     transport: outlook-win32
     log-preview: true
   # ── Tabla MDM en LZ ambiente intermedio ─────────────────────────────
-  # DEV y QA usan default.sipro_fcr_mdm_datos_generales_clientes.
+  # DEV y QA usan proceso.sipro_fcr_mdm_datos_generales_clientes.
   # LzDevSeedService crea datos dummy en esa tabla al arrancar.
   # PDN usa resultados_fcr.fcr_mdm_datos_generales_clientes (desde application.yml).
   lz:

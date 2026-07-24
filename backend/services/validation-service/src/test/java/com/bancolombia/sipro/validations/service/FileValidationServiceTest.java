@@ -4,9 +4,12 @@ import com.bancolombia.sipro.validations.domain.service.DynamicExcelValidationSe
 import com.bancolombia.sipro.validations.domain.service.ParametroUnicoService;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
@@ -14,6 +17,21 @@ import static org.mockito.Mockito.mock;
  * Verifica que el reporte TXT de errores sea legible y útil para el usuario final.
  */
 class FileValidationServiceTest {
+
+    @Test
+    void shouldParseSummaryDecimalWithCurrencyAndSeparators() {
+        assertEquals(new BigDecimal("36.55"), FileValidationService.parseSummaryDecimal("$ 36.55"));
+        assertEquals(new BigDecimal("36.55"), FileValidationService.parseSummaryDecimal("36,55"));
+        assertEquals(new BigDecimal("4000000.22"), FileValidationService.parseSummaryDecimal("$ 4.000.000,22"));
+        assertEquals(new BigDecimal("4000000.22"), FileValidationService.parseSummaryDecimal("4,000,000.22"));
+    }
+
+    @Test
+    void shouldReturnNullForInvalidSummaryDecimal() {
+        assertNull(FileValidationService.parseSummaryDecimal(null));
+        assertNull(FileValidationService.parseSummaryDecimal(""));
+        assertNull(FileValidationService.parseSummaryDecimal("texto"));
+    }
 
     @Test
     void shouldGenerateReadableTxtErrorReport() throws Exception {

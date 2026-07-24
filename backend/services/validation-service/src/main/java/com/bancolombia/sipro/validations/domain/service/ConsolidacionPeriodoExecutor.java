@@ -22,7 +22,6 @@ import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.xssf.streaming.SXSSFSheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -154,7 +153,6 @@ public class ConsolidacionPeriodoExecutor {
 
     private static final long DEFAULT_POST_CLOSE_DELAY_HOURS = 1;
     private static final long DEFAULT_MAX_POST_CLOSE_DAYS = 5;
-    private static final int DEFAULT_AUTO_SIZE_LIMIT = 50;
     private static final String ADMIN_CONSOLIDACION_BYPASS_WINDOW_KEY = "APP_ADMIN_CONSOLIDACION_BYPASS_WINDOW";
 
     public ConsolidacionPeriodoExecutor(SiproDetalleCargaPlanillasRepository planillaRepository,
@@ -1003,7 +1001,11 @@ public class ConsolidacionPeriodoExecutor {
             return null;
         }
         try {
-            return new BigDecimal(normalizeNumber(value));
+            String normalized = DynamicExcelValidationService.normalizeNumericInput(value);
+            if (normalized == null || normalized.isBlank()) {
+                return null;
+            }
+            return new BigDecimal(normalized);
         } catch (NumberFormatException ex) {
             return null;
         }
@@ -1026,20 +1028,15 @@ public class ConsolidacionPeriodoExecutor {
 
     private final class ConsolidatedExcelWriter implements AutoCloseable {
 
+        private static final int COLUMN_WIDTH = 25 * 256; // 25 caracteres en unidades POI
+
         private final SXSSFWorkbook workbook;
         private final Sheet sheet;
-        private final int maxAutoSize;
         private int currentRowIndex = 1;
 
         private ConsolidatedExcelWriter() {
             this.workbook = new SXSSFWorkbook(200);
             this.sheet = workbook.createSheet("CONSOLIDADO");
-            if (sheet instanceof SXSSFSheet streamingSheet) {
-                streamingSheet.trackAllColumnsForAutoSizing();
-            }
-            this.maxAutoSize = Math.min(
-                    HEADERS_CONSOLIDADO_SALIDA.size(),
-                    parametroUnicoService.getInt("AUTO_SIZE_LIMIT", DEFAULT_AUTO_SIZE_LIMIT));
             crearHeader();
         }
 
@@ -1053,6 +1050,7 @@ public class ConsolidacionPeriodoExecutor {
 
             Row headerRow = sheet.createRow(0);
             for (int index = 0; index < HEADERS_CONSOLIDADO_SALIDA.size(); index++) {
+                sheet.setColumnWidth(index, COLUMN_WIDTH);
                 Cell cell = headerRow.createCell(index);
                 cell.setCellValue(HEADERS_CONSOLIDADO_SALIDA.get(index));
                 cell.setCellStyle(headerStyle);
@@ -1069,10 +1067,6 @@ public class ConsolidacionPeriodoExecutor {
         }
 
         private byte[] toByteArray() throws IOException {
-            for (int index = 0; index < maxAutoSize; index++) {
-                sheet.autoSizeColumn(index);
-            }
-
             try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
                 workbook.write(outputStream);
                 return outputStream.toByteArray();

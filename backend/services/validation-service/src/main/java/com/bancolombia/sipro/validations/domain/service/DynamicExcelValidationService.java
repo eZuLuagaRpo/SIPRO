@@ -2,6 +2,7 @@ package com.bancolombia.sipro.validations.domain.service;
 
 import com.bancolombia.sipro.validations.domain.model.ValidationRule;
 import com.bancolombia.sipro.validations.infrastructure.repository.ClienteLzRepository;
+import com.bancolombia.sipro.validations.infrastructure.repository.HomologacionColgaapRepository;
 import com.bancolombia.sipro.validations.infrastructure.repository.ValidationRuleRepository;
 import com.bancolombia.sipro.validations.service.ValidationProgressListener;
 import com.bancolombia.sipro.validations.shared.exceptions.BusinessException;
@@ -39,14 +40,12 @@ import java.util.stream.Collectors;
  *
  * Además incluye una fase adicional:
  * 4. LZ_EXISTENCE: Validar que el NIT del Excel exista en sipro_lz_mdm_datos_generales_clientes
- * 5. USUARIO_EXISTENCE: Validar que el USUARIO del Excel exista en directorio activo Bancolombia
  *
  * Flujo de validación:
  * 1. Primero ejecuta reglas FIELD para validar cada campo individualmente
  * 2. Después ejecuta reglas COMPOSITE_DATE para armar fechas y validar que existan
  * 3. Finalmente ejecuta reglas DATE_RELATION para comparar fechas entre sí
  * 4. Validación de existencia NIT en LZ (max 30 errores, con fallback de periodo)
- * 5. Validación de existencia USUARIO en directorio corporativo (batch por usuarios únicos)
  *
  * Nota de mantenimiento 2026: comentarios funcionales agregados por
  * Junior Alexander Ortiz Arenas (junortiz), ANALITICO/A - EVC OTRAS FUNCIONES CORPORATIVAS.
@@ -72,16 +71,14 @@ public class DynamicExcelValidationService {
             .create();
 
     private static final int DEFAULT_MAX_NIT_ERRORS = 30;
-    private static final int DEFAULT_MAX_USUARIO_ERRORS = 50;
     private static final int DEFAULT_NIT_ERROR_SUMMARY_LIMIT = 5;
     private static final int DEFAULT_MAX_FIELD_ERRORS_PER_COLUMN = 50;
+        private static final String CTAPUC_FORMAT_ERROR_MESSAGE =
+            "Debe ser campo numérico, no puede contener puntos, comas o caracteres especiales, " +
+            "no puede tener letras.";
 
     private int MAX_NIT_ERRORS() {
         return parametroUnicoService.getInt("MAX_NIT_ERRORS", DEFAULT_MAX_NIT_ERRORS);
-    }
-
-    private int MAX_USUARIO_ERRORS() {
-        return parametroUnicoService.getInt("MAX_USUARIO_ERRORS", DEFAULT_MAX_USUARIO_ERRORS);
     }
 
     private int NIT_ERROR_SUMMARY_LIMIT() {
@@ -94,16 +91,16 @@ public class DynamicExcelValidationService {
 
     private final ValidationRuleRepository ruleRepository;
     private final ClienteLzRepository clienteLzRepository;
-    private final UsuarioDirectoryValidator usuarioDirectoryValidator;
+    private final HomologacionColgaapRepository homologacionRepository;
     private final ParametroUnicoService parametroUnicoService;
 
     public DynamicExcelValidationService(ValidationRuleRepository ruleRepository,
                                           ClienteLzRepository clienteLzRepository,
-                                          UsuarioDirectoryValidator usuarioDirectoryValidator,
+                                          HomologacionColgaapRepository homologacionRepository,
                                           ParametroUnicoService parametroUnicoService) {
         this.ruleRepository = ruleRepository;
         this.clienteLzRepository = clienteLzRepository;
-        this.usuarioDirectoryValidator = usuarioDirectoryValidator;
+        this.homologacionRepository = homologacionRepository;
         this.parametroUnicoService = parametroUnicoService;
     }
 
@@ -227,7 +224,7 @@ public class DynamicExcelValidationService {
             Map<Integer, String> colIndexToName = new LinkedHashMap<>();
             Map<String, Integer> colNameToIndex = new LinkedHashMap<>();
             Map<Integer, String> rowToNit = new LinkedHashMap<>();
-            Map<String, List<Integer>> userToRows = new LinkedHashMap<>();
+            Map<String, List<Integer>> ctapucToRows = new LinkedHashMap<>();
             Map<String, Integer> documentoMonedaPrimerFila = new LinkedHashMap<>();
             boolean[] headerProcessed = { false };
             boolean[] structuralFailure = { false };
@@ -370,7 +367,7 @@ public class DynamicExcelValidationService {
                     }
 
                     collectNit(rowToNit, colNameToIndex.get("NIT"), rowValues, rowNumber);
-                    collectUsuario(userToRows, colNameToIndex.get("USUARIO"), rowValues, rowNumber);
+                    collectCtapuc(ctapucToRows, colNameToIndex.get("CTAPUC"), rowValues, rowNumber);
                 });
             } catch (StopSheetProcessingException ignored) {
             }
@@ -409,10 +406,10 @@ public class DynamicExcelValidationService {
                 validateNitExistenceInLz(rowToNit, fechaCorte, errors);
             }
 
-            if (usuarioDirectoryValidator != null && colNameToIndex.containsKey("USUARIO")) {
-                validateUsuarioExistence(userToRows, errors);
+            if (homologacionRepository != null && colNameToIndex.containsKey("CTAPUC") && Long.valueOf(1L).equals(idSegmento)) {
+                validateCtapucExistence(ctapucToRows, errors);
             }
-            
+
         } catch (Exception e) {
             logger.error("Error al validar archivo Excel: {}", e.getMessage(), e);
             errors.add(new ValidationError(0, "ARCHIVO", "",
@@ -449,11 +446,19 @@ public class DynamicExcelValidationService {
             return;
         }
 
-        validateDataTypeAndNumericConstraints(value, rule);
+        if (isCtapucRule(rule) && !value.trim().matches("^[0-9]+$")) {
+            throw new ValidationException(CTAPUC_FORMAT_ERROR_MESSAGE);
+        }
+
+        String dataType = rule.getDataType() != null ? rule.getDataType().trim().toLowerCase(Locale.ROOT) : "";
+        boolean isNumericType = "decimal".equals(dataType) || "integer".equals(dataType);
+        String effectiveValue = isNumericType && !isCtapucRule(rule) ? normalizeNumericInput(value) : value;
+
+        validateDataTypeAndNumericConstraints(effectiveValue, rule);
 
         // Validación Regex
         if (rule.getRegexPattern() != null && !rule.getRegexPattern().isEmpty()) {
-            if (!Pattern.matches(rule.getRegexPattern(), value)) {
+            if (!Pattern.matches(rule.getRegexPattern(), effectiveValue)) {
                 String hint = getDataTypeHint(rule.getDataType());
                 String comment = rule.getComments() != null ? rule.getComments() : "";
                 throw new ValidationException(String.format("%s %s (Valor recibido: '%s')", hint, comment, value));
@@ -479,7 +484,7 @@ public class DynamicExcelValidationService {
         // Validación de Fórmulas JEXL
         String formula = rule.getValidationFormula();
         if (formula != null && !formula.isEmpty()) {
-            validateFormula(value, formula, rule, rowContext, fechaCorte, 
+            validateFormula(effectiveValue, formula, rule, rowContext, fechaCorte,
                           productoEsperado, usuarioEsperado);
         }
     }
@@ -496,6 +501,10 @@ public class DynamicExcelValidationService {
 
     private boolean isClasificacionRule(ValidationRule rule) {
         return normalizeHeaderName(rule.getFieldName()).equals("CLASIFICACION");
+    }
+
+    private boolean isCtapucRule(ValidationRule rule) {
+        return normalizeHeaderName(rule.getFieldName()).equals("CTAPUC");
     }
 
     private void validateDataTypeAndNumericConstraints(String value, ValidationRule rule) throws ValidationException {
@@ -528,6 +537,29 @@ public class DynamicExcelValidationService {
                 ? "Se esperaba un número entero válido."
                 : "Se esperaba un número decimal válido (use punto para decimales).");
         }
+    }
+
+    public static String normalizeNumericInput(String raw) {
+        if (raw == null) return "";
+        String cleaned = raw.trim().replaceAll("[^0-9.,-]", "");
+        if (cleaned.isEmpty()) return raw.trim();
+        int lastComma = cleaned.lastIndexOf(',');
+        int lastDot   = cleaned.lastIndexOf('.');
+        if (lastComma >= 0 && lastDot >= 0) {
+            if (lastComma > lastDot) {
+                cleaned = cleaned.replace(".", "").replace(",", ".");
+            } else {
+                cleaned = cleaned.replace(",", "");
+            }
+        } else if (lastComma >= 0) {
+            cleaned = cleaned.replace(",", ".");
+        }
+        // El formato contabilidad de Excel muestra el cero como "$    -" o "$    - 0".
+        // Tras quitar simbolos y espacios quedan "-" o "-0". No son negativos: son cero.
+        if (cleaned.equals("-") || (cleaned.startsWith("-") && cleaned.substring(1).matches("0+(\\.0+)?"))) {
+            return "0";
+        }
+        return cleaned;
     }
 
     private void validateNumericBounds(ValidationRule rule, BigDecimal numericValue) throws ValidationException {
@@ -885,72 +917,6 @@ public class DynamicExcelValidationService {
             .collect(Collectors.joining(", "));
     }
 
-    // ========== FASE 5: VALIDACIÓN USUARIO EN DIRECTORIO CORPORATIVO ==========
-
-    /**
-     * Fase 5: Valida que los valores de la columna USUARIO existan en el directorio
-     * corporativo de Bancolombia.
-     * <p>
-     * Estrategia optimizada:
-     * <ul>
-     *   <li>Recolecta usuarios únicos (lowercase) del Excel</li>
-     *   <li>Hace UNA consulta batch al directorio (DB o Graph API)</li>
-     *   <li>Reporta UN error consolidado por cada usuario no encontrado (no por fila)</li>
-     *   <li>Máximo {@code MAX_USUARIO_ERRORS} errores</li>
-     * </ul>
-     */
-    private void validateUsuarioExistence(Map<String, List<Integer>> userToRows,
-                                           List<ValidationError> errors) {
-        if (userToRows.isEmpty()) {
-            return;
-        }
-
-        logger.info("Validando {} usuarios únicos contra directorio corporativo", userToRows.size());
-
-        // 5.2 Query batch: obtener usuarios que SÍ existen
-        Set<String> uniqueUsers = new LinkedHashSet<>(userToRows.keySet());
-        Set<String> existingUsers = usuarioDirectoryValidator.findExistingUsers(uniqueUsers);
-
-        // Se consolida un error por usuario y no por fila para que el equipo corrija el dato
-        // base una sola vez, en lugar de leer decenas de mensajes repetidos.
-        int maxUsuarioErrors = MAX_USUARIO_ERRORS();
-        int userErrorCount = 0;
-        for (Map.Entry<String, List<Integer>> entry : userToRows.entrySet()) {
-            if (userErrorCount >= maxUsuarioErrors) break;
-
-            String usuario = entry.getKey();
-            if (!existingUsers.contains(usuario)) {
-                List<Integer> filas = entry.getValue();
-                int totalFilas = filas.size();
-                int filasResumenLimit = NIT_ERROR_SUMMARY_LIMIT();
-                
-                // Construir mensaje consolidado (no fila por fila)
-                String filasResumen;
-                if (totalFilas <= filasResumenLimit) {
-                    filasResumen = filas.stream().map(String::valueOf).collect(Collectors.joining(", "));
-                } else {
-                    filasResumen = filas.subList(0, filasResumenLimit).stream().map(String::valueOf)
-                            .collect(Collectors.joining(", ")) + " y " + (totalFilas - filasResumenLimit) + " más";
-                }
-
-                errors.add(new ValidationError(0, "USUARIO", usuario,
-                    "El usuario '" + usuario + "' no existe en el directorio activo de usuarios de " +
-                    "Bancolombia. Aparece en " + totalFilas + " fila(s): [" + filasResumen + "]. " +
-                    "Debe ser un usuario válido y activo. Corrija la columna USUARIO en esas filas."));
-                userErrorCount++;
-            }
-        }
-
-        if (userErrorCount >= maxUsuarioErrors) {
-            errors.add(new ValidationError(0, "USUARIO", "",
-                "Se alcanzó el límite de " + maxUsuarioErrors + " usuarios no encontrados en directorio. " +
-                "Corrija estos registros y vuelva a validar para detectar posibles errores adicionales."));
-        }
-
-        logger.info("Validación USUARIO completada: {} usuarios no encontrados de {} verificados",
-                userErrorCount, uniqueUsers.size());
-    }
-
     // ========== MÉTODOS AUXILIARES ==========
 
     private boolean isNullOrEmpty(String s) {
@@ -1188,17 +1154,38 @@ public class DynamicExcelValidationService {
         }
     }
 
-    private void collectUsuario(Map<String, List<Integer>> userToRows,
-                                Integer usuarioColIdx,
-                                List<String> rowValues,
-                                int rowNumber) {
-        if (usuarioColIdx == null) {
+    private void collectCtapuc(Map<String, List<Integer>> ctapucToRows,
+                               Integer ctapucColIdx,
+                               List<String> rowValues,
+                               int rowNumber) {
+        if (ctapucColIdx == null) {
             return;
         }
+        String ctapucValue = getValue(rowValues, ctapucColIdx);
+        if (!ctapucValue.isEmpty()) {
+            ctapucToRows.computeIfAbsent(ctapucValue, k -> new ArrayList<>()).add(rowNumber);
+        }
+    }
 
-        String userValue = getValue(rowValues, usuarioColIdx).toLowerCase();
-        if (!userValue.isEmpty()) {
-            userToRows.computeIfAbsent(userValue, key -> new ArrayList<>()).add(rowNumber);
+    private void validateCtapucExistence(Map<String, List<Integer>> ctapucToRows,
+                                         List<ValidationError> errors) {
+        if (ctapucToRows.isEmpty()) {
+            return;
+        }
+        Set<String> existentes = homologacionRepository.findExistingCuentasSap(ctapucToRows.keySet());
+        for (Map.Entry<String, List<Integer>> entry : ctapucToRows.entrySet()) {
+            String cuenta = entry.getKey();
+            if (!existentes.contains(cuenta)) {
+                List<Integer> filas = entry.getValue();
+                String filasStr = filas.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(", "));
+                errors.add(new ValidationError(
+                        filas.get(0),
+                        "CTAPUC",
+                        cuenta,
+                        CTAPUC_FORMAT_ERROR_MESSAGE + " " +
+                        "Debe cruzar con la tabla de cuentas homólogas por el campo cuenta_SAP. " +
+                        "(Valor recibido: '" + cuenta + "') — Filas afectadas: " + filasStr));
+            }
         }
     }
 
@@ -1366,7 +1353,7 @@ public class DynamicExcelValidationService {
             if (o == null) return BigDecimal.ZERO;
             String s = String.valueOf(o).trim();
             if (s.isEmpty()) return BigDecimal.ZERO;
-            s = s.replace(",", ".");
+            s = normalizeNumericInput(s);
             try {
                 return new BigDecimal(s);
             } catch(Exception e) {

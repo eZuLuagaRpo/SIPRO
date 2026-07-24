@@ -149,7 +149,7 @@ public class CreffosParametricGenerator {
 
             Set<String> keys = new LinkedHashSet<>();
             for (SiproDetalleConsolidadoRegistro registro : registros) {
-                String value = getSourceValue(buildSourceMap(registro), sourceField);
+                String value = extractSingleField(registro, sourceField);
                 if (!isBlank(value)) {
                     keys.add(value);
                 }
@@ -397,7 +397,7 @@ public class CreffosParametricGenerator {
                 definition.columnaOrigen(), definition.nombreColumna());
         int requestedCount = 0;
         for (SiproDetalleConsolidadoRegistro registro : registros) {
-            String currentValue = getSourceValue(buildSourceMap(registro), sourceField);
+            String currentValue = extractSingleField(registro, sourceField);
             if (isBlankOrZero(currentValue)) {
                 requestedCount++;
             }
@@ -559,6 +559,54 @@ public class CreffosParametricGenerator {
             source.put(propertyName.toUpperCase(Locale.ROOT), value);
         }
         return source;
+    }
+
+    private String extractSingleField(SiproDetalleConsolidadoRegistro registro, String fieldName) {
+        if (fieldName == null) {
+            return "";
+        }
+        return switch (fieldName.toLowerCase(Locale.ROOT)) {
+            case "documento"                                          -> normalizeValue(registro.getDocumento());
+            case "nit"                                                -> normalizeValue(registro.getNit());
+            case "ctapuc"                                             -> normalizeValue(registro.getCtapuc());
+            case "oficina"                                            -> normalizeValue(registro.getOficina());
+            case "moneda"                                             -> normalizeValue(registro.getMoneda());
+            case "modalidad"                                          -> normalizeValue(registro.getModalidad());
+            case "segmento"                                           -> normalizeValue(registro.getSegmento());
+            case "descripcion"                                        -> normalizeValue(registro.getDescripcion());
+            case "usuario"                                            -> normalizeValue(registro.getUsuario());
+            case "producto"                                           -> normalizeValue(registro.getProducto());
+            case "clasificacion"                                      -> normalizeValue(registro.getClasificacion());
+            case "vlriniobl"                                          -> normalizeValue(registro.getVlriniobl());
+            case "saldo"                                              -> normalizeValue(registro.getSaldo());
+            case "sdootrctas"                                         -> normalizeValue(registro.getSdootrctas());
+            case "intereses"                                          -> normalizeValue(registro.getIntereses());
+            case "sdovencido"                                         -> normalizeValue(registro.getSdovencido());
+            case "intctasord"                                         -> normalizeValue(registro.getIntctasord());
+            case "anoiniobl"                                          -> normalizeValue(registro.getAnoiniobl());
+            case "mesiniobl"                                          -> normalizeValue(registro.getMesiniobl());
+            case "diainiobl"                                          -> normalizeValue(registro.getDiainiobl());
+            case "anovcto"                                            -> normalizeValue(registro.getAnovcto());
+            case "mesvcto"                                            -> normalizeValue(registro.getMesvcto());
+            case "diavcto"                                            -> normalizeValue(registro.getDiavcto());
+            case "anovctofin"                                         -> normalizeValue(registro.getAnovctofin());
+            case "mesvctofin"                                         -> normalizeValue(registro.getMesvctofin());
+            case "diavctofin"                                         -> normalizeValue(registro.getDiavctofin());
+            case "tipoid",             "tipo_id"                      -> normalizeValue(registro.getTipoId());
+            case "productoorigen",     "producto_origen"              -> normalizeValue(registro.getProductoOrigen());
+            case "idsegmento",         "id_segmento"                  -> normalizeValue(registro.getIdSegmento());
+            case "fechacorte",         "fecha_corte"                  -> normalizeValue(registro.getFechaCorte());
+            case "usuariocargador",    "usuario_cargador"             -> normalizeValue(registro.getUsuarioCargador());
+            case "usuarioaprobador",   "usuario_aprobador"            -> normalizeValue(registro.getUsuarioAprobador());
+            case "idconsolidacion",    "id_consolidacion"             -> normalizeValue(registro.getIdConsolidacion());
+            case "idcargaplanilla",    "id_carga_planilla"            -> normalizeValue(registro.getIdCargaPlanilla());
+            case "idproductoorigen",   "id_producto_origen"           -> normalizeValue(registro.getIdProductoOrigen());
+            case "idusuariocargador",  "id_usuario_cargador"          -> normalizeValue(registro.getIdUsuarioCargador());
+            case "idusuarioaprobador", "id_usuario_aprobador"         -> normalizeValue(registro.getIdUsuarioAprobador());
+            case "idconsolidadoregistro",   "id_consolidado_registro" -> normalizeValue(registro.getIdConsolidadoRegistro());
+            case "idconsolidacionarchivo",  "id_consolidacion_archivo" -> normalizeValue(registro.getIdConsolidacionArchivo());
+            default -> getSourceValue(buildSourceMap(registro), fieldName);
+        };
     }
 
     private byte[] renderFile(List<CreffosColumnDefinition> definitions,

@@ -453,9 +453,11 @@ public class FileValidationService {
                     String monedaLabel = "0".equals(monedaCode) ? "COP" : ("1".equals(monedaCode) ? "USD" : "OTRA");
                     
                     if (idx.containsKey("VLRINIOBL")) {
-                        BigDecimal vlr = new BigDecimal(cols[idx.get("VLRINIOBL")].trim().replace(",", "."));
-                        countByMoneda.put(monedaLabel, countByMoneda.getOrDefault(monedaLabel, 0L) + 1);
-                        sumByMoneda.put(monedaLabel, sumByMoneda.getOrDefault(monedaLabel, BigDecimal.ZERO).add(vlr));
+                        BigDecimal vlr = parseSummaryDecimal(cols[idx.get("VLRINIOBL")]);
+                        if (vlr != null) {
+                            countByMoneda.put(monedaLabel, countByMoneda.getOrDefault(monedaLabel, 0L) + 1);
+                            sumByMoneda.put(monedaLabel, sumByMoneda.getOrDefault(monedaLabel, BigDecimal.ZERO).add(vlr));
+                        }
                     }
                 } catch (Exception e) {
                     logger.debug("Fila ignorada en resumen: {}", e.getMessage());
@@ -481,9 +483,8 @@ public class FileValidationService {
                 String monedaLabel = "0".equals(monedaCode) ? "COP" : ("1".equals(monedaCode) ? "USD" : "OTRA");
 
                 if (idx.containsKey("VLRINIOBL")) {
-                    String val = getValue(rowValues, idx.get("VLRINIOBL")).replace(",", ".");
-                    if (!val.isEmpty()) {
-                        BigDecimal vlr = new BigDecimal(val);
+                    BigDecimal vlr = parseSummaryDecimal(getValue(rowValues, idx.get("VLRINIOBL")));
+                    if (vlr != null) {
                         countByMoneda.put(monedaLabel, countByMoneda.getOrDefault(monedaLabel, 0L) + 1);
                         sumByMoneda.put(monedaLabel, sumByMoneda.getOrDefault(monedaLabel, BigDecimal.ZERO).add(vlr));
                     }
@@ -492,6 +493,23 @@ public class FileValidationService {
                 logger.debug("Fila ignorada en resumen: {}", e.getMessage());
             }
         });
+    }
+
+    static BigDecimal parseSummaryDecimal(String rawValue) {
+        if (rawValue == null || rawValue.isBlank()) {
+            return null;
+        }
+
+        String normalized = DynamicExcelValidationService.normalizeNumericInput(rawValue);
+        if (normalized == null || normalized.isBlank()) {
+            return null;
+        }
+
+        try {
+            return new BigDecimal(normalized);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
     
     /**

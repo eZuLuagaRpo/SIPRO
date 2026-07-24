@@ -2,6 +2,7 @@ package com.bancolombia.sipro.validations.domain.service;
 
 import com.bancolombia.sipro.validations.domain.model.ValidationRule;
 import com.bancolombia.sipro.validations.infrastructure.repository.ClienteLzRepository;
+import com.bancolombia.sipro.validations.infrastructure.repository.HomologacionColgaapRepository;
 import com.bancolombia.sipro.validations.infrastructure.repository.ValidationRuleRepository;
 import com.bancolombia.sipro.validations.service.ValidationProgressListener;
 import org.apache.poi.ss.usermodel.Row;
@@ -27,6 +28,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -44,7 +47,7 @@ class DynamicExcelValidationServiceTest {
     private ClienteLzRepository clienteLzRepository;
 
     @Mock
-    private UsuarioDirectoryValidator usuarioDirectoryValidator;
+    private HomologacionColgaapRepository homologacionRepository;
 
     @Mock
     private ParametroUnicoService parametroUnicoService;
@@ -56,7 +59,7 @@ class DynamicExcelValidationServiceTest {
         service = new DynamicExcelValidationService(
                 ruleRepository,
                 clienteLzRepository,
-                usuarioDirectoryValidator,
+                homologacionRepository,
                 parametroUnicoService);
 
         // lenient: los tests de ctrl file y countDataRows no invocan parametroUnicoService
@@ -212,6 +215,21 @@ class DynamicExcelValidationServiceTest {
                 ValidationProgressListener.NOOP);
     }
 
+        private List<DynamicExcelValidationService.ValidationError> validateForSegment(List<ValidationRule> rules,
+                                                                                                                                                                        byte[] content,
+                                                                                                                                                                        String filename,
+                                                                                                                                                                        long idSegmento) {
+                when(ruleRepository.findActiveRulesBySegment(String.valueOf(idSegmento), "9999")).thenReturn(rules);
+                return service.validateExcel(
+                                () -> new ByteArrayInputStream(content),
+                                filename,
+                                "producto-prueba",
+                                idSegmento,
+                                FECHA_CORTE,
+                                "qa.user",
+                                ValidationProgressListener.NOOP);
+        }
+
         /**
          * Define el conjunto base de reglas usado por los escenarios de estructura y contenido.
          */
@@ -230,6 +248,12 @@ class DynamicExcelValidationServiceTest {
         return List.of(
                 fieldRule("NIT", 1, true, false, "integer", 14,
                         null, "^[0-9]{1,14}$", null, null));
+    }
+
+    private List<ValidationRule> fullSegmentCtapucRules() {
+        return List.of(
+                fieldRule("CTAPUC", 1, true, false, "integer", null,
+                        null, "^[0-9]+$", null, null));
     }
 
         /**
@@ -502,6 +526,46 @@ class DynamicExcelValidationServiceTest {
         long occurrences = msg.chars().filter(c -> c == '3').count();
         assertTrue(occurrences >= 2 || msg.contains("3.14"),
                 "El mensaje debe referenciar el valor recibido al menos una vez");
+    }
+
+    @Test
+    void fullSegment_ctapucShouldRejectLettersSpecialCharsAndSpaces() throws Exception {
+        List<DynamicExcelValidationService.ValidationError> errors = validateForSegment(
+                fullSegmentCtapucRules(),
+                buildWorkbookBytes(
+                        List.of("CTAPUC"),
+                        List.of(
+                                List.of("12AB34"),
+                                List.of("12.34"),
+                                List.of("12,34"),
+                                List.of("12 34"),
+                                List.of("1234@"))),
+                "planilla.xlsx",
+                2L);
+
+        List<DynamicExcelValidationService.ValidationError> ctapucErrors = errors.stream()
+                .filter(error -> "CTAPUC".equals(error.getColumnName()))
+                .toList();
+
+        assertEquals(5, ctapucErrors.size());
+        assertTrue(ctapucErrors.stream().allMatch(error -> error.getErrorMessage().contains(
+                "Debe ser campo numérico, no puede contener puntos, comas o caracteres especiales, no puede tener letras.")));
+
+        verify(homologacionRepository, never()).findExistingCuentasSap(org.mockito.ArgumentMatchers.anyCollection());
+    }
+
+    @Test
+    void fullSegment_ctapucShouldAcceptOnlyDigits() throws Exception {
+        List<DynamicExcelValidationService.ValidationError> errors = validateForSegment(
+                fullSegmentCtapucRules(),
+                buildWorkbookBytes(
+                        List.of("CTAPUC"),
+                        List.of(List.of("1416001234"))),
+                "planilla.xlsx",
+                2L);
+
+        assertTrue(errors.isEmpty());
+        verify(homologacionRepository, never()).findExistingCuentasSap(org.mockito.ArgumentMatchers.anyCollection());
     }
 
     // ─────────────────────────────────────────────────────────────────────────
