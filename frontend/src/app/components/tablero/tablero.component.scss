@@ -415,3 +415,56 @@
   opacity: 0.6;
   flex-shrink: 0;
 }
+
+// Resumen de progreso por segmento
+.tablero-progreso {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.tablero-progreso__item {
+  flex: 1;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 24px;
+  border-radius: 20px;
+  border: 1px solid;
+}
+
+.tablero-progreso__item--colgaap {
+  background: rgba(253, 218, 36, 0.1);
+  border-color: rgba(253, 218, 36, 0.35);
+}
+
+.tablero-progreso__item--ifrs {
+  background: rgba(138, 226, 240, 0.12);
+  border-color: rgba(66, 191, 210, 0.3);
+}
+
+.tablero-progreso__label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #5f5d59;
+}
+
+.tablero-progreso__contador {
+  font-size: 28px;
+  font-weight: 400;
+  color: #2c2a29;
+  line-height: 1.1;
+  margin: 2px 0;
+
+  strong {
+    font-weight: 800;
+  }
+}
+
+.tablero-progreso__sublabel {
+  font-size: 13px;
+  color: #6b6965;
+}

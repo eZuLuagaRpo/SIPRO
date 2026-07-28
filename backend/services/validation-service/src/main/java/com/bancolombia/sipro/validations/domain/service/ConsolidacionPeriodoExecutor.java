@@ -17,6 +17,8 @@ import com.bancolombia.sipro.validations.infrastructure.repository.SiproDetalleC
 import com.bancolombia.sipro.validations.shared.utils.XlsxStreamingReader;
 import jakarta.persistence.EntityManager;
 import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.DataFormat;
 import org.apache.poi.ss.usermodel.FillPatternType;
 import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.IndexedColors;
@@ -78,6 +80,7 @@ public class ConsolidacionPeriodoExecutor {
     private static final String CONSOLIDADO_NOMBRE_ARCHIVO_COMPARTIDO = "CONSOLIDADO.xlsx";
     private static final String CONTENT_TYPE_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     private static final DateTimeFormatter FECHA_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private static final DateTimeFormatter FECHA_HORA_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final int DEFAULT_BATCH_INSERT_SIZE = 500;
     private static final int DEFAULT_LZ_LOOKUP_CHUNK_SIZE = 1000;
     private static final List<String> HEADERS_ENTRADA_PLANILLA = List.of(
@@ -136,7 +139,9 @@ public class ConsolidacionPeriodoExecutor {
             "FECHA_CORTE",
             "DESCRIPCION",
             "USUARIO_CARGADOR",
-            "USUARIO_APROBADOR");
+            "USUARIO_APROBADOR",
+            "FECHA_SOLICITUD",
+            "FECHA_APROBACION");
 
     private final SiproDetalleCargaPlanillasRepository planillaRepository;
     private final SiproDetalleArchivoValidacionRepository validacionRepository;
@@ -647,12 +652,12 @@ public class ConsolidacionPeriodoExecutor {
         registro.setMesvctofin(parseInteger(getValue(fila, "MESVCTOFIN")));
         registro.setDiavctofin(parseInteger(getValue(fila, "DIAVCTOFIN")));
         registro.setCtapuc(parseLong(getValue(fila, "CTAPUC")));
-        registro.setVlriniobl(parseDecimal(getValue(fila, "VLRINIOBL")));
-        registro.setSaldo(parseDecimal(getValue(fila, "SALDO")));
-        registro.setSdootrctas(parseDecimal(getValue(fila, "SDOOTRCTAS")));
-        registro.setIntereses(parseDecimal(getValue(fila, "INTERESES")));
-        registro.setSdovencido(parseDecimal(getValue(fila, "SDOVENCIDO")));
-        registro.setIntctasord(parseDecimal(getValue(fila, "INTCTASORD")));
+        registro.setVlriniobl(parseDecimalOrZero(getValue(fila, "VLRINIOBL")));
+        registro.setSaldo(parseDecimalOrZero(getValue(fila, "SALDO")));
+        registro.setSdootrctas(parseDecimalOrZero(getValue(fila, "SDOOTRCTAS")));
+        registro.setIntereses(parseDecimalOrZero(getValue(fila, "INTERESES")));
+        registro.setSdovencido(parseDecimalOrZero(getValue(fila, "SDOVENCIDO")));
+        registro.setIntctasord(parseDecimalOrZero(getValue(fila, "INTCTASORD")));
         registro.setUsuario(getValue(fila, "USUARIO"));
         registro.setProducto(getValue(fila, "PRODUCTO"));
         registro.setClasificacion(parseShort(getValue(fila, "CLASIFICACION")));
@@ -745,6 +750,11 @@ public class ConsolidacionPeriodoExecutor {
                                                           String tipoId) {
         Map<String, String> filaConsolidado = new LinkedHashMap<>(fila);
         filaConsolidado.put("TIPO_ID", firstNonBlank(tipoId, getValue(fila, "TIPO_ID")));
+        for (String campo : List.of("VLRINIOBL", "SALDO", "SDOOTRCTAS", "INTERESES", "SDOVENCIDO", "INTCTASORD")) {
+            if (filaConsolidado.getOrDefault(campo, "").isBlank()) {
+                filaConsolidado.put(campo, "0");
+            }
+        }
         filaConsolidado.put("PRODUCTO_ORIGEN", firstNonBlank(planilla.getProducto(), ""));
         filaConsolidado.put("SEGMENTO", firstNonBlank(planilla.getSegmento(), ""));
         filaConsolidado.put("FECHA_CORTE", planilla.getFechaCorteInformacion() == null
@@ -753,6 +763,10 @@ public class ConsolidacionPeriodoExecutor {
         filaConsolidado.put("DESCRIPCION", firstNonBlank(planilla.getDescripcionLarga(), ""));
         filaConsolidado.put("USUARIO_CARGADOR", firstNonBlank(planilla.getNombreUsuarioCarga(), ""));
         filaConsolidado.put("USUARIO_APROBADOR", firstNonBlank(planilla.getUsuarioAprobador(), ""));
+        filaConsolidado.put("FECHA_SOLICITUD", planilla.getFechaCreacion() != null
+                ? planilla.getFechaCreacion().format(FECHA_HORA_FMT) : "");
+        filaConsolidado.put("FECHA_APROBACION", planilla.getFechaAprobacion() != null
+                ? planilla.getFechaAprobacion().toLocalDateTime().format(FECHA_HORA_FMT) : "");
         return filaConsolidado;
     }
 
@@ -1023,6 +1037,11 @@ public class ConsolidacionPeriodoExecutor {
         }
     }
 
+    private BigDecimal parseDecimalOrZero(String value) {
+        BigDecimal result = parseDecimal(value);
+        return result != null ? result : BigDecimal.ZERO;
+    }
+
     private String normalizeNumber(String value) {
         String cleaned = value.trim().replace(" ", "");
         if (cleaned.contains(",") && cleaned.contains(".")) {
@@ -1041,19 +1060,25 @@ public class ConsolidacionPeriodoExecutor {
     private final class ConsolidatedExcelWriter implements AutoCloseable {
 
         private static final int COLUMN_WIDTH = 25 * 256; // 25 caracteres en unidades POI
+        private static final Set<String> DECIMAL_COLUMNS = Set.of(
+                "VLRINIOBL", "SALDO", "SDOOTRCTAS", "INTERESES", "SDOVENCIDO", "INTCTASORD");
 
         private final SXSSFWorkbook workbook;
         private final Sheet sheet;
+        private final CellStyle decimalStyle;
         private int currentRowIndex = 1;
 
         private ConsolidatedExcelWriter() {
             this.workbook = new SXSSFWorkbook(200);
             this.sheet = workbook.createSheet("CONSOLIDADO");
+            DataFormat dataFormat = workbook.createDataFormat();
+            this.decimalStyle = workbook.createCellStyle();
+            this.decimalStyle.setDataFormat(dataFormat.getFormat("0.00"));
             crearHeader();
         }
 
         private void crearHeader() {
-            org.apache.poi.ss.usermodel.CellStyle headerStyle = workbook.createCellStyle();
+            CellStyle headerStyle = workbook.createCellStyle();
             Font headerFont = workbook.createFont();
             headerFont.setBold(true);
             headerStyle.setFont(headerFont);
@@ -1075,6 +1100,9 @@ public class ConsolidacionPeriodoExecutor {
                 String header = HEADERS_CONSOLIDADO_SALIDA.get(columnIndex);
                 Cell cell = row.createCell(columnIndex);
                 setCellValue(cell, fila.getOrDefault(header, ""));
+                if (DECIMAL_COLUMNS.contains(header)) {
+                    cell.setCellStyle(decimalStyle);
+                }
             }
         }
 

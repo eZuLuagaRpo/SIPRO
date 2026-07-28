@@ -184,6 +184,23 @@
             <p class="sipro-card__text">No hay productos configurados para el período seleccionado.</p>
           </section>
 
+          <section class="tablero-progreso" *ngIf="filas.length > 0">
+            <div class="tablero-progreso__item tablero-progreso__item--colgaap">
+              <span class="tablero-progreso__label">Colgaap/Modificado</span>
+              <span class="tablero-progreso__contador">
+                <strong>{{ resumenColgaap.aprobadas }}</strong> / {{ resumenColgaap.total }}
+              </span>
+              <span class="tablero-progreso__sublabel">planillas aprobadas</span>
+            </div>
+            <div class="tablero-progreso__item tablero-progreso__item--ifrs">
+              <span class="tablero-progreso__label">Full IFRS</span>
+              <span class="tablero-progreso__contador">
+                <strong>{{ resumenFullIfrs.aprobadas }}</strong> / {{ resumenFullIfrs.total }}
+              </span>
+              <span class="tablero-progreso__sublabel">planillas aprobadas</span>
+            </div>
+          </section>
+
           <article class="resumen-card resumen-card--contrast tablero-card" *ngIf="filas.length > 0">
             <div class="resumen-card__header">
               <div>

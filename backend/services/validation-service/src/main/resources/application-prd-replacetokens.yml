@@ -34,6 +34,19 @@ spring:
     url: '#{JDBC_URL}#'
     username: '#{DB_USER}#'
     password: '#{DB_PASS}#'
+    hikari:
+      maximum-pool-size: 30
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+app:
+  validation:
+    async:
+      core-pool-size: 3
+      max-pool-size: 6
+      queue-capacity: 25
 
 security:
   ad:

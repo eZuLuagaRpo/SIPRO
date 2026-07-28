@@ -162,6 +162,34 @@ export class TableroComponent implements OnInit, OnDestroy {
     return this.tablero?.filas ?? [];
   }
 
+  get resumenColgaap(): { aprobadas: number; total: number } {
+    const filas = this.filas;
+    return {
+      aprobadas: filas.filter(f =>
+        f.estadoAprobadoColgaap === 'ARCHIVO_APROBADO' ||
+        f.estadoAprobadoColgaap === 'APROBACION_SIN_DATOS'
+      ).length,
+      total: filas.filter(f =>
+        f.estadoAprobadoColgaap !== 'NO_APLICA' &&
+        f.estadoAprobadoColgaap !== null
+      ).length
+    };
+  }
+
+  get resumenFullIfrs(): { aprobadas: number; total: number } {
+    const filas = this.filas;
+    return {
+      aprobadas: filas.filter(f =>
+        f.estadoAprobadoFullIfrs === 'ARCHIVO_APROBADO' ||
+        f.estadoAprobadoFullIfrs === 'APROBACION_SIN_DATOS'
+      ).length,
+      total: filas.filter(f =>
+        f.estadoAprobadoFullIfrs !== 'NO_APLICA' &&
+        f.estadoAprobadoFullIfrs !== null
+      ).length
+    };
+  }
+
   /**
    * Consulta el tablero de control para el período seleccionado o para el período actual.
    */
