@@ -69,6 +69,18 @@ app:
       access-key: '#{APP_MAIL_SES_ACCESS_KEY}#'
       secret-key: '#{APP_MAIL_SES_SECRET_KEY}#'
 
+# ── Parámetros críticos de Entra ID y URLs (Replace Tokens) ───────────────────
+# Cuando Replace Tokens está activo, estos tokens se reemplazan por los valores
+# reales del Variable Group de Azure DevOps.
+sipro:
+  param:
+    AZURE_CLIENT_ID: '#{AZURE_CLIENT_ID}#'
+    AZURE_TENANT_ID: '#{AZURE_TENANT_ID}#'
+    AZURE_CLIENT_SECRET: '#{AZURE_CLIENT_SECRET}#'
+    URL_DEV: '#{URL_DEV}#'
+    URL_QA: '#{URL_QA}#'
+    URL_PDN: '#{URL_PDN}#'
+
 # Host/puerto de Impala — ya son los valores reales de PDN, no necesitan token.
 lz:
   host: impala.bancolombia.corp

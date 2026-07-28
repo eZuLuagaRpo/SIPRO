@@ -185,6 +185,49 @@ class CreffosParametricGeneratorTest {
     }
 
     @Test
+    void deberiaUsarDefaultEnCampos44y48CuandoDocumentoVieneVacio() {
+        List<CreffosColumnDefinition> definiciones = List.of(
+                definition("CLASEGTIA", 44, "STRING", "LOOKUP", "resolverClaseGarantiaDesdeCenie", "N",
+                        Map.of(
+                                "sourceField", "documento",
+                                "lookupSchema", "s_productos",
+                                "lookupTable", "bvnc_visionry_cenie",
+                                "lookupKey", "ceac21",
+                                "lookupValue", "cein21",
+                                "defaultValue", "N"
+                        )),
+                definition("CALIFICPUC", 48, "STRING", "LOOKUP", "resolverCalificacionDesdeCenie", "A",
+                        Map.of(
+                                "sourceField", "documento",
+                                "lookupSchema", "s_productos",
+                                "lookupTable", "bvnc_visionry_cenie",
+                                "lookupKey", "ceac21",
+                                "lookupValue", "ceca21",
+                                "defaultValue", "A"
+                        ))
+        );
+
+        when(parametroColumnasRepository.findActiveDefinitions()).thenReturn(definiciones);
+        when(parametroUnicoService.getString("CREFFSOS_FORMATO_SALIDA", "XLSX")).thenReturn("csv");
+        when(parametroUnicoService.getString("CREFFSOS_NOMBRE_ARCHIVO_SALIDA", "CREFFSOS.csv"))
+                .thenReturn("defaults.csv");
+        when(parametroUnicoService.getString("CREFFSOS_INCLUIR_ENCABEZADO", "true")).thenReturn("false");
+        when(parametroUnicoService.getString("CREFFSOS_HOJA_XLSX", "CREFFSOS")).thenReturn("CREFFSOS");
+        when(lzJdbcService.isEnabled()).thenReturn(true);
+
+        SiproDetalleConsolidadoRegistro registro = new SiproDetalleConsolidadoRegistro();
+        registro.setDocumento(null);
+
+        CreffosParametricGenerator.GeneratedCreffosFile generated = generator.generate(
+                LocalDate.of(2026, 3, 31),
+                List.of(registro)
+        );
+
+        String content = new String(generated.content(), StandardCharsets.UTF_8).stripTrailing();
+        assertEquals("N;A", content);
+    }
+
+    @Test
     void deberiaGenerarXlsxConEncabezadoCuandoFormatoConfiguradoNoEsValido() throws Exception {
         List<CreffosColumnDefinition> definiciones = List.of(
                 definition("NIT", 1, "INTEGER", "DIRECTO", "copiarDirecto", null,

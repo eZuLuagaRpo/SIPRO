@@ -23,6 +23,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.env.Environment;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -100,6 +101,9 @@ class ConsolidacionPeriodoExecutorTest {
     @Mock
     private Environment environment;
 
+    @Mock
+    private ArchivosBloqueadosFase2Service archivosBloqueadosFase2Service;
+
     private ConsolidacionPeriodoExecutor service;
 
     @BeforeEach
@@ -119,7 +123,8 @@ class ConsolidacionPeriodoExecutorTest {
                 notificacionConsolidacionService,
                 parametroUnicoService,
                 entityManager,
-                environment
+                environment,
+                archivosBloqueadosFase2Service
         );
 
             lenient().when(parametroUnicoService.getLong("APP_CONSOLIDACION_POST_CLOSE_DELAY_HOURS", 1L))
@@ -142,7 +147,13 @@ class ConsolidacionPeriodoExecutorTest {
             when(planillaRepository.findPlanillasAprobadasByFechaCorteAndSegmentoId(periodo, 1L))
                 .thenReturn(List.of());
 
-            boolean consolidado = service.consolidarPeriodoForzado(periodo, 1L, "Bypass DEV");
+            iniciarSincronizacionTransaccional();
+            boolean consolidado;
+            try {
+                consolidado = service.consolidarPeriodoForzado(periodo, 1L, "Bypass DEV");
+            } finally {
+                limpiarSincronizacionTransaccional();
+            }
 
             assertFalse(consolidado);
             verify(planillaRepository).findPlanillasAprobadasByFechaCorteAndSegmentoId(periodo, 1L);
@@ -190,8 +201,7 @@ class ConsolidacionPeriodoExecutorTest {
         });
         when(parametroUnicoService.getInt(eq("APP_CONSOLIDACION_BATCH_INSERT_SIZE"), anyInt())).thenReturn(1);
         when(parametroUnicoService.getInt(eq("APP_CONSOLIDACION_LZ_LOOKUP_CHUNK_SIZE"), anyInt())).thenReturn(1000);
-        when(parametroUnicoService.getInt(eq("AUTO_SIZE_LIMIT"), anyInt())).thenReturn(3);
-        when(creffosConsolidationService.reconstruirCompleto(periodo))
+        when(creffosConsolidationService.generarYPublicarCreffsos(periodo))
             .thenReturn(CreffosConsolidationService.PublicationResult.generated(
                 "consolidados/2026-05-31/CREFFSOS.xlsx",
                 "CREFFSOS.xlsx",
@@ -227,7 +237,13 @@ class ConsolidacionPeriodoExecutorTest {
             return batch;
         }).when(consolidadoRegistroRepository).saveAll(any());
 
-        boolean consolidado = service.consolidarPeriodoForzado(periodo, 1L, "Prueba consolidación");
+        iniciarSincronizacionTransaccional();
+        boolean consolidado;
+        try {
+            consolidado = service.consolidarPeriodoForzado(periodo, 1L, "Prueba consolidación");
+        } finally {
+            limpiarSincronizacionTransaccional();
+        }
 
         assertTrue(consolidado, "consolidarPeriodoForzado debio retornar true");
         assertEquals(2, savedBatches.size(), "cantidad de batches persistidos");
@@ -271,9 +287,8 @@ class ConsolidacionPeriodoExecutorTest {
                 .thenReturn(List.of(planillaSinDatos));
         when(consolidacionRepository.findAllByPeriodoValoracionOrderByCreadoEnDesc(periodo)).thenReturn(List.of());
         when(validacionRepository.findByIdCargaPlanillaIn(List.of(98L))).thenReturn(List.of());
-        when(parametroUnicoService.getInt(eq("AUTO_SIZE_LIMIT"), anyInt())).thenReturn(3);
         when(fileStorageService.storeBytes(any(), anyString(), anyString())).thenReturn("consolidados/2026-05-31/CONSOLIDADO_2026-05-31.xlsx");
-        when(creffosConsolidationService.reconstruirCompleto(periodo))
+        when(creffosConsolidationService.generarYPublicarCreffsos(periodo))
             .thenReturn(CreffosConsolidationService.PublicationResult.generated(
                 "consolidados/2026-05-31/CREFFSOS.xlsx",
                 "CREFFSOS.xlsx",
@@ -304,7 +319,13 @@ class ConsolidacionPeriodoExecutorTest {
             return value;
         }).when(consolidacionArchivoRepository).save(any(SiproDetalleConsolidacionArchivo.class));
 
-        boolean consolidado = service.consolidarPeriodoForzado(periodo, 1L, "Prueba excepción");
+        iniciarSincronizacionTransaccional();
+        boolean consolidado;
+        try {
+            consolidado = service.consolidarPeriodoForzado(periodo, 1L, "Prueba excepción");
+        } finally {
+            limpiarSincronizacionTransaccional();
+        }
 
         assertTrue(consolidado);
         SiproDetalleConsolidacionesPlanillas inicial = snapshots.get(0);
@@ -329,9 +350,8 @@ class ConsolidacionPeriodoExecutorTest {
             .thenReturn(List.of(planillaSinDatos));
         when(consolidacionRepository.findAllByPeriodoValoracionOrderByCreadoEnDesc(periodo)).thenReturn(List.of());
         when(validacionRepository.findByIdCargaPlanillaIn(List.of(99L))).thenReturn(List.of());
-        when(parametroUnicoService.getInt(eq("AUTO_SIZE_LIMIT"), anyInt())).thenReturn(3);
         when(fileStorageService.storeBytes(any(), anyString(), anyString())).thenReturn("consolidados/2026-05-31/CONSOLIDADO_2026-05-31.xlsx");
-        when(creffosConsolidationService.reconstruirCompleto(periodo))
+        when(creffosConsolidationService.generarYPublicarCreffsos(periodo))
             .thenReturn(CreffosConsolidationService.PublicationResult.generated(
                 "consolidados/2026-05-31/CREFFSOS.xlsx",
                 "CREFFSOS.xlsx",
@@ -364,7 +384,13 @@ class ConsolidacionPeriodoExecutorTest {
             return value;
         }).when(consolidacionArchivoRepository).save(any(SiproDetalleConsolidacionArchivo.class));
 
-        boolean consolidado = service.consolidarPeriodoForzado(periodo, 1L, "Prueba advertencias");
+        iniciarSincronizacionTransaccional();
+        boolean consolidado;
+        try {
+            consolidado = service.consolidarPeriodoForzado(periodo, 1L, "Prueba advertencias");
+        } finally {
+            limpiarSincronizacionTransaccional();
+        }
 
         assertTrue(consolidado);
         SiproDetalleConsolidacionesPlanillas finalSnapshot = snapshots.get(snapshots.size() - 1);
@@ -387,7 +413,6 @@ class ConsolidacionPeriodoExecutorTest {
             .thenReturn(List.of(planillaSinDatos));
         when(consolidacionRepository.findAllByPeriodoValoracionOrderByCreadoEnDesc(periodo)).thenReturn(List.of());
         when(validacionRepository.findByIdCargaPlanillaIn(List.of(120L))).thenReturn(List.of());
-        when(parametroUnicoService.getInt(eq("AUTO_SIZE_LIMIT"), anyInt())).thenReturn(3);
         when(fileStorageService.storeBytes(any(), anyString(), anyString()))
             .thenThrow(new IllegalStateException("fallo escribiendo consolidado en storage"));
         when(notificacionConsolidacionService.notificarError(anyLong()))
@@ -404,9 +429,15 @@ class ConsolidacionPeriodoExecutorTest {
             return value;
         }).when(consolidacionRepository).save(any(SiproDetalleConsolidacionesPlanillas.class));
 
-        IllegalStateException error = org.junit.jupiter.api.Assertions.assertThrows(
-            IllegalStateException.class,
-            () -> service.consolidarPeriodoForzado(periodo, 1L, "Prueba correo error"));
+        iniciarSincronizacionTransaccional();
+        IllegalStateException error;
+        try {
+            error = org.junit.jupiter.api.Assertions.assertThrows(
+                IllegalStateException.class,
+                () -> service.consolidarPeriodoForzado(periodo, 1L, "Prueba correo error"));
+        } finally {
+            limpiarSincronizacionTransaccional();
+        }
 
         assertTrue(error.getMessage().contains("Error consolidando periodo 2026-05-31"));
         SiproDetalleConsolidacionesPlanillas finalSnapshot = snapshots.get(snapshots.size() - 1);
@@ -523,6 +554,18 @@ class ConsolidacionPeriodoExecutorTest {
 
             workbook.write(outputStream);
             return outputStream.toByteArray();
+        }
+    }
+
+    private void iniciarSincronizacionTransaccional() {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.initSynchronization();
+        }
+    }
+
+    private void limpiarSincronizacionTransaccional() {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.clearSynchronization();
         }
     }
 }

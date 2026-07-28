@@ -21,12 +21,31 @@ import java.util.concurrent.ConcurrentHashMap;
  * Cuando la BD no está disponible (DEV local sin PostgreSQL), el servicio
  * busca el valor en las propiedades de Spring con prefijo {@code sipro.param.<CLAVE>}.
  * Configurar en application-dev.yml o como variables de entorno.
+ *
+ * PARÁMETROS CRÍTICOS DE SEGURIDAD (solo desde config, nunca desde BD):
+ * - AZURE_TENANT_ID: identificador del tenant de Entra ID
+ * - AZURE_CLIENT_ID: identificador de la aplicación registrada en Entra ID
+ * - AZURE_CLIENT_SECRET: credencial secreta de Entra ID (crítica)
+ * - URL_PDN: URL base del frontend en producción
+ *
+ * Estos 4 parámetros SIEMPRE se leen desde propiedades Spring (config files + env vars),
+ * nunca desde la tabla sipro_parametros_unico en la BD, incluso si existe un valor ahí.
+ * Esto asegura que en PDN estos valores críticos vengan EXCLUSIVAMENTE del pipeline,
+ * del Variable Group de Azure DevOps, o de Secrets Manager.
  */
 @Service
 public class ParametroUnicoService {
 
     private static final Logger logger = LoggerFactory.getLogger(ParametroUnicoService.class);
     private static final String ENV_PREFIX = "sipro.param.";
+    
+    /** Parámetros que NUNCA deben venir de la BD — solo de config/env vars */
+    private static final java.util.Set<String> CRITICAL_CONFIG_ONLY_PARAMS = java.util.Set.of(
+            "AZURE_TENANT_ID",
+            "AZURE_CLIENT_ID",
+            "AZURE_CLIENT_SECRET",
+            "URL_PDN"
+    );
 
     private final SiproParametroUnicoRepository repository;
     private final Environment environment;
@@ -60,6 +79,11 @@ public class ParametroUnicoService {
     }
 
     public Optional<String> getString(String clave) {
+        // Si es un parámetro crítico, leer SOLO desde config
+        if (CRITICAL_CONFIG_ONLY_PARAMS.contains(clave)) {
+            return getConfigOnly(clave);
+        }
+        
         String val = cache.get(clave);
         if (val != null && !val.isBlank()) return Optional.of(val);
         String fromEnv = resolveFromEnvironment(clave);
@@ -67,10 +91,29 @@ public class ParametroUnicoService {
     }
 
     public String getString(String clave, String defaultValue) {
+        // Si es un parámetro crítico, leer SOLO desde config
+        if (CRITICAL_CONFIG_ONLY_PARAMS.contains(clave)) {
+            return getConfigOnly(clave).orElse(defaultValue);
+        }
+        
         String val = cache.get(clave);
         if (val != null && !val.isBlank()) return val;
         String fromEnv = resolveFromEnvironment(clave);
         return fromEnv != null ? fromEnv : defaultValue;
+    }
+
+    /**
+     * Obtiene un valor EXCLUSIVAMENTE desde propiedades Spring (config + env vars).
+     * No consulta la BD bajo ninguna circunstancia.
+     * Usado para parámetros críticos de seguridad que NO deben estar en la BD.
+     */
+    private Optional<String> getConfigOnly(String clave) {
+        String val = environment.getProperty(ENV_PREFIX + clave);
+        if (val != null && !val.isBlank()) {
+            logger.debug("Parámetro crítico '{}' resuelto desde propiedades (config-only)", clave);
+            return Optional.of(val.trim());
+        }
+        return Optional.empty();
     }
 
     /**

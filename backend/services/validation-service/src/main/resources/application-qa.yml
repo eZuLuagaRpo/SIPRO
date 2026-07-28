@@ -25,3 +25,15 @@ app:
     schema: ${APP_LZ_SCHEMA:default}
     tables:
       mdm: ${APP_LZ_TABLE_MDM:sipro_fcr_mdm_datos_generales_clientes}
+
+# ── Parámetros de Entra ID y URLs por ambiente (QA) ──────────────────────────
+# En QA los parámetros críticos vienen de propiedades (no de la BD).
+# Configurar mediante variables de entorno o aquí con defaults.
+sipro:
+  param:
+    AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:}
+    AZURE_TENANT_ID: ${AZURE_TENANT_ID:}
+    AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET:}
+    URL_DEV: ${URL_DEV:}
+    URL_QA: ${URL_QA:http://localhost:4200}
+    URL_PDN: ${URL_PDN:}

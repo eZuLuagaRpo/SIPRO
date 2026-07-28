@@ -63,3 +63,17 @@ app:
       region: ${APP_MAIL_SES_REGION:us-east-1}
       access-key: ${APP_MAIL_SES_ACCESS_KEY:}
       secret-key: ${APP_MAIL_SES_SECRET_KEY:}
+
+# ── Parámetros críticos de Entra ID y URLs (PDN producción) ─────────────────
+# ESTOS VALORES VIENEN EXCLUSIVAMENTE DEL PIPELINE (variables de entorno).
+# NO están en la BD sipro_parametros_unico — la aplicación los busca SOLO en config.
+# El equipo de provision/despliegue debe inyectar estos valores en el Variable Group
+# de Azure DevOps antes de desplegar.
+sipro:
+  param:
+    AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:}
+    AZURE_TENANT_ID: ${AZURE_TENANT_ID:}
+    AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET:}
+    URL_DEV: ${URL_DEV:}
+    URL_QA: ${URL_QA:}
+    URL_PDN: ${URL_PDN:}

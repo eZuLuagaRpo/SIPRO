@@ -17,6 +17,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Publica en carpeta bloqueada las planillas Full IFRS aprobadas de un periodo,
@@ -58,14 +61,23 @@ public class FullIfrsBloqueadosConsolidacionService {
             return;
         }
 
-        for (SiproDetalleCargaPlanillas planilla : planillas) {
-            try {
-                publicarXlsxBloqueado(fechaCorte, planilla);
-                publicarControlWordBloqueado(fechaCorte, planilla);
-            } catch (Exception ex) {
-                logger.warn("[Full IFRS Bloqueados] No se pudo publicar planilla id={} del periodo {}: {}",
-                        planilla.getId(), fechaCorte, ex.getMessage());
-            }
+        int concurrencia = Math.min(planillas.size(), 4);
+        ExecutorService executor = Executors.newFixedThreadPool(concurrencia);
+        try {
+            List<CompletableFuture<Void>> tareas = planillas.stream()
+                    .map(planilla -> CompletableFuture.runAsync(() -> {
+                        try {
+                            publicarXlsxBloqueado(fechaCorte, planilla);
+                            publicarControlWordBloqueado(fechaCorte, planilla);
+                        } catch (Exception ex) {
+                            logger.warn("[Full IFRS Bloqueados] No se pudo publicar planilla id={} del periodo {}: {}",
+                                    planilla.getId(), fechaCorte, ex.getMessage());
+                        }
+                    }, executor))
+                    .toList();
+            CompletableFuture.allOf(tareas.toArray(new CompletableFuture[0])).join();
+        } finally {
+            executor.shutdown();
         }
     }
 

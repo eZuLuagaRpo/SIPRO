@@ -112,8 +112,12 @@ public class ArchivosBloqueadosService {
             }
 
             eliminarDirectorio(periodoDir);
-            logger.info("[ArchivosBloqueados] Periodo {} comprimido en {} ({} archivos empaquetados).",
-                    fechaCorte, zipFile, archivos.size());
+            if (Files.exists(periodoDir)) {
+                logger.warn("[ArchivosBloqueados] ZIP creado pero la carpeta '{}' no se pudo eliminar completamente. Puede requerir limpieza manual.", periodoDir);
+            } else {
+                logger.info("[ArchivosBloqueados] Periodo {} comprimido en {} ({} archivos empaquetados).",
+                        fechaCorte, zipFile, archivos.size());
+            }
         } catch (Exception ex) {
             logger.warn("[ArchivosBloqueados] No se pudo comprimir el periodo '{}': {}", fechaCorte, ex.getMessage());
         }
@@ -156,7 +160,7 @@ public class ArchivosBloqueadosService {
                 try {
                     Files.deleteIfExists(path);
                 } catch (IOException ex) {
-                    logger.debug("[ArchivosBloqueados] No se pudo borrar '{}': {}", path, ex.getMessage());
+                    logger.warn("[ArchivosBloqueados] No se pudo borrar '{}': {}", path, ex.getMessage());
                 }
             });
         }

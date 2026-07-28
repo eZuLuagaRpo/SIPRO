@@ -28,6 +28,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -150,6 +152,7 @@ public class ConsolidacionPeriodoExecutor {
     private final NotificacionConsolidacionService notificacionConsolidacionService;
     private final ParametroUnicoService parametroUnicoService;
     private final EntityManager entityManager;
+    private final ArchivosBloqueadosFase2Service archivosBloqueadosFase2Service;
 
     private static final long DEFAULT_POST_CLOSE_DELAY_HOURS = 1;
     private static final long DEFAULT_MAX_POST_CLOSE_DAYS = 5;
@@ -169,7 +172,8 @@ public class ConsolidacionPeriodoExecutor {
                                         NotificacionConsolidacionService notificacionConsolidacionService,
                                         ParametroUnicoService parametroUnicoService,
                                         EntityManager entityManager,
-                                        Environment environment) {
+                                        Environment environment,
+                                        ArchivosBloqueadosFase2Service archivosBloqueadosFase2Service) {
         this.planillaRepository = planillaRepository;
         this.validacionRepository = validacionRepository;
         this.clienteLzRepository = clienteLzRepository;
@@ -185,6 +189,7 @@ public class ConsolidacionPeriodoExecutor {
         this.parametroUnicoService = parametroUnicoService;
         this.entityManager = entityManager;
         this.environment = environment;
+        this.archivosBloqueadosFase2Service = archivosBloqueadosFase2Service;
     }
 
     private final Environment environment;
@@ -387,6 +392,13 @@ public class ConsolidacionPeriodoExecutor {
                 MailTemplateNotificationService.DeliveryResult resultadoCorreo =
                     notificacionConsolidacionService.enviarConfirmacion(cabecera.getIdConsolidacion());
                 persistirAdvertenciaCorreoSiAplica(cabecera, usuarioAuditoria, fechaFin, resultadoCorreo);
+
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    archivosBloqueadosFase2Service.ejecutarFase2(periodoValoracion);
+                }
+            });
 
             logger.info("Consolidación de periodo {} finalizada con estado {} ({} archivos, {} registros, advertencias={}).",
                     periodoValoracion,
@@ -814,7 +826,7 @@ public class ConsolidacionPeriodoExecutor {
 
         try {
             CreffosConsolidationService.PublicationResult publicationResult =
-                    creffosConsolidationService.reconstruirCompleto(periodoValoracion);
+                    creffosConsolidationService.generarYPublicarCreffsos(periodoValoracion);
             if (publicationResult.sharedCopyWarning() != null && !publicationResult.sharedCopyWarning().isBlank()) {
                 advertencias.add("CREFFSOS generado pero no copiado a red");
             }

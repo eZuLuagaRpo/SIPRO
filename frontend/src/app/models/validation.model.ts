@@ -141,6 +141,7 @@ export interface ConsolidacionManualStatus {
   fechaHoraInicio?: string | null;
   fechaHoraFin?: string | null;
   mensajeError?: string | null;
+  fase2EnCurso?: boolean;
 }
 
 /**

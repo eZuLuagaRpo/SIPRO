@@ -528,8 +528,9 @@ public class CreffosParametricGenerator {
                                  Map<String, Map<String, String>> lookupCache) {
         String sourceField = firstNonBlank(definition.parametroTexto("sourceField"), definition.columnaOrigen(), definition.nombreColumna());
         String sourceValue = getSourceValue(source, sourceField);
+        String ifNotFound = firstNonBlank(definition.parametroTexto("ifNotFound"), definition.parametroTexto("defaultValue"), definition.valorConstante(), "");
         if (isBlank(sourceValue)) {
-            return "";
+            return "NULL".equalsIgnoreCase(ifNotFound) ? "" : ifNotFound;
         }
 
         String resolved = lookupCache.getOrDefault(definition.nombreColumna(), Map.of()).get(sourceValue);
@@ -541,7 +542,6 @@ public class CreffosParametricGenerator {
             logger.warn("Cuenta SAP {} sin homologación para columna {}", sourceValue, definition.nombreColumna());
         }
 
-        String ifNotFound = firstNonBlank(definition.parametroTexto("ifNotFound"), definition.parametroTexto("defaultValue"), definition.valorConstante(), "");
         return "NULL".equalsIgnoreCase(ifNotFound) ? "" : ifNotFound;
     }
 

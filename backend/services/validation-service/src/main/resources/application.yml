@@ -98,6 +98,19 @@ app:
     transport: ${APP_MAIL_TRANSPORT:outlook-win32}
     from: ${APP_MAIL_FROM:no-reply-sipro@bancolombia.com.co}
     action-url: ${APP_MAIL_ACTION_URL:http://localhost:4200/aprobacion}
+
+# ── Parámetros críticos de Entra ID y URLs (PDN default) ────────────────────
+# Para DEV/QA, estos valores se sobreescriben en application-dev.yml/application-qa.yml
+# Para PDN, vienen de variables de entorno (AZURE_TENANT_ID, AZURE_CLIENT_ID, URL_PDN, etc.)
+# Estos parámetros NUNCA se leen desde la BD — siempre desde config/env.
+sipro:
+  param:
+    AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:}
+    AZURE_TENANT_ID: ${AZURE_TENANT_ID:}
+    AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET:}
+    URL_DEV: ${URL_DEV:}
+    URL_QA: ${URL_QA:}
+    URL_PDN: ${URL_PDN:}
     banner-url: ${APP_MAIL_BANNER_URL:http://localhost:8080/email-assets/SIPRO_BannerCorreo.png}
     banner-resource-path: ${APP_MAIL_BANNER_RESOURCE_PATH:classpath:static/email-assets/SIPRO_BannerCorreo.png}
     outlook-powershell-path: ${APP_MAIL_OUTLOOK_POWERSHELL:powershell.exe}
@@ -161,7 +174,6 @@ app:
       default-query-limit: ${APP_ADMIN_LOGS_DEFAULT_QUERY_LIMIT:500}
       max-query-limit: ${APP_ADMIN_LOGS_MAX_QUERY_LIMIT:5000}
 
-
 # 2. CONFIGURACIÓN TÉCNICA DE CONEXIÓN LZ (Impala On-Prem - Solo Lectura)
 #    LzJdbcService construye la URL JDBC dinamicamente:
 #      jdbc:impala://host:port;AuthMech=3;KrbHostFQDN=host;...
@@ -183,7 +195,3 @@ lz:
   ingestion:
     # Ejecutar validacion de secrets al arrancar el backend.
     validate-on-startup: ${LZ_VALIDATE_ON_STARTUP:true}
-
-sipro:
-  param:
-    APP_ADMIN_CONSOLIDACION_BYPASS_WINDOW: ${APP_ADMIN_CONSOLIDACION_BYPASS_WINDOW:false}

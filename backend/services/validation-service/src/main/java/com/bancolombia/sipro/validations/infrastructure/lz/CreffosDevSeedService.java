@@ -26,7 +26,7 @@ import java.util.List;
  *      Todos los registros cumplen los filtros del query de producción:
  *        cetr21 = 1, ceap21 = 'C', cest21 NOT IN ('01', '02')
  *      Valores dummy de negocio:
- *        cein21 = 'N1'  →  campo 44 (CLASEGTIA) devolverá 'N1' si cruza
+ *        cein21 = 'Y'  →  campo 44 (CLASEGTIA) devolverá 'Y' si cruza
  *        ceca21 = 'B'   →  campo 48 (CALIFICPUC) devolverá 'B' si cruza
  *        (los documentos que NO estén en esta tabla recibirán el default: campo44='N', campo48='A')
  *
@@ -49,7 +49,7 @@ public class CreffosDevSeedService implements ApplicationRunner {
     private static final int    BATCH_SIZE = 100;
 
     // Valores dummy que satisfacen los filtros del query de producción
-    private static final String CEIN21_DUMMY = "N1";   // campo 44 CLASEGTIA
+    private static final String CEIN21_DUMMY = "Y";   // campo 44 CLASEGTIA
     private static final String CECA21_DUMMY = "B";    // campo 48 CALIFICPUC
     private static final int    CETR21_VALUE = 1;      // filtro: cetr21 = 1
     private static final String CEAP21_VALUE = "C";    // filtro: ceap21 = 'C'
