@@ -1,0 +1,103 @@
+# ============================================================================
+# application-cloud.yml  —  Plantilla Replace Tokens para ambientes desplegados
+#
+# Se usa en DEV, QA y PDN. NUNCA en local.
+# El pipeline de Azure DevOps corre la tarea "Replace Tokens" ANTES de arrancar
+# la app: reemplaza cada #{TOKEN}# con el valor del Variable Group activo en
+# esa corrida (DEV/QA/PDN tienen Variable Groups distintos con sus propios valores).
+#
+# SPRING_PROFILES_ACTIVE=cloud  →  Spring carga application.yml + este archivo.
+#
+# application-dev.yml  sigue existiendo solo para desarrollo local en tu maquina.
+# application-qa.yml   y  application-prd.yml  pueden conservarse como referencia
+# del mecanismo anterior (variables de entorno ${VAR}), pero ya no son necesarios
+# cuando el despliegue usa Replace Tokens.
+# ============================================================================
+
+spring:
+  datasource:
+    url: '#{JDBC_URL}#'
+    username: '#{DB_USER}#'
+    password: '#{DB_PASS}#'
+    hikari:
+      maximum-pool-size: 30
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+security:
+  ad:
+    url: '#{AD_URL}#'
+    domain: '#{AD_DOMAIN}#'
+
+# Bloque app: unificado (evita que YAML descarte el primer bloque por clave duplicada)
+app:
+  validation:
+    async:
+      core-pool-size: 3
+      max-pool-size: 6
+      queue-capacity: 25
+
+  cors:
+    allowed-origins: '#{APP_CORS_ALLOWED_ORIGINS}#'
+
+  storage:
+    s3:
+      endpoint: '#{APP_STORAGE_S3_ENDPOINT}#'
+      region: '#{APP_STORAGE_S3_REGION}#'
+      bucket: '#{APP_STORAGE_S3_BUCKET}#'
+      access-key: '#{APP_STORAGE_S3_ACCESS_KEY}#'
+      secret-key: '#{APP_STORAGE_S3_SECRET_KEY}#'
+
+  lz:
+    schema: '#{APP_LZ_SCHEMA}#'
+    tables:
+      mdm: '#{APP_LZ_TABLE_MDM}#'
+
+  mail:
+    enabled: '#{APP_MAIL_ENABLED}#'
+    transport: '#{APP_MAIL_TRANSPORT}#'
+    from: '#{APP_MAIL_FROM}#'
+    action-url: '#{APP_MAIL_ACTION_URL}#'
+    banner-url: '#{APP_MAIL_BANNER_URL}#'
+    ses:
+      region: '#{APP_MAIL_SES_REGION}#'
+      access-key: '#{APP_MAIL_SES_ACCESS_KEY}#'
+      secret-key: '#{APP_MAIL_SES_SECRET_KEY}#'
+
+sipro:
+  param:
+    AZURE_CLIENT_ID: '#{AZURE_CLIENT_ID}#'
+    AZURE_TENANT_ID: '#{AZURE_TENANT_ID}#'
+    AZURE_CLIENT_SECRET: '#{AZURE_CLIENT_SECRET}#'
+    URL_DEV: '#{URL_DEV}#'
+    URL_QA: '#{URL_QA}#'
+    URL_PDN: '#{URL_PDN}#'
+
+lz:
+  # Host tokenizado: DEV/QA usan 10.8.85.237, PDN usa impala.bancolombia.corp
+  host: '#{LZ_HOST}#'
+  port: '#{LZ_PORT}#'
+
+  # Credenciales directas (bypass de Secrets Manager).
+  # DEV/QA: llenar LZ_USER y LZ_PASSWORD en el Variable Group.
+  # PDN: dejar LZ_USER y LZ_PASSWORD vacios → LzSecretsService usa el bloque secrets abajo.
+  dev:
+    user:     '#{LZ_USER}#'
+    password: '#{LZ_PASSWORD}#'
+
+  # Secrets Manager — necesario cuando LZ_USER/LZ_PASSWORD vienen vacios (PDN).
+  # DEV/QA pueden dejarlo vacio si usan el bypass de credenciales directas.
+  secrets:
+    endpoint: '#{LZ_SECRETS_ENDPOINT}#'
+    region:   '#{LZ_SECRETS_REGION}#'
+    name:     '#{LZ_SECRETS_NAME}#'
+
+  ssl:
+    truststore-path:     '#{LZ_TRUSTSTORE_PATH}#'
+    truststore-password: '#{LZ_TRUSTSTORE_PWD}#'
+    truststore-type: JKS
+
+  ingestion:
+    validate-on-startup: true

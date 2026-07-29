@@ -255,23 +255,23 @@ public class CreffosParametricGenerator {
         String lookupKey = validateSqlIdentifier(rawLookupKey);
         String lookupValue = validateSqlIdentifier(rawLookupValue);
         StringBuilder sql = new StringBuilder();
-        sql.append("SELECT CAST(")
+        sql.append("SELECT TRIM(CAST(")
                 .append(lookupKey)
-                .append(" AS STRING) AS lookup_key, ")
+                .append(" AS STRING)) AS lookup_key, ")
                 .append("MAX(CAST(")
                 .append(lookupValue)
                 .append(" AS STRING)) AS lookup_value ")
                 .append("FROM ")
                 .append(qualifiedTable)
-                .append(" WHERE CAST(")
+                .append(" WHERE TRIM(CAST(")
                 .append(lookupKey)
-                .append(" AS STRING) IN (")
+                .append(" AS STRING)) IN (")
                 .append(joinQuoted(keys))
                 .append(")");
 
         appendLzFilters(sql, filters);
 
-        sql.append(" GROUP BY CAST(").append(lookupKey).append(" AS STRING)");
+        sql.append(" GROUP BY TRIM(CAST(").append(lookupKey).append(" AS STRING))");
         return sql.toString();
     }
 
@@ -284,19 +284,19 @@ public class CreffosParametricGenerator {
         String lookupValue = validateSqlIdentifier(rawLookupValue);
         StringBuilder sql = new StringBuilder();
         sql.append("SELECT lookup_key, lookup_value FROM (")
-                .append("SELECT CAST(")
+                .append("SELECT TRIM(CAST(")
                 .append(lookupKey)
-                .append(" AS STRING) AS lookup_key, CAST(")
+                .append(" AS STRING)) AS lookup_key, CAST(")
                 .append(lookupValue)
-                .append(" AS STRING) AS lookup_value, ROW_NUMBER() OVER (PARTITION BY CAST(")
+                .append(" AS STRING) AS lookup_value, ROW_NUMBER() OVER (PARTITION BY TRIM(CAST(")
                 .append(lookupKey)
-                .append(" AS STRING) ORDER BY ")
+                .append(" AS STRING)) ORDER BY ")
                 .append(buildLatestOrderByClause(filters))
                 .append(") AS rn FROM ")
                 .append(qualifiedTable)
-                .append(" WHERE CAST(")
+                .append(" WHERE TRIM(CAST(")
                 .append(lookupKey)
-                .append(" AS STRING) IN (")
+                .append(" AS STRING)) IN (")
                 .append(joinQuoted(keys))
                 .append(")");
 

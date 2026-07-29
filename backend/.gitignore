@@ -92,6 +92,7 @@ $RECYCLE.BIN/
 *.csv
 !**/test-data/**/*.xlsx
 !**/test-data/**/*.csv
+!**/resources/dev/*.csv
 
 # Backups
 *.bak
