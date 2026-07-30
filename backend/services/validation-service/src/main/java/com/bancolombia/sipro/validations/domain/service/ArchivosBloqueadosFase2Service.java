@@ -55,4 +55,27 @@ public class ArchivosBloqueadosFase2Service {
             }
         });
     }
+
+    public void ejecutarFase2(LocalDate fechaCorte,
+            CreffosParametricGenerator.GeneratedCreffosFile preBuiltCreffos) {
+        if (fechaCorte == null) {
+            return;
+        }
+        estadoFase2PorPeriodo.put(fechaCorte, "EN_PROCESO");
+        validationTaskExecutor.execute(() -> {
+            MDC.put(AdminLogBufferService.MDC_SCOPE_KEY, AdminLogBufferService.CONSOLIDACION_SCOPE);
+            try {
+                logger.info("[Fase 2] Iniciando publicación de archivos bloqueados para periodo {}.", fechaCorte);
+                creffosConsolidationService.procesarArchivosBloqueados(fechaCorte, preBuiltCreffos);
+                estadoFase2PorPeriodo.put(fechaCorte, "COMPLETADO");
+                logger.info("[Fase 2] Archivos bloqueados completados para periodo {}.", fechaCorte);
+            } catch (Exception ex) {
+                estadoFase2PorPeriodo.put(fechaCorte, "ERROR");
+                logger.error("[Fase 2] Error procesando archivos bloqueados para periodo {}: {}",
+                        fechaCorte, ex.getMessage(), ex);
+            } finally {
+                MDC.remove(AdminLogBufferService.MDC_SCOPE_KEY);
+            }
+        });
+    }
 }

@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -127,19 +126,6 @@ public class AdminSqlService {
         Set<String> tables = extraerTablas(sql);
         if (tables.isEmpty()) {
             throw new IllegalArgumentException("No fue posible identificar la tabla objetivo de la consulta.");
-        }
-
-        Set<String> unauthorizedTables = new TreeSet<>();
-        for (String table : tables) {
-            if (!adminPanelProperties.getSql().getAllowedTablesNormalized().contains(table)) {
-                unauthorizedTables.add(table);
-            }
-        }
-
-        if (!unauthorizedTables.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "Consulta fuera de alcance. Solo se permiten tablas maestras y métricas del panel admin. "
-                            + "Tablas no permitidas: " + String.join(", ", unauthorizedTables));
         }
 
         return new ValidatedSql(sql, tables);

@@ -107,7 +107,7 @@ public class CreffosConsolidationService {
 
             archivosBloqueadosService.comprimirYFinalizarPeriodo(fechaCorte);
 
-            return PublicationResult.generated(storageKey, generatedFile.fileName(), sharedCopyWarning);
+            return PublicationResult.generated(storageKey, generatedFile.fileName(), sharedCopyWarning, generatedFile);
         } catch (Exception ex) {
             throw new IllegalStateException("No se pudo publicar el archivo CREFFSOS paramétrico: " + ex.getMessage(), ex);
         }
@@ -137,7 +137,7 @@ public class CreffosConsolidationService {
             String sharedCopyWarning = publicarEnRutaCompartida(generatedFile);
             logger.info("[CREFFSOS] Archivo paramétrico generado: {} (filas={}, formato={})",
                     storageKey, generatedFile.rowCount(), generatedFile.format());
-            return PublicationResult.generated(storageKey, generatedFile.fileName(), sharedCopyWarning);
+            return PublicationResult.generated(storageKey, generatedFile.fileName(), sharedCopyWarning, generatedFile);
         } catch (Exception ex) {
             throw new IllegalStateException("No se pudo publicar el archivo CREFFSOS paramétrico: " + ex.getMessage(), ex);
         }
@@ -157,6 +157,37 @@ public class CreffosConsolidationService {
                     creffosParametricGenerator.generate(fechaCorte, registros);
             archivosBloqueadosService.publicarArchivo(fechaCorte, generatedFile.protectedFileName(),
                     generatedFile.protectedContent());
+        }
+
+        fullIfrsBloqueadosConsolidacionService.publicarPeriodo(fechaCorte);
+
+        if (!registros.isEmpty()) {
+            try {
+                ConciliacionArchivosBloqueadosService.GeneratedConciliacion conciliacion =
+                        conciliacionArchivosBloqueadosService.generar(fechaCorte, registros);
+                archivosBloqueadosService.publicarArchivo(fechaCorte, conciliacion.fileName(), conciliacion.content());
+            } catch (Exception ex) {
+                logger.warn("[CREFFSOS] No se pudo generar el Excel de conciliacion de archivos bloqueados para '{}': {}",
+                        fechaCorte, ex.getMessage());
+            }
+        }
+
+        archivosBloqueadosService.comprimirYFinalizarPeriodo(fechaCorte);
+    }
+
+    /**
+     * Variante de {@link #procesarArchivosBloqueados(LocalDate)} que recibe el CREFFSOS
+     * ya generado en Fase 1, evitando una segunda llamada a generate() que avanzaría
+     * innecesariamente el consecutivo de la BD.
+     */
+    public void procesarArchivosBloqueados(LocalDate fechaCorte,
+            CreffosParametricGenerator.GeneratedCreffosFile preBuiltCreffos) {
+        List<SiproDetalleConsolidadoRegistro> registros = consolidadoRegistroRepository
+                .findByFechaCorteOrderByIdConsolidadoRegistroAsc(fechaCorte);
+
+        if (!registros.isEmpty()) {
+            archivosBloqueadosService.publicarArchivo(fechaCorte,
+                    preBuiltCreffos.protectedFileName(), preBuiltCreffos.protectedContent());
         }
 
         fullIfrsBloqueadosConsolidacionService.publicarPeriodo(fechaCorte);
@@ -202,14 +233,16 @@ public class CreffosConsolidationService {
     public record PublicationResult(boolean generated,
                                     String storageKey,
                                     String fileName,
-                                    String sharedCopyWarning) {
+                                    String sharedCopyWarning,
+                                    CreffosParametricGenerator.GeneratedCreffosFile generatedFile) {
 
-        public static PublicationResult generated(String storageKey, String fileName, String sharedCopyWarning) {
-            return new PublicationResult(true, storageKey, fileName, sharedCopyWarning);
+        public static PublicationResult generated(String storageKey, String fileName, String sharedCopyWarning,
+                                                  CreffosParametricGenerator.GeneratedCreffosFile generatedFile) {
+            return new PublicationResult(true, storageKey, fileName, sharedCopyWarning, generatedFile);
         }
 
         public static PublicationResult notGenerated() {
-            return new PublicationResult(false, null, null, null);
+            return new PublicationResult(false, null, null, null, null);
         }
     }
 }

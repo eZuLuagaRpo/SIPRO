@@ -374,8 +374,10 @@ public class ConsolidacionPeriodoExecutor {
             }
 
             String advertenciaExcelConsolidado = guardarExcelConsolidado(periodoValoracion, excelWriter);
-            List<String> advertenciasPostProceso = new ArrayList<>(
-                    ejecutarPostProcesamiento(periodoValoracion, cabecera.getIdConsolidacion()));
+            PostProcesamientoResult postResult =
+                    ejecutarPostProcesamiento(periodoValoracion, cabecera.getIdConsolidacion());
+            List<String> advertenciasPostProceso = new ArrayList<>(postResult.advertencias());
+            final CreffosParametricGenerator.GeneratedCreffosFile creffosGenerado = postResult.creffosFile();
             if (advertenciaExcelConsolidado != null && !advertenciaExcelConsolidado.isBlank()) {
                 advertenciasPostProceso.add(advertenciaExcelConsolidado);
             }
@@ -401,7 +403,7 @@ public class ConsolidacionPeriodoExecutor {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    archivosBloqueadosFase2Service.ejecutarFase2(periodoValoracion);
+                    archivosBloqueadosFase2Service.ejecutarFase2(periodoValoracion, creffosGenerado);
                 }
             });
 
@@ -835,12 +837,17 @@ public class ConsolidacionPeriodoExecutor {
         }
     }
 
-    private List<String> ejecutarPostProcesamiento(LocalDate periodoValoracion, Long idConsolidacion) {
+    private record PostProcesamientoResult(List<String> advertencias,
+            CreffosParametricGenerator.GeneratedCreffosFile creffosFile) {}
+
+    private PostProcesamientoResult ejecutarPostProcesamiento(LocalDate periodoValoracion, Long idConsolidacion) {
         List<String> advertencias = new ArrayList<>();
+        CreffosParametricGenerator.GeneratedCreffosFile creffosFile = null;
 
         try {
             CreffosConsolidationService.PublicationResult publicationResult =
                     creffosConsolidationService.generarYPublicarCreffsos(periodoValoracion);
+            creffosFile = publicationResult.generatedFile();
             if (publicationResult.sharedCopyWarning() != null && !publicationResult.sharedCopyWarning().isBlank()) {
                 advertencias.add("CREFFSOS generado pero no copiado a red");
             }
@@ -856,7 +863,7 @@ public class ConsolidacionPeriodoExecutor {
                     periodoValoracion, ex.getMessage(), ex);
             advertencias.add("Reporte de conciliación no generado: " + resumirMensaje(ex));
         }
-        return advertencias;
+        return new PostProcesamientoResult(advertencias, creffosFile);
     }
 
     private String construirObservacion(String observacionBase, List<String> advertencias) {
