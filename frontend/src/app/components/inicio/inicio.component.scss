@@ -21,13 +21,13 @@
     // quedando centrado en el espacio derecho (55%–100%, centro ~76%).
     right: 3%;
     transform: translateY(-50%);
-    width: 42%;
+    width: 46%;
     aspect-ratio: 1 / 1;
     background-image: url('/assets/images/SiproLogoConTrazos.png');
     background-repeat: no-repeat;
     background-position: center center;
-    // 115% compensa el padding transparente de la imagen sin agrandar demasiado el logo.
-    background-size: 115%;
+    // 125% compensa el padding transparente de la imagen con un tamaño un poco mayor.
+    background-size: 125%;
     pointer-events: none;
     z-index: 0;
     opacity: 0.55;
