@@ -12,25 +12,26 @@
   position: relative;
   overflow: hidden; // recorte limpio en los bordes del main
 
-  // Logo SIPRO como pseudo-elemento decorativo: ocupa la mitad derecha
+  // Logo SIPRO como pseudo-elemento decorativo centrado en el espacio derecho
   &::after {
     content: '';
     position: absolute;
     top: 50%;
-    right: 2%;
+    // right: 3% + width: 42% → el elemento va de 55% a 97% del main,
+    // quedando centrado en el espacio derecho (55%–100%, centro ~76%).
+    right: 3%;
     transform: translateY(-50%);
-    width: 52%;
+    width: 42%;
     aspect-ratio: 1 / 1;
     background-image: url('/assets/images/SiproLogoConTrazos.png');
     background-repeat: no-repeat;
     background-position: center center;
-    // La imagen tiene ~20% de padding transparente alrededor del logo real.
-    // 130% compensa ese padding para que el logo ocupe visualmente el contenedor.
-    background-size: 130%;
+    // 115% compensa el padding transparente de la imagen sin agrandar demasiado el logo.
+    background-size: 115%;
     pointer-events: none;
     z-index: 0;
     opacity: 0.55;
-    // Desvanecimiento en el borde izquierdo para no solapar las cards
+    // Desvanecimiento suave en el borde izquierdo para no solapar las cards
     -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0,0,0,0.4) 20%, black 50%);
     mask-image: linear-gradient(to right, transparent 0%, rgba(0,0,0,0.4) 20%, black 50%);
   }
@@ -49,12 +50,14 @@
   font-weight: 700;
   margin-bottom: 8px;
   color: #2C2A29;
+  max-width: 55%;
 }
 
 .sipro-welcome-text {
   margin: 8px 0 24px;
   color: #2C2A29;
   font-weight: 600;
+  max-width: 55%;
 }
 
 // =================== Cards container (mitad izquierda) ===================
@@ -417,11 +420,16 @@
 
 @media (max-width: 992px) {
   .home-cards {
-    max-width: 100%; // en tablet/mobile las cards usan todo el ancho
+    max-width: 100%;
+  }
+
+  .page-title,
+  .sipro-welcome-text {
+    max-width: 100%;
   }
 
   .sipro-main::after {
-    display: none; // ocultar imagen en pantallas pequeñas
+    display: none;
   }
 }
 
