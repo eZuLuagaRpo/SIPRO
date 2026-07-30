@@ -190,6 +190,34 @@ export class TableroComponent implements OnInit, OnDestroy {
     };
   }
 
+  get resumenCargadoColgaap(): { cargadas: number; total: number } {
+    const filas = this.filas;
+    return {
+      cargadas: filas.filter(f =>
+        f.estadoCargadoColgaap === 'ARCHIVO_CARGADO' ||
+        f.estadoCargadoColgaap === 'SIN_DATOS'
+      ).length,
+      total: filas.filter(f =>
+        f.estadoCargadoColgaap !== 'NO_APLICA' &&
+        f.estadoCargadoColgaap !== null
+      ).length
+    };
+  }
+
+  get resumenCargadoFullIfrs(): { cargadas: number; total: number } {
+    const filas = this.filas;
+    return {
+      cargadas: filas.filter(f =>
+        f.estadoCargadoFullIfrs === 'ARCHIVO_CARGADO' ||
+        f.estadoCargadoFullIfrs === 'SIN_DATOS'
+      ).length,
+      total: filas.filter(f =>
+        f.estadoCargadoFullIfrs !== 'NO_APLICA' &&
+        f.estadoCargadoFullIfrs !== null
+      ).length
+    };
+  }
+
   /**
    * Consulta el tablero de control para el período seleccionado o para el período actual.
    */

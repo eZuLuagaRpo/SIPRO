@@ -185,20 +185,49 @@
           </section>
 
           <section class="tablero-progreso" *ngIf="filas.length > 0">
+
             <div class="tablero-progreso__item tablero-progreso__item--colgaap">
               <span class="tablero-progreso__label">Colgaap/Modificado</span>
-              <span class="tablero-progreso__contador">
-                <strong>{{ resumenColgaap.aprobadas }}</strong> / {{ resumenColgaap.total }}
-              </span>
-              <span class="tablero-progreso__sublabel">planillas aprobadas</span>
+              <div class="tablero-progreso__mitades">
+                <div class="tablero-progreso__mitad">
+                  <span class="tablero-progreso__mitad-titulo">Cargadas</span>
+                  <span class="tablero-progreso__contador">
+                    <strong>{{ resumenCargadoColgaap.cargadas }}</strong> / {{ resumenCargadoColgaap.total }}
+                  </span>
+                  <span class="tablero-progreso__sublabel">planillas cargadas</span>
+                </div>
+                <div class="tablero-progreso__divider"></div>
+                <div class="tablero-progreso__mitad">
+                  <span class="tablero-progreso__mitad-titulo">Aprobadas</span>
+                  <span class="tablero-progreso__contador">
+                    <strong>{{ resumenColgaap.aprobadas }}</strong> / {{ resumenColgaap.total }}
+                  </span>
+                  <span class="tablero-progreso__sublabel">planillas aprobadas</span>
+                </div>
+              </div>
             </div>
+
             <div class="tablero-progreso__item tablero-progreso__item--ifrs">
               <span class="tablero-progreso__label">Full IFRS</span>
-              <span class="tablero-progreso__contador">
-                <strong>{{ resumenFullIfrs.aprobadas }}</strong> / {{ resumenFullIfrs.total }}
-              </span>
-              <span class="tablero-progreso__sublabel">planillas aprobadas</span>
+              <div class="tablero-progreso__mitades">
+                <div class="tablero-progreso__mitad">
+                  <span class="tablero-progreso__mitad-titulo">Cargadas</span>
+                  <span class="tablero-progreso__contador">
+                    <strong>{{ resumenCargadoFullIfrs.cargadas }}</strong> / {{ resumenCargadoFullIfrs.total }}
+                  </span>
+                  <span class="tablero-progreso__sublabel">planillas cargadas</span>
+                </div>
+                <div class="tablero-progreso__divider"></div>
+                <div class="tablero-progreso__mitad">
+                  <span class="tablero-progreso__mitad-titulo">Aprobadas</span>
+                  <span class="tablero-progreso__contador">
+                    <strong>{{ resumenFullIfrs.aprobadas }}</strong> / {{ resumenFullIfrs.total }}
+                  </span>
+                  <span class="tablero-progreso__sublabel">planillas aprobadas</span>
+                </div>
+              </div>
             </div>
+
           </section>
 
           <article class="resumen-card resumen-card--contrast tablero-card" *ngIf="filas.length > 0">
