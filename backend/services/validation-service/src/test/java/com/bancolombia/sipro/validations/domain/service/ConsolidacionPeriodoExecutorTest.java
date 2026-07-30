@@ -205,6 +205,7 @@ class ConsolidacionPeriodoExecutorTest {
             .thenReturn(CreffosConsolidationService.PublicationResult.generated(
                 "consolidados/2026-05-31/CREFFSOS.xlsx",
                 "CREFFSOS.xlsx",
+                null,
                 null
             ));
         when(consolidacionConciliacionReportService.generar(anyLong()))
@@ -292,6 +293,7 @@ class ConsolidacionPeriodoExecutorTest {
             .thenReturn(CreffosConsolidationService.PublicationResult.generated(
                 "consolidados/2026-05-31/CREFFSOS.xlsx",
                 "CREFFSOS.xlsx",
+                null,
                 null
             ));
         when(consolidacionConciliacionReportService.generar(anyLong()))
@@ -355,7 +357,8 @@ class ConsolidacionPeriodoExecutorTest {
             .thenReturn(CreffosConsolidationService.PublicationResult.generated(
                 "consolidados/2026-05-31/CREFFSOS.xlsx",
                 "CREFFSOS.xlsx",
-                "No se pudo copiar CREFFSOS a ruta compartida: \\\\share. Motivo: access denied"
+                "No se pudo copiar CREFFSOS a ruta compartida: \\\\share. Motivo: access denied",
+                null
             ));
         when(notificacionConsolidacionService.enviarConfirmacion(anyLong()))
             .thenReturn(MailTemplateNotificationService.DeliveryResult.failed("smtp timeout"));
