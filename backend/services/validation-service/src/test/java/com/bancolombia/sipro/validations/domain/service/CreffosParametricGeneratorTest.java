@@ -213,7 +213,6 @@ class CreffosParametricGeneratorTest {
                 .thenReturn("defaults.csv");
         when(parametroUnicoService.getString("CREFFSOS_INCLUIR_ENCABEZADO", "true")).thenReturn("false");
         when(parametroUnicoService.getString("CREFFSOS_HOJA_XLSX", "CREFFSOS")).thenReturn("CREFFSOS");
-        when(lzJdbcService.isEnabled()).thenReturn(true);
 
         SiproDetalleConsolidadoRegistro registro = new SiproDetalleConsolidadoRegistro();
         registro.setDocumento(null);
