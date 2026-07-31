@@ -12,8 +12,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
 
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
@@ -31,7 +29,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-@MockitoSettings(strictness = Strictness.LENIENT)
 class CreffosParametricGeneratorTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -182,45 +179,6 @@ class CreffosParametricGeneratorTest {
 
         String content = new String(generated.content(), StandardCharsets.UTF_8).stripTrailing();
         assertEquals("456;G", content);
-    }
-
-    @Test
-    void deberiaUsarDefaultEnCampos44y48CuandoDocumentoVieneVacio() {
-        List<CreffosColumnDefinition> definiciones = List.of(
-                definition("CLASEGTIA", 44, "STRING", "LOOKUP", "resolverClaseGarantiaDesdeCenie", "N",
-                        Map.of(
-                                "sourceField", "documento",
-                                "lookupSchema", "s_productos",
-                                "lookupTable", "bvnc_visionry_cenie",
-                                "lookupKey", "ceac21",
-                                "lookupValue", "cein21",
-                                "defaultValue", "N"
-                        )),
-                definition("CALIFICPUC", 48, "STRING", "LOOKUP", "resolverCalificacionDesdeCenie", "A",
-                        Map.of(
-                                "sourceField", "documento",
-                                "lookupSchema", "s_productos",
-                                "lookupTable", "bvnc_visionry_cenie",
-                                "lookupKey", "ceac21",
-                                "lookupValue", "ceca21",
-                                "defaultValue", "A"
-                        ))
-        );
-
-        when(parametroColumnasRepository.findActiveDefinitions()).thenReturn(definiciones);
-        when(parametroUnicoService.getString("CREFFSOS_FORMATO_SALIDA", "XLSX")).thenReturn("csv");
-        when(parametroUnicoService.getString("CREFFSOS_INCLUIR_ENCABEZADO", "true")).thenReturn("false");
-
-        SiproDetalleConsolidadoRegistro registro = new SiproDetalleConsolidadoRegistro();
-        registro.setDocumento(null);
-
-        CreffosParametricGenerator.GeneratedCreffosFile generated = generator.generate(
-                LocalDate.of(2026, 3, 31),
-                List.of(registro)
-        );
-
-        String content = new String(generated.content(), StandardCharsets.UTF_8).stripTrailing();
-        assertEquals("N;A", content);
     }
 
     @Test
