@@ -156,10 +156,6 @@ export class ResumenComponent implements OnInit, OnDestroy {
       : 'El cambio de parámetros solo está habilitado para perfiles administrativos.';
   }
 
-  get tooltipModuloNoDisponible(): string {
-    return 'Este módulo está bloqueado para su perfil actual.';
-  }
-
   get mesesDisponibles(): ConsolidacionMesDisponible[] {
     if (this.selectedYear == null) {
       return [];

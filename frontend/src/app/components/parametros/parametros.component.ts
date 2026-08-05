@@ -280,10 +280,6 @@ export class ParametrosComponent implements OnInit {
     return 'Módulo de cambio de parámetros del sistema (activo).';
   }
 
-  get tooltipModuloNoDisponible(): string {
-    return 'Este módulo está bloqueado para su perfil actual.';
-  }
-
   toggleSidebar(): void { this.sidebarOpen = !this.sidebarOpen; }
   toggleSubMenu(): void { this.subMenuOpen = !this.subMenuOpen; }
 

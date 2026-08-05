@@ -131,10 +131,6 @@ export class AprobacionComponent implements OnInit, OnDestroy {
             : 'El cambio de parámetros solo está habilitado para perfiles administrativos.';
     }
 
-    get tooltipModuloNoDisponible(): string {
-        return 'Este módulo está bloqueado para su perfil actual.';
-    }
-
     constructor(
         private validationService: ValidationService,
         private authService: AuthService,

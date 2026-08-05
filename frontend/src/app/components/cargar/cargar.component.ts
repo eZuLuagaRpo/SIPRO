@@ -189,10 +189,6 @@ export class CargarComponent implements OnInit, OnDestroy {
       : 'El cambio de parámetros solo está habilitado para perfiles administrativos.';
   }
 
-  get tooltipModuloNoDisponible(): string {
-    return 'Este módulo está bloqueado para su perfil actual.';
-  }
-
   get isFullIfrs(): boolean {
     const seg = this.uploadForm.get('segmento')?.value;
     return seg === 2 || seg === '2';

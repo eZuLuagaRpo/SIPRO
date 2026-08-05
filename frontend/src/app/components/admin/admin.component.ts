@@ -249,10 +249,6 @@ export class AdminComponent implements OnInit, OnDestroy {
       : 'El cambio de parámetros solo está habilitado para perfiles administrativos.';
   }
 
-  get tooltipModuloNoDisponible(): string {
-    return 'Este módulo está bloqueado para su perfil actual.';
-  }
-
   get yearsDisponibles(): number[] {
     const years = new Set<number>();
     for (const periodo of this.dashboard?.periodosDisponibles ?? []) {
