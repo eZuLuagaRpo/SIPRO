@@ -96,13 +96,9 @@ app:
     allowed-origins: '#{APP_CORS_ALLOWED_ORIGINS}#'
 
   storage:
-    type: s3
-    s3:
-      endpoint: '#{APP_STORAGE_S3_ENDPOINT}#'
-      region: '#{APP_STORAGE_S3_REGION}#'
-      bucket: '#{APP_STORAGE_S3_BUCKET}#'
-      access-key: '#{APP_STORAGE_S3_ACCESS_KEY}#'
-      secret-key: '#{APP_STORAGE_S3_SECRET_KEY}#'
+    type: local
+    local:
+      base-dir: '#{APP_STORAGE_LOCAL_BASE_DIR}#'
 
   lz:
     schema: '#{APP_LZ_SCHEMA}#'

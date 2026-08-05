@@ -81,6 +81,12 @@ public class SiproDetalleConsolidacionesPlanillas implements Serializable {
     @Column(name = "mensaje_error", columnDefinition = "TEXT")
     private String mensajeError;
 
+    @Column(name = "creffsos_cantidad_registros")
+    private Long creffsosCantidadRegistros;
+
+    @Column(name = "creffsos_total_vlriniobl")
+    private BigDecimal creffosTotalVlriniobl;
+
     public Long getIdConsolidacion() {
         return idConsolidacion;
     }
@@ -239,5 +245,21 @@ public class SiproDetalleConsolidacionesPlanillas implements Serializable {
 
     public void setMensajeError(String mensajeError) {
         this.mensajeError = mensajeError;
+    }
+
+    public Long getCreffsosCantidadRegistros() {
+        return creffsosCantidadRegistros;
+    }
+
+    public void setCreffsosCantidadRegistros(Long creffsosCantidadRegistros) {
+        this.creffsosCantidadRegistros = creffsosCantidadRegistros;
+    }
+
+    public BigDecimal getCreffosTotalVlriniobl() {
+        return creffosTotalVlriniobl;
+    }
+
+    public void setCreffosTotalVlriniobl(BigDecimal creffosTotalVlriniobl) {
+        this.creffosTotalVlriniobl = creffosTotalVlriniobl;
     }
 }

@@ -9,7 +9,7 @@ app:
   storage:
     type: local
     local:
-      base-dir: C:/s3mock2/sipro-local-storage
+      base-dir: \\SBMDEBNS03\BFT\SIPRO\planillas
   mail:
     enabled: true
     transport: outlook-win32

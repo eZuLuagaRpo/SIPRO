@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -25,6 +26,12 @@ public interface SiproDetalleConsolidadoRegistroRepository extends JpaRepository
 	 * Obtiene los registros asociados a una consolidación específica.
 	 */
 	List<SiproDetalleConsolidadoRegistro> findByIdConsolidacionOrderByIdConsolidadoRegistroAsc(Long idConsolidacion);
+
+	/**
+	 * Suma el campo vlriniobl de todos los registros de una consolidación.
+	 */
+	@Query("SELECT COALESCE(SUM(r.vlriniobl), 0) FROM SiproDetalleConsolidadoRegistro r WHERE r.idConsolidacion = :idConsolidacion")
+	BigDecimal sumVlrinioblByIdConsolidacion(@Param("idConsolidacion") Long idConsolidacion);
 
 	/**
 	 * Elimina un lote acotado de registros asociados a una consolidación.

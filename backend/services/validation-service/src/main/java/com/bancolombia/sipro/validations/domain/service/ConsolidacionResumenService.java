@@ -124,10 +124,21 @@ public class ConsolidacionResumenService {
             ? valorEntero(cabecera.getCantidadRegistrosConsolidados())
             : registros.size();
 
-        CreffosComparisonService.ComparisonSnapshot comparisonSnapshot = creffosComparisonService.comparar(
-            cabecera.getPeriodoValoracion(),
-            cantidadRegistrosPostgres,
-            totalVlrIniOblPostgres);
+        CreffosComparisonService.ComparisonSnapshot comparisonSnapshot;
+        if (cabecera.getCreffsosCantidadRegistros() != null) {
+            comparisonSnapshot = creffosComparisonService.compararDesdeBD(
+                    cantidadRegistrosPostgres,
+                    totalVlrIniOblPostgres,
+                    cabecera.getCreffsosCantidadRegistros(),
+                    cabecera.getCreffosTotalVlriniobl() != null
+                            ? cabecera.getCreffosTotalVlriniobl()
+                            : BigDecimal.ZERO);
+        } else {
+            comparisonSnapshot = creffosComparisonService.comparar(
+                    cabecera.getPeriodoValoracion(),
+                    cantidadRegistrosPostgres,
+                    totalVlrIniOblPostgres);
+        }
         applyComparison(response, comparisonSnapshot);
 
         if (registros.isEmpty()) {

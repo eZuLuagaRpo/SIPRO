@@ -394,6 +394,13 @@ public class ConsolidacionPeriodoExecutor {
             cabecera.setObservacion(construirObservacion(cabecera.getObservacion(), advertenciasPostProceso));
             cabecera.setModificadoPorId(usuarioAuditoria);
             cabecera.setModificadoEn(fechaFin);
+            if (creffosGenerado != null) {
+                BigDecimal totalVlrinioblCreffos = consolidadoRegistroRepository
+                        .sumVlrinioblByIdConsolidacion(cabecera.getIdConsolidacion());
+                cabecera.setCreffsosCantidadRegistros((long) creffosGenerado.rowCount());
+                cabecera.setCreffosTotalVlriniobl(
+                        totalVlrinioblCreffos != null ? totalVlrinioblCreffos : BigDecimal.ZERO);
+            }
             consolidacionRepository.save(cabecera);
 
                 MailTemplateNotificationService.DeliveryResult resultadoCorreo =

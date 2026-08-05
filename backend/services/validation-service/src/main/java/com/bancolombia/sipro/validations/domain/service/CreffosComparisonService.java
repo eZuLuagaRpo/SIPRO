@@ -135,6 +135,48 @@ public class CreffosComparisonService {
     }
 
     /**
+     * Construye la comparación usando el snapshot almacenado en BD al momento de la consolidación,
+     * sin necesidad de leer el archivo físico del CREFFSOS.
+     */
+    public ComparisonSnapshot compararDesdeBD(long cantidadRegistrosPostgres,
+                                              BigDecimal totalVlrIniOblPostgres,
+                                              long cantidadCreffos,
+                                              BigDecimal totalCreffosVlriniobl) {
+        List<CreffosColumnDefinition> definitions = parametroColumnasRepository.findActiveDefinitions();
+        int columnasEsperadas = definitions.size();
+        String formato = normalizedOutputFormat();
+        String nombreArchivo = expectedFileName();
+
+        CreffosFileMetrics metrics = new CreffosFileMetrics(columnasEsperadas, cantidadCreffos,
+                normalize(totalCreffosVlriniobl));
+        List<ConsolidacionResumenResponse.ComparacionMetricaResumen> diferencias = buildDifferences(
+                cantidadRegistrosPostgres, totalVlrIniOblPostgres, metrics);
+
+        boolean tieneDiferencias = diferencias.stream().anyMatch(metric -> !metric.isCoincide());
+        String estado = tieneDiferencias ? "CON_DIFERENCIAS" : "CONSISTENTE";
+        String detalle = tieneDiferencias
+                ? "Se detectaron diferencias entre PostgreSQL y el snapshot CREFFSOS almacenado."
+                : "El snapshot CREFFSOS almacenado coincide con los totales consolidados del periodo.";
+
+        ConsolidacionResumenResponse.CreffosArchivoResumen resumenArchivo =
+                new ConsolidacionResumenResponse.CreffosArchivoResumen(
+                        true,
+                        nombreArchivo,
+                        formato,
+                        estado,
+                        "SNAPSHOT_BD",
+                        "",
+                        columnasEsperadas,
+                        columnasEsperadas,
+                        cantidadCreffos,
+                        normalize(totalCreffosVlriniobl),
+                        detalle
+                );
+
+        return new ComparisonSnapshot(resumenArchivo, diferencias, tieneDiferencias);
+    }
+
+    /**
      * Carga el archivo CREFFSOS con filas materializadas para soportar conciliación detallada.
      */
     public DetailedCreffosFile cargarDetalleArchivo(LocalDate fechaCorte) {
