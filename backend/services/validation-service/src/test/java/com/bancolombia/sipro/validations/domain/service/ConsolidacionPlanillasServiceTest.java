@@ -1,5 +1,6 @@
 package com.bancolombia.sipro.validations.domain.service;
 
+import com.bancolombia.sipro.validations.infrastructure.repository.ProductoRepository;
 import com.bancolombia.sipro.validations.infrastructure.repository.SiproDetalleConsolidacionesPlanillasRepository;
 import com.bancolombia.sipro.validations.infrastructure.repository.SiproDetalleCargaPlanillasRepository;
 import com.bancolombia.sipro.validations.domain.model.SiproDetalleCargaPlanillas;
@@ -19,6 +20,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -47,6 +49,9 @@ class ConsolidacionPlanillasServiceTest {
         @Mock
         private Environment environment;
 
+        @Mock
+        private ProductoRepository productoRepository;
+
     private ConsolidacionPlanillasService service;
 
     @BeforeEach
@@ -57,7 +62,8 @@ class ConsolidacionPlanillasServiceTest {
                 ventanaCargaService,
                 consolidacionPeriodoExecutor,
                 parametroUnicoService,
-                environment
+                environment,
+                productoRepository
         );
 
         lenient().when(parametroUnicoService.getLong("APP_CONSOLIDACION_POST_CLOSE_DELAY_HOURS", 1L))
@@ -67,40 +73,80 @@ class ConsolidacionPlanillasServiceTest {
         lenient().when(environment.matchesProfiles("dev")).thenReturn(false);
     }
 
-        // Verifica que el barrido consolida periodos con aprobadas aunque existan pendientes o rechazadas.
+        // Verifica que el barrido selecciona solo el periodo más reciente con fecha <= hoy e ignora los anteriores.
         @Test
-        void barridoDebeIntentarConsolidarAunqueExistanPendientesORechazadas() {
-                LocalDate periodoConPendientes = LocalDate.of(2026, 5, 31);
-                LocalDate periodoListo = LocalDate.of(2026, 6, 30);
-                SiproDetalleCargaPlanillas planillaAprobada = new SiproDetalleCargaPlanillas();
-                planillaAprobada.setRutaArchivoAlmacenamiento("aprobados/2026-05-31/aprobada.xlsx");
-                planillaAprobada.setEstadoPlanilla("APROBADO");
-                SiproDetalleCargaPlanillas planillaPendiente = new SiproDetalleCargaPlanillas();
-                planillaPendiente.setEstadoPlanilla("PENDIENTE_APROBACION");
-
-                SiproDetalleCargaPlanillas planillaLista = new SiproDetalleCargaPlanillas();
-                planillaLista.setRutaArchivoAlmacenamiento("aprobados/2026-06-30/lista.xlsx");
-                planillaLista.setEstadoPlanilla("APROBADO");
+        void barridoDebeConsolidarSoloPeriodoMasRecienteNoElAnterior() {
+                LocalDate periodoAntiguo = LocalDate.of(2026, 5, 31);
+                LocalDate periodoReciente = LocalDate.of(2026, 6, 30);
 
                 when(planillaRepository.findDistinctFechasCorteInformacionAprobadasBySegmentoId(1L))
-                        .thenReturn(List.of(periodoConPendientes, periodoListo));
-                when(consolidacionRepository.existsByPeriodoValoracionAndEstadoConsolidacionIn(eq(periodoConPendientes), anyCollection()))
+                        .thenReturn(List.of(periodoAntiguo, periodoReciente));
+                when(consolidacionRepository.existsByPeriodoValoracionAndEstadoConsolidacionIn(eq(periodoReciente), anyCollection()))
                         .thenReturn(false);
-                when(consolidacionRepository.existsByPeriodoValoracionAndEstadoConsolidacionIn(eq(periodoListo), anyCollection()))
-                        .thenReturn(false);
-                when(planillaRepository.findPlanillasActivasByFechaCorteAndSegmentoId(periodoConPendientes, 1L))
-                        .thenReturn(List.of(planillaAprobada, planillaPendiente));
-                when(planillaRepository.findPlanillasActivasByFechaCorteAndSegmentoId(periodoListo, 1L))
-                        .thenReturn(List.of(planillaLista));
+                when(productoRepository.countActivosByIdSegmento(1L)).thenReturn(2L);
+                when(planillaRepository.countActivasByFechaCorteAndSegmentoId(periodoReciente, 1L)).thenReturn(2L);
+                when(planillaRepository.countPlanillasNoAprobadasByFechaCorteAndSegmentoId(periodoReciente, 1L)).thenReturn(0L);
 
                 service.ejecutarBarridoConsolidacionesPendientes();
 
-                verify(planillaRepository).findDistinctFechasCorteInformacionAprobadasBySegmentoId(1L);
-                verify(planillaRepository, never()).findDistinctFechasCorteInformacionByEstadoPlanillaAndActivoTrue("APROBADO");
                 verify(consolidacionPeriodoExecutor)
-                        .consolidarPeriodoSiCorresponde(periodoConPendientes, 1L, "Barrido automático de consolidaciones pendientes");
+                        .consolidarPeriodoSiCorresponde(periodoReciente, 1L, "Barrido automático de consolidaciones pendientes");
+                verify(consolidacionPeriodoExecutor, never())
+                        .consolidarPeriodoSiCorresponde(eq(periodoAntiguo), any(), any());
+        }
+
+        // Verifica que el barrido no consolida si aún faltan planillas por cargar.
+        @Test
+        void barridoNoDebeConsolidarSiNoEstanTodasLasPlanillasCargadas() {
+                LocalDate periodo = LocalDate.of(2026, 7, 31);
+
+                when(planillaRepository.findDistinctFechasCorteInformacionAprobadasBySegmentoId(1L))
+                        .thenReturn(List.of(periodo));
+                when(consolidacionRepository.existsByPeriodoValoracionAndEstadoConsolidacionIn(eq(periodo), anyCollection()))
+                        .thenReturn(false);
+                when(productoRepository.countActivosByIdSegmento(1L)).thenReturn(22L);
+                when(planillaRepository.countActivasByFechaCorteAndSegmentoId(periodo, 1L)).thenReturn(18L);
+
+                service.ejecutarBarridoConsolidacionesPendientes();
+
+                verify(consolidacionPeriodoExecutor, never()).consolidarPeriodoSiCorresponde(any(), any(), any());
+        }
+
+        // Verifica que el barrido no consolida si hay planillas pendientes de aprobación o rechazadas.
+        @Test
+        void barridoNoDebeConsolidarSiHayPlanillasNoAprobadas() {
+                LocalDate periodo = LocalDate.of(2026, 7, 31);
+
+                when(planillaRepository.findDistinctFechasCorteInformacionAprobadasBySegmentoId(1L))
+                        .thenReturn(List.of(periodo));
+                when(consolidacionRepository.existsByPeriodoValoracionAndEstadoConsolidacionIn(eq(periodo), anyCollection()))
+                        .thenReturn(false);
+                when(productoRepository.countActivosByIdSegmento(1L)).thenReturn(22L);
+                when(planillaRepository.countActivasByFechaCorteAndSegmentoId(periodo, 1L)).thenReturn(22L);
+                when(planillaRepository.countPlanillasNoAprobadasByFechaCorteAndSegmentoId(periodo, 1L)).thenReturn(3L);
+
+                service.ejecutarBarridoConsolidacionesPendientes();
+
+                verify(consolidacionPeriodoExecutor, never()).consolidarPeriodoSiCorresponde(any(), any(), any());
+        }
+
+        // Verifica que el barrido consolida cuando todas las planillas están cargadas y aprobadas.
+        @Test
+        void barridoDebeConsolidarCuandoTodasLasPlanillasEstanCargadasYAprobadas() {
+                LocalDate periodo = LocalDate.of(2026, 7, 31);
+
+                when(planillaRepository.findDistinctFechasCorteInformacionAprobadasBySegmentoId(1L))
+                        .thenReturn(List.of(periodo));
+                when(consolidacionRepository.existsByPeriodoValoracionAndEstadoConsolidacionIn(eq(periodo), anyCollection()))
+                        .thenReturn(false);
+                when(productoRepository.countActivosByIdSegmento(1L)).thenReturn(22L);
+                when(planillaRepository.countActivasByFechaCorteAndSegmentoId(periodo, 1L)).thenReturn(22L);
+                when(planillaRepository.countPlanillasNoAprobadasByFechaCorteAndSegmentoId(periodo, 1L)).thenReturn(0L);
+
+                service.ejecutarBarridoConsolidacionesPendientes();
+
                 verify(consolidacionPeriodoExecutor)
-                        .consolidarPeriodoSiCorresponde(periodoListo, 1L, "Barrido automático de consolidaciones pendientes");
+                        .consolidarPeriodoSiCorresponde(periodo, 1L, "Barrido automático de consolidaciones pendientes");
         }
 
         // Verifica que la validacion manual permite iniciar y consolida solo planillas aprobadas.
