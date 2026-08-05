@@ -1,35 +1,88 @@
 # ============================================================================
-# application-cloud.yml  —  Plantilla Replace Tokens para ambientes desplegados
+# application-cloud.yml  —  Archivo AUTOSUFICIENTE para ambientes desplegados
 #
-# Se usa en DEV, QA y PDN. NUNCA en local.
-# El pipeline de Azure DevOps corre la tarea "Replace Tokens" ANTES de arrancar
-# la app: reemplaza cada #{TOKEN}# con el valor del Variable Group activo en
-# esa corrida (DEV/QA/PDN tienen Variable Groups distintos con sus propios valores).
+# Levanta la app SOLO con este archivo (sin application.yml del JAR):
+#   java -Duser.timezone=America/Bogota -jar sipro.jar \
+#        --spring.config.location=file:/ruta/application-cloud.yml
 #
-# SPRING_PROFILES_ACTIVE=cloud  →  Spring carga application.yml + este archivo.
+# El pipeline de Azure DevOps corre "Replace Tokens" sobre este archivo
+# antes del despliegue, reemplazando cada #{TOKEN}# con el valor del
+# Variable Group del ambiente (DEV, QA o PDN).
 #
-# application-dev.yml  sigue existiendo solo para desarrollo local en tu maquina.
-# application-qa.yml   y  application-prd.yml  pueden conservarse como referencia
-# del mecanismo anterior (variables de entorno ${VAR}), pero ya no son necesarios
-# cuando el despliegue usa Replace Tokens.
+# application-dev.yml  sigue existiendo solo para desarrollo local.
 # ============================================================================
 
+server:
+  port: 8080
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
 spring:
+  application:
+    name: sipro-validation-service
+  main:
+    banner-mode: console
+  servlet:
+    multipart:
+      max-file-size: 300MB
+      max-request-size: 300MB
   datasource:
     url: '#{JDBC_URL}#'
     username: '#{DB_USER}#'
     password: '#{DB_PASS}#'
+    driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 30
       minimum-idle: 5
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        temp:
+          use_jdbc_metadata_defaults: false
+      connection.characterEncoding: utf-8
+      hibernate.connection.charSet: utf-8
+      hibernate.connection.useUnicode: true
+  mail:
+    host: ''
+    port: 587
+    username: ''
+    password: ''
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+  http:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  tracing:
+    enabled: true
 
 security:
   ad:
     url: '#{AD_URL}#'
     domain: '#{AD_DOMAIN}#'
+    groupsMapping: classpath:security/roles.yml
 
 # Bloque app: unificado (evita que YAML descarte el primer bloque por clave duplicada)
 app:
@@ -43,6 +96,7 @@ app:
     allowed-origins: '#{APP_CORS_ALLOWED_ORIGINS}#'
 
   storage:
+    type: s3
     s3:
       endpoint: '#{APP_STORAGE_S3_ENDPOINT}#'
       region: '#{APP_STORAGE_S3_REGION}#'
@@ -67,6 +121,55 @@ app:
       secret-key: '#{APP_MAIL_SES_SECRET_KEY}#'
 
 sipro:
+  excel:
+    poi-byte-array-max-override: 250000000
+  validation:
+    cached-upload-ttl-minutes: 120
+  admin:
+    sql:
+      max-select-rows: 200
+      require-where-on-select: false
+      require-where-on-update: true
+      enabled-operations:
+        - SELECT
+        - UPDATE
+        - INSERT
+      allowed-tables:
+        - data_validation_rule
+        - productos
+        - segmentos
+        - sipro_lz_catalogo_tablas
+        - sipro_lz_ingestion_run
+        - sipro_lz_ingestion_run_default
+        - sipro_lz_mdm_datos_generales_clientes
+        - sipro_lz_mdm_datos_generales_clientes_default
+        - sipro_lz_mdm_datos_generales_clientes_stg
+        - sipro_lz_mdm_datos_generales_clientes_stg_default
+        - sipro_parametros_columnas
+        - sipro_parametros_columnas_creffsos
+        - sipro_parametros_excepcionventanacarga
+        - sipro_parametros_homologacion_colgaap
+        - sipro_parametros_rango_habilitado
+        - sipro_parametros_reglaventanacarga
+        - sipro_parametros_tablas_lz
+        - sipro_parametros_unico
+        - sipro_resumen_por_moneda
+      forbidden-tokens:
+        - delete
+        - truncate
+        - drop
+        - alter
+        - create
+        - grant
+        - revoke
+        - comment
+        - copy
+    logs:
+      streaming-enabled: true
+      download-enabled: true
+      max-buffered-entries: 5000
+      default-query-limit: 500
+      max-query-limit: 5000
   param:
     AZURE_CLIENT_ID: '#{AZURE_CLIENT_ID}#'
     AZURE_TENANT_ID: '#{AZURE_TENANT_ID}#'
@@ -74,6 +177,9 @@ sipro:
     URL_DEV: '#{URL_DEV}#'
     URL_QA: '#{URL_QA}#'
     URL_PDN: '#{URL_PDN}#'
+    banner-resource-path: classpath:static/email-assets/SIPRO_BannerCorreo.png
+    outlook-powershell-path: powershell.exe
+    log-preview: false
 
 lz:
   # Host tokenizado: DEV/QA usan 10.8.85.237, PDN usa impala.bancolombia.corp
