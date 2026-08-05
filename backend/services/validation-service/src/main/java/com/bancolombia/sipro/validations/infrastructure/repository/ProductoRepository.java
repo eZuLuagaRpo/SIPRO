@@ -45,4 +45,10 @@ public interface ProductoRepository extends JpaRepository<Producto, Long> {
      * Busca un producto por su título exacto (case insensitive si se requiere, pero aquí estricto)
      */
     java.util.Optional<Producto> findByTitulo(String titulo);
+
+    /**
+     * Cuenta los productos activos de un segmento. Usado para saber cuántas planillas se esperan por periodo.
+     */
+    @Query("SELECT COUNT(p) FROM Producto p WHERE p.idSegmento = :idSegmento AND p.activo = 1")
+    long countActivosByIdSegmento(@Param("idSegmento") Long idSegmento);
 }

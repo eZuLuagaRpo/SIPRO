@@ -2,6 +2,7 @@ package com.bancolombia.sipro.validations.domain.service;
 
 import com.bancolombia.sipro.validations.domain.model.SiproDetalleCargaPlanillas;
 import com.bancolombia.sipro.validations.domain.model.SiproDetalleConsolidacionesPlanillas;
+import com.bancolombia.sipro.validations.infrastructure.repository.ProductoRepository;
 import com.bancolombia.sipro.validations.infrastructure.repository.SiproDetalleConsolidacionesPlanillasRepository;
 import com.bancolombia.sipro.validations.infrastructure.repository.SiproDetalleCargaPlanillasRepository;
 import org.slf4j.Logger;
@@ -13,6 +14,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -41,19 +43,22 @@ public class ConsolidacionPlanillasService {
     private final ConsolidacionPeriodoExecutor consolidacionPeriodoExecutor;
     private final ParametroUnicoService parametroUnicoService;
     private final Environment environment;
+    private final ProductoRepository productoRepository;
 
     public ConsolidacionPlanillasService(SiproDetalleCargaPlanillasRepository planillaRepository,
                                          SiproDetalleConsolidacionesPlanillasRepository consolidacionRepository,
                                          VentanaCargaService ventanaCargaService,
                                          ConsolidacionPeriodoExecutor consolidacionPeriodoExecutor,
                                          ParametroUnicoService parametroUnicoService,
-                                         Environment environment) {
+                                         Environment environment,
+                                         ProductoRepository productoRepository) {
         this.planillaRepository = planillaRepository;
         this.consolidacionRepository = consolidacionRepository;
         this.ventanaCargaService = ventanaCargaService;
         this.consolidacionPeriodoExecutor = consolidacionPeriodoExecutor;
         this.parametroUnicoService = parametroUnicoService;
         this.environment = environment;
+        this.productoRepository = productoRepository;
     }
 
     /**
@@ -76,13 +81,53 @@ public class ConsolidacionPlanillasService {
     }
 
     /**
-     * Recorre periodos aprobados y trata de consolidar los que estén pendientes.
+     * Consolida automáticamente SOLO el periodo actual (el más reciente con fecha ≤ hoy).
+     * No intenta periodos anteriores: si un periodo pasado no se consolidó en su momento,
+     * debe hacerse de forma manual.
      */
     public void ejecutarBarridoConsolidacionesPendientes() {
-        ejecutarBarridoHastaPeriodo(
-                null,
-                SISTEMA_USUARIO_ID,
-                "Barrido automático de consolidaciones pendientes");
+        List<LocalDate> periodos = planillaRepository
+                .findDistinctFechasCorteInformacionAprobadasBySegmentoId(SEGMENTO_COLGAAP_MODIFICADO_ID);
+
+        LocalDate hoy = LocalDate.now();
+        LocalDate periodoActual = periodos.stream()
+                .filter(p -> !p.isAfter(hoy))
+                .max(Comparator.naturalOrder())
+                .orElse(null);
+
+        if (periodoActual == null) {
+            logger.info("Barrido automático: no hay periodos con planillas aprobadas para fechas no futuras.");
+            return;
+        }
+
+        if (consolidacionRepository.existsByPeriodoValoracionAndEstadoConsolidacionIn(periodoActual, ESTADOS_NO_DUPLICABLES)) {
+            logger.info("Barrido automático: periodo {} ya está consolidado o en curso, nada que hacer.", periodoActual);
+            return;
+        }
+
+        long productosEsperados = productoRepository.countActivosByIdSegmento(SEGMENTO_COLGAAP_MODIFICADO_ID);
+        long planillasCargadas = planillaRepository.countActivasByFechaCorteAndSegmentoId(periodoActual, SEGMENTO_COLGAAP_MODIFICADO_ID);
+        if (planillasCargadas < productosEsperados) {
+            logger.info("Barrido automático: periodo {} tiene {}/{} planillas cargadas, esperando a que se completen.",
+                    periodoActual, planillasCargadas, productosEsperados);
+            return;
+        }
+
+        long noAprobadas = planillaRepository.countPlanillasNoAprobadasByFechaCorteAndSegmentoId(periodoActual, SEGMENTO_COLGAAP_MODIFICADO_ID);
+        if (noAprobadas > 0) {
+            logger.info("Barrido automático: periodo {} tiene {} planilla(s) pendientes o rechazadas, esperando aprobación.",
+                    periodoActual, noAprobadas);
+            return;
+        }
+
+        try {
+            consolidacionPeriodoExecutor.consolidarPeriodoSiCorresponde(
+                    periodoActual,
+                    SISTEMA_USUARIO_ID,
+                    "Barrido automático de consolidaciones pendientes");
+        } catch (Exception e) {
+            logger.error("Error en barrido automático para periodo {}: {}", periodoActual, e.getMessage(), e);
+        }
     }
 
     /**

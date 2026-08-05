@@ -267,6 +267,18 @@ public interface SiproDetalleCargaPlanillasRepository extends JpaRepository<Sipr
             @Param("idSegmento") Long idSegmento);
 
     /**
+     * Cuenta planillas activas del segmento indicado para un periodo, sin filtrar por estado.
+     */
+    @Query("SELECT COUNT(cp) FROM SiproDetalleCargaPlanillas cp, Producto prod " +
+            "WHERE cp.idProducto = prod.idProducto " +
+            "AND prod.idSegmento = :idSegmento " +
+            "AND cp.fechaCorteInformacion = :fechaCorte " +
+            "AND cp.activo = true")
+    long countActivasByFechaCorteAndSegmentoId(
+            @Param("fechaCorte") LocalDate fechaCorte,
+            @Param("idSegmento") Long idSegmento);
+
+    /**
      * Cuenta planillas activas del segmento indicado que aún no están en un estado aprobado.
      */
     @Query("SELECT COUNT(cp) FROM SiproDetalleCargaPlanillas cp, Producto prod " +
