@@ -32,7 +32,7 @@ public class MicrosoftGraphDirectoryService {
 
     private static final String GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0";
     private final RestTemplate restTemplate = new RestTemplate();
-    private static final String SIPRO_GROUP_PREFIX = "a_sipro_";
+    private static final String SIPRO_GROUP_PREFIX = "a_euc_sipro_";
 
     // Claves para token de aplicación (client_credentials)
     private static final String TENANT_ID_KEY = "AZURE_TENANT_ID";

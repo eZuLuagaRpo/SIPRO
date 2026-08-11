@@ -8,7 +8,7 @@ import java.util.Locale;
  */
 public final class GroupNameNormalizer {
 
-    private static final String SIPRO_GROUP_PREFIX = "a_sipro_";
+    private static final String SIPRO_GROUP_PREFIX = "a_euc_sipro_";
 
     private GroupNameNormalizer() {
     }
