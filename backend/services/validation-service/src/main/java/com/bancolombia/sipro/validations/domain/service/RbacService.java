@@ -9,6 +9,7 @@ import com.bancolombia.sipro.validations.infrastructure.repository.SiproUsuarioP
 import com.bancolombia.sipro.validations.shared.utils.GroupNameNormalizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,6 +49,7 @@ public class RbacService {
      * @param idUsuario ID del usuario autenticado
      * @return UsuarioPermisosResponse con los permisos consolidados
      */
+    @Cacheable(value = "permisosUsuario", key = "#idUsuario")
     @Transactional(readOnly = true)
     public UsuarioPermisosResponse obtenerPermisosUsuario(Long idUsuario) {
         logger.debug("Consultando permisos RBAC para usuario: {}", idUsuario);
@@ -67,6 +69,7 @@ public class RbacService {
         /**
          * Construye permisos efectivos filtrando por los grupos que llegan desde Entra ID.
          */
+        @Cacheable(value = "permisosUsuario", key = "#idUsuario")
         @Transactional(readOnly = true)
         public UsuarioPermisosResponse obtenerPermisosUsuario(Long idUsuario, Set<String> gruposAd) {
         logger.debug("Consultando permisos RBAC para usuario {} con grupos AD: {}", idUsuario, gruposAd);

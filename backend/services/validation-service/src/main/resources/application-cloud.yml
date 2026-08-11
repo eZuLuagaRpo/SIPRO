@@ -64,6 +64,10 @@ spring:
           auth: true
           starttls:
             enable: true
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=5m
   http:
     encoding:
       charset: UTF-8

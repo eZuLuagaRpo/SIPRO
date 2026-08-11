@@ -51,6 +51,10 @@ spring:
       connection.characterEncoding: utf-8
       hibernate.connection.charSet: utf-8
       hibernate.connection.useUnicode: true
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=5m
   http:
     encoding:
       charset: UTF-8

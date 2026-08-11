@@ -9,6 +9,7 @@ import com.bancolombia.sipro.validations.shared.utils.GroupNameNormalizer;
 import jakarta.persistence.EntityManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -325,6 +326,7 @@ public class ParametrosService {
         return new AsignacionDto(idRol, pps);
     }
 
+    @CacheEvict(value = "permisosUsuario", key = "#idUsuario", beforeInvocation = true)
     @Transactional
     public void guardarAsignacion(Long idUsuario, AsignacionRequest req) {
         personaRepo.findById(idUsuario)
