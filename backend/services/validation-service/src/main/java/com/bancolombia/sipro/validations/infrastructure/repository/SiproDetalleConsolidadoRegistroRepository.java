@@ -1,5 +1,6 @@
 package com.bancolombia.sipro.validations.infrastructure.repository;
 
+import com.bancolombia.sipro.validations.application.dto.ProductoAgregadoDto;
 import com.bancolombia.sipro.validations.domain.model.SiproDetalleConsolidadoRegistro;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -32,6 +33,19 @@ public interface SiproDetalleConsolidadoRegistroRepository extends JpaRepository
 	 */
 	@Query("SELECT COALESCE(SUM(r.vlriniobl), 0) FROM SiproDetalleConsolidadoRegistro r WHERE r.idConsolidacion = :idConsolidacion")
 	BigDecimal sumVlrinioblByIdConsolidacion(@Param("idConsolidacion") Long idConsolidacion);
+
+	/**
+	 * Agrega los registros de una consolidación agrupando por producto.
+	 * Devuelve una fila por producto en lugar de todos los registros individuales,
+	 * evitando cargar decenas de miles de filas en memoria Java.
+	 */
+	@Query("SELECT new com.bancolombia.sipro.validations.application.dto.ProductoAgregadoDto(" +
+		"r.idProductoOrigen, r.productoOrigen, COUNT(r.idConsolidadoRegistro), SUM(r.vlriniobl), " +
+		"SUM(CASE WHEN r.tipoId IS NULL OR TRIM(r.tipoId) = '' OR r.clasificacion IS NULL THEN 1L ELSE 0L END)) " +
+		"FROM SiproDetalleConsolidadoRegistro r " +
+		"WHERE r.idConsolidacion = :idConsolidacion " +
+		"GROUP BY r.idProductoOrigen, r.productoOrigen")
+	List<ProductoAgregadoDto> findProductosAgregadosByIdConsolidacion(@Param("idConsolidacion") Long idConsolidacion);
 
 	/**
 	 * Elimina un lote acotado de registros asociados a una consolidación.

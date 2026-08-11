@@ -26,6 +26,7 @@ import com.bancolombia.sipro.validations.domain.model.SiproDetalleRechazosPlanil
 import org.springframework.web.multipart.MultipartFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -461,6 +462,7 @@ public class PlanillaUseCase {
     }
 
     @Transactional
+    @CacheEvict(value = "listObjectsNas", allEntries = true)
     public void aprobar(Long id, String usuarioAprobador, Long idUsuarioAprobador) throws java.io.IOException {
         logger.info("Aprobando planilla con ID: {}", id);
 

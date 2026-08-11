@@ -11,4 +11,6 @@ import org.springframework.context.annotation.Configuration;
 public class CacheConfig {
 
     public static final String CACHE_PERMISOS_USUARIO = "permisosUsuario";
+    public static final String CACHE_LIST_OBJECTS_NAS = "listObjectsNas";
+    public static final String CACHE_GRUPOS_GRAPH = "gruposGraph";
 }

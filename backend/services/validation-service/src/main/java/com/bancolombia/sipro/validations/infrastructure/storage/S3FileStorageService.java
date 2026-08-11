@@ -4,6 +4,7 @@ import com.bancolombia.sipro.validations.domain.service.FileStorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -486,6 +487,7 @@ public class S3FileStorageService implements FileStorageService {
      * Lista las claves almacenadas bajo un prefijo del bucket.
      */
     @Override
+    @Cacheable(value = "listObjectsNas", key = "#prefix")
     public List<String> listObjects(String prefix) {
         List<String> keys = new ArrayList<>();
         try {

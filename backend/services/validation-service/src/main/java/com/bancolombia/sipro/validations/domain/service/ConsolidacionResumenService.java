@@ -1,6 +1,7 @@
 package com.bancolombia.sipro.validations.domain.service;
 
 import com.bancolombia.sipro.validations.application.dto.ConsolidacionResumenResponse;
+import com.bancolombia.sipro.validations.application.dto.ProductoAgregadoDto;
 import com.bancolombia.sipro.validations.domain.model.SiproDetalleArchivoValidacion;
 import com.bancolombia.sipro.validations.domain.model.SiproDetalleCargaPlanillas;
 import com.bancolombia.sipro.validations.domain.model.SiproDetalleConsolidacionesPlanillas;
@@ -104,8 +105,8 @@ public class ConsolidacionResumenService {
 
         YearMonth seleccionado = resolverPeriodoSeleccionado(anio, mes, periodosMap.keySet());
         SiproDetalleConsolidacionesPlanillas cabecera = periodosMap.get(seleccionado);
-        List<SiproDetalleConsolidadoRegistro> registros = consolidadoRegistroRepository
-                .findByIdConsolidacionOrderByIdConsolidadoRegistroAsc(cabecera.getIdConsolidacion());
+        List<ProductoAgregadoDto> productosAgregados = consolidadoRegistroRepository
+                .findProductosAgregadosByIdConsolidacion(cabecera.getIdConsolidacion());
 
         response.setAnioSeleccionado(seleccionado.getYear());
         response.setMesSeleccionado(seleccionado.getMonthValue());
@@ -116,13 +117,15 @@ public class ConsolidacionResumenService {
                 ? cabecera.getModificadoEn()
                 : (cabecera.getFechaHoraFin() != null ? cabecera.getFechaHoraFin() : cabecera.getCreadoEn()));
 
-        BigDecimal totalVlrIniOblPostgres = registros.stream()
-            .map(SiproDetalleConsolidadoRegistro::getVlriniobl)
+        BigDecimal totalVlrIniOblPostgres = productosAgregados.stream()
+            .map(ProductoAgregadoDto::totalVlriniobl)
             .filter(Objects::nonNull)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
-        long cantidadRegistrosPostgres = registros.isEmpty()
+        long cantidadRegistrosPostgres = productosAgregados.isEmpty()
             ? valorEntero(cabecera.getCantidadRegistrosConsolidados())
-            : registros.size();
+            : productosAgregados.stream()
+                .mapToLong(d -> d.cantidadRegistros() != null ? d.cantidadRegistros() : 0L)
+                .sum();
 
         CreffosComparisonService.ComparisonSnapshot comparisonSnapshot;
         if (cabecera.getCreffsosCantidadRegistros() != null) {
@@ -141,7 +144,7 @@ public class ConsolidacionResumenService {
         }
         applyComparison(response, comparisonSnapshot);
 
-        if (registros.isEmpty()) {
+        if (productosAgregados.isEmpty()) {
             response.setHayDatos(false);
             response.setCantidadRegistrosConsolidados(valorEntero(cabecera.getCantidadRegistrosConsolidados()));
             response.setTotalVlrIniObl(BigDecimal.ZERO);
@@ -154,7 +157,7 @@ public class ConsolidacionResumenService {
         FullIfrsRegistros registrosFullIfrs = obtenerRegistrosControlFullIfrsPorProducto(
                 cabecera.getPeriodoValoracion());
         List<ConsolidacionResumenResponse.ProductoResumen> productos = agruparProductos(
-            registros,
+            productosAgregados,
                 registrosFullIfrs);
         response.setCantidadRegistrosArchivoControl(registrosFullIfrs.totalRegistrosControl());
         long registrosObservados = productos.stream().mapToLong(ConsolidacionResumenResponse.ProductoResumen::getRegistrosObservados).sum();
@@ -166,7 +169,7 @@ public class ConsolidacionResumenService {
 
         response.setHayDatos(true);
         response.setProductos(productos);
-        response.setCantidadRegistrosConsolidados(registros.size());
+        response.setCantidadRegistrosConsolidados((int) cantidadRegistrosPostgres);
         response.setTotalVlrIniObl(totalVlrIniObl);
         response.setRegistrosObservados(registrosObservados);
         response.setProductosObservados(productosObservados);
@@ -243,19 +246,19 @@ public class ConsolidacionResumenService {
     }
 
     private List<ConsolidacionResumenResponse.ProductoResumen> agruparProductos(
-            List<SiproDetalleConsolidadoRegistro> registros,
+            List<ProductoAgregadoDto> productosAgregados,
             FullIfrsRegistros registrosFullIfrs) {
         Map<String, ProductoAcumulado> agrupados = new LinkedHashMap<>();
 
-        for (SiproDetalleConsolidadoRegistro registro : registros) {
-            Long idProducto = registro.getIdProductoOrigen();
-            String nombreProducto = normalizarNombreProducto(registro.getProductoOrigen());
+        for (ProductoAgregadoDto dto : productosAgregados) {
+            Long idProducto = dto.idProductoOrigen();
+            String nombreProducto = normalizarNombreProducto(dto.productoOrigen());
             String key = (idProducto == null ? "sin-id" : idProducto) + "|" + nombreProducto;
 
             ProductoAcumulado acumulado = agrupados.computeIfAbsent(key,
                     ignored -> new ProductoAcumulado(idProducto, nombreProducto));
-            acumulado.cantidadRegistros++;
-            acumulado.totalVlrIniObl = acumulado.totalVlrIniObl.add(valorMonetario(registro.getVlriniobl()));
+            acumulado.cantidadRegistros += dto.cantidadRegistros() != null ? dto.cantidadRegistros() : 0L;
+            acumulado.totalVlrIniObl = acumulado.totalVlrIniObl.add(valorMonetario(dto.totalVlriniobl()));
             if (acumulado.cantidadRegistrosFullIfrs == 0L) {
                 long cantidadPorId = idProducto == null ? 0L
                         : registrosFullIfrs.porIdProducto().getOrDefault(idProducto, 0L);
@@ -263,9 +266,7 @@ public class ConsolidacionResumenService {
                         .getOrDefault(normalizarClaveProducto(nombreProducto), 0L);
                 acumulado.cantidadRegistrosFullIfrs = cantidadPorId > 0L ? cantidadPorId : cantidadPorNombre;
             }
-            if (tieneObservacionCreffos(registro)) {
-                acumulado.registrosObservados++;
-            }
+            acumulado.registrosObservados += dto.registrosObservados() != null ? dto.registrosObservados() : 0L;
         }
 
         // Tabla 1 debe mostrar la unión de productos cargados en segmento 1 y segmento 2.
@@ -455,10 +456,6 @@ public class ConsolidacionResumenService {
         );
     }
 
-    private boolean tieneObservacionCreffos(SiproDetalleConsolidadoRegistro registro) {
-        return esBlanco(registro.getTipoId()) || registro.getClasificacion() == null;
-    }
-
     private String normalizarNombreProducto(String nombreProducto) {
         if (nombreProducto == null || nombreProducto.isBlank()) {
             return "Producto sin identificar";
@@ -493,10 +490,6 @@ public class ConsolidacionResumenService {
             return "";
         }
         return valor.substring(0, 1).toUpperCase(LOCALE_ES_CO) + valor.substring(1).toLowerCase(LOCALE_ES_CO);
-    }
-
-    private boolean esBlanco(String valor) {
-        return valor == null || valor.isBlank();
     }
 
     /**

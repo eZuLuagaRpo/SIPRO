@@ -4,6 +4,7 @@ import com.bancolombia.sipro.validations.domain.service.ParametroUnicoService;
 import com.bancolombia.sipro.validations.infrastructure.security.EntraIdTokenService.EntraAuthenticatedUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -103,6 +104,14 @@ public class MicrosoftGraphDirectoryService {
 
         normalizedTokenGroups.addAll(graphGroups);
         return Set.copyOf(normalizedTokenGroups);
+    }
+
+    @Cacheable(value = "gruposGraph", key = "#userObjectId")
+    public Set<String> resolveCurrentUserGroupNamesCached(String userObjectId,
+                                                          String graphAccessToken,
+                                                          Set<String> tokenGroupNames,
+                                                          boolean groupsOverage) {
+        return resolveCurrentUserGroupNames(graphAccessToken, tokenGroupNames, groupsOverage);
     }
 
     private Set<String> getGroups(HttpHeaders headers) {

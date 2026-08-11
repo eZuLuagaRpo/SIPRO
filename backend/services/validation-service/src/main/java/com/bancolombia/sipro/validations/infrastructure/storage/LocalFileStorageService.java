@@ -8,6 +8,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import org.springframework.cache.annotation.Cacheable;
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.io.InputStream;
@@ -210,6 +211,7 @@ public class LocalFileStorageService implements FileStorageService {
      * Lista archivos guardados bajo un prefijo o coincidencia parcial de nombre.
      */
     @Override
+    @Cacheable(value = "listObjectsNas", key = "#prefix")
     public List<String> listObjects(String prefix) {
         List<String> keys = new ArrayList<>();
         Path prefixPath = basePath.resolve(prefix.replace("/", basePath.getFileSystem().getSeparator()));

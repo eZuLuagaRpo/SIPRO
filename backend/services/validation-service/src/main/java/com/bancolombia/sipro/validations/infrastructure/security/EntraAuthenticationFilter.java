@@ -84,7 +84,8 @@ public class EntraAuthenticationFilter extends OncePerRequestFilter {
             String graphAccessToken = request.getHeader(GRAPH_ACCESS_TOKEN_HEADER);
             if (graphAccessToken != null && !graphAccessToken.isBlank()) {
             try {
-                gruposAd = microsoftGraphDirectoryService.resolveCurrentUserGroupNames(
+                gruposAd = microsoftGraphDirectoryService.resolveCurrentUserGroupNamesCached(
+                    entraUser.objectId(),
                     graphAccessToken,
                     entraUser.groupNames(),
                     entraUser.groupsOverage());

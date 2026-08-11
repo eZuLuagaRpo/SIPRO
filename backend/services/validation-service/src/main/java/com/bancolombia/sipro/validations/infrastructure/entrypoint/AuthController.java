@@ -149,7 +149,8 @@ public class AuthController {
             Set<String> gruposAd = principal.groupNames();
             if (graphAccessToken != null && !graphAccessToken.isBlank()) {
                 try {
-                    gruposAd = microsoftGraphDirectoryService.resolveCurrentUserGroupNames(
+                    gruposAd = microsoftGraphDirectoryService.resolveCurrentUserGroupNamesCached(
+                            principal.objectId(),
                             graphAccessToken,
                             principal.groupNames(),
                             principal.groupsOverage());

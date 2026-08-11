@@ -96,7 +96,7 @@ public interface FileStorageService {
 
     /**
      * Lista las keys de objetos bajo un prefijo dado en S3.
-     * 
+     *
      * @param prefix Prefijo para filtrar objetos
      * @return Lista de keys que coinciden con el prefijo
      */
