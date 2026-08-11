@@ -50,7 +50,7 @@ public class RbacService {
      */
     @Transactional(readOnly = true)
     public UsuarioPermisosResponse obtenerPermisosUsuario(Long idUsuario) {
-        logger.info("Consultando permisos RBAC para usuario: {}", idUsuario);
+        logger.debug("Consultando permisos RBAC para usuario: {}", idUsuario);
 
         List<SiproUsuarioProductoRol> asignaciones = uprRepository.findActiveByUsuarioWithProducto(idUsuario);
 
@@ -69,7 +69,7 @@ public class RbacService {
          */
         @Transactional(readOnly = true)
         public UsuarioPermisosResponse obtenerPermisosUsuario(Long idUsuario, Set<String> gruposAd) {
-        logger.info("Consultando permisos RBAC para usuario {} con grupos AD: {}", idUsuario, gruposAd);
+        logger.debug("Consultando permisos RBAC para usuario {} con grupos AD: {}", idUsuario, gruposAd);
 
         List<SiproUsuarioProductoRol> asignaciones = uprRepository.findActiveByUsuarioWithProducto(idUsuario);
         if (gruposAd == null || gruposAd.isEmpty()) {
@@ -161,7 +161,7 @@ public class RbacService {
 
         permisos.setProductosAsignados(productosAsignados);
 
-            logger.info("Permisos RBAC para usuario {}: cargar={}, aprobar={}, roles={}, asignaciones={}, grupos={}",
+            logger.debug("Permisos RBAC para usuario {}: cargar={}, aprobar={}, roles={}, asignaciones={}, grupos={}",
                 idUsuario, puedeCargar, puedeAprobar, rolesEfectivos.size(), asignaciones.size(), gruposAd);
 
         return permisos;

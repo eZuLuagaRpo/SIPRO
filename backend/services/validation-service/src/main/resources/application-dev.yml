@@ -12,7 +12,7 @@ app:
       base-dir: \\SBMDEBNS03\BFT\SIPRO\planillas
   mail:
     enabled: true
-    transport: outlook-win32
+    transport: preview
     log-preview: true
   # ── Tabla MDM en LZ ambiente intermedio ─────────────────────────────
   # DEV y QA usan proceso.sipro_fcr_mdm_datos_generales_clientes.
