@@ -10,8 +10,12 @@ import { AuthService } from '../../services/auth.service';
 import { ParametrosService } from '../../services/parametros.service';
 import { User } from '../../models/user.model';
 import {
+  CuentaHomologacion,
   ExcepcionVentanaCarga,
   ExcepcionRequest,
+  HomologacionCuentaRequest,
+  HomologacionErrorFila,
+  HomologacionMasivaResultado,
   MesDisponible,
   ReglaVentanaBase,
   ProductoCatalogo,
@@ -196,6 +200,30 @@ export class ParametrosComponent implements OnInit {
   confirmacionProductoNombre = '';
   private _productoDesactivarPendiente: ProductoCatalogo | null = null;
 
+  // ─── Sección 6: Cuentas Contables Colgaap ────────────────────────────────
+  cuentasHomologacion: CuentaHomologacion[] = [];
+  busquedaHomologacion = '';
+  cargandoHomologacion = false;
+
+  // Formulario individual
+  homologacionModo: 'nueva' | 'modificar' | null = null;
+  homologacionForm: HomologacionCuentaRequest = { cuentaSap: '', cuentaBv: '' };
+  homologacionEditandoId: number | null = null;
+  homologacionEditandoCuentaSap = '';
+  guardandoHomologacion = false;
+  homologacionError = '';
+  homologacionExito = '';
+
+  // Modal desactivar
+  homologacionDesactivarPendiente: CuentaHomologacion | null = null;
+  desactivandoHomologacion = false;
+
+  // Carga masiva
+  archivoHomologacion: File | null = null;
+  archivoHomologacionNombre = '';
+  cargandoMasivoHomologacion = false;
+  homologacionMasivoResultado: HomologacionMasivaResultado | null = null;
+
   readonly modifyIcon = '/assets/images/modify_edit.png';
   readonly eraseIcon = '/assets/images/erase.png';
   readonly viewIcon = '/assets/images/view.png';
@@ -301,9 +329,10 @@ export class ParametrosComponent implements OnInit {
       usuarios: this.cargarConFallback(this.parametrosService.getUsuarios(), [], 'usuarios', erroresCarga),
       productos: this.cargarConFallback(this.parametrosService.getProductos(), [], 'productos', erroresCarga),
       roles: this.cargarConFallback(this.parametrosService.getRoles(), [], 'roles', erroresCarga),
-      segmentos: this.cargarConFallback(this.parametrosService.getSegmentos(), [], 'segmentos', erroresCarga)
+      segmentos: this.cargarConFallback(this.parametrosService.getSegmentos(), [], 'segmentos', erroresCarga),
+      cuentasHomologacion: this.cargarConFallback(this.parametrosService.getCuentasHomologacion(), [], 'cuentas de homologación Colgaap', erroresCarga)
     }).subscribe({
-      next: ({ reglaBase, excepciones, meses, usuarios, productos, roles, segmentos }) => {
+      next: ({ reglaBase, excepciones, meses, usuarios, productos, roles, segmentos, cuentasHomologacion }) => {
         this.reglaBase = reglaBase;
         this.excepciones = excepciones;
         this.mesesDisponibles = meses;
@@ -311,6 +340,7 @@ export class ParametrosComponent implements OnInit {
         this.productos = productos;
         this.roles = this.normalizarRoles(roles);
         this.segmentos = this.normalizarSegmentos(segmentos);
+        this.cuentasHomologacion = cuentasHomologacion;
 
         if (!this.usuarioSeleccionadoId && this.usuarios.length > 0) {
           this.usuarioSeleccionadoId = this.usuarios[0].idUsuario;
@@ -1664,6 +1694,183 @@ export class ParametrosComponent implements OnInit {
 
   nombreSegmento(idSegmento: number): string {
     return this.segmentos.find(s => s.id === idSegmento)?.nombre ?? '—';
+  }
+
+  // ── Sección 6: Cuentas Contables Colgaap ─────────────────────────────────
+
+  get cuentasHomologacionFiltradas(): CuentaHomologacion[] {
+    const q = this.busquedaHomologacion.trim().toLowerCase();
+    if (!q) return this.cuentasHomologacion;
+    return this.cuentasHomologacion.filter(c =>
+      c.cuentaSap.toLowerCase().includes(q) ||
+      c.cuentaBv.toLowerCase().includes(q)
+    );
+  }
+
+  iniciarNuevaCuenta(): void {
+    this.homologacionModo = 'nueva';
+    this.homologacionForm = { cuentaSap: '', cuentaBv: '' };
+    this.homologacionEditandoId = null;
+    this.homologacionEditandoCuentaSap = '';
+    this.homologacionError = '';
+    this.homologacionExito = '';
+  }
+
+  cancelarFormularioHomologacion(): void {
+    this.homologacionModo = null;
+    this.homologacionForm = { cuentaSap: '', cuentaBv: '' };
+    this.homologacionEditandoId = null;
+    this.homologacionEditandoCuentaSap = '';
+    this.homologacionError = '';
+    this.homologacionExito = '';
+  }
+
+  iniciarModificarCuenta(cuenta: CuentaHomologacion): void {
+    this.homologacionModo = 'modificar';
+    this.homologacionEditandoId = cuenta.id;
+    this.homologacionEditandoCuentaSap = cuenta.cuentaSap;
+    this.homologacionForm = { cuentaSap: cuenta.cuentaSap, cuentaBv: cuenta.cuentaBv };
+    this.homologacionError = '';
+    this.homologacionExito = '';
+  }
+
+  guardarCuentaHomologacion(): void {
+    const cuentaSap = (this.homologacionForm.cuentaSap ?? '').trim();
+    const cuentaBv = (this.homologacionForm.cuentaBv ?? '').trim();
+    const patron = /^[0-9]{9}$/;
+
+    if (!patron.test(cuentaSap)) {
+      this.homologacionError = 'La cuenta SAP debe tener exactamente 9 dígitos numéricos.';
+      return;
+    }
+    if (!patron.test(cuentaBv)) {
+      this.homologacionError = 'La cuenta BV debe tener exactamente 9 dígitos numéricos.';
+      return;
+    }
+
+    this.guardandoHomologacion = true;
+    this.homologacionError = '';
+    this.homologacionExito = '';
+
+    const req: HomologacionCuentaRequest = { cuentaSap, cuentaBv };
+
+    const obs = this.homologacionModo === 'modificar' && this.homologacionEditandoId != null
+      ? this.parametrosService.modificarCuentaHomologacion(this.homologacionEditandoId, req)
+      : this.parametrosService.crearCuentaHomologacion(req);
+
+    obs.subscribe({
+      next: res => {
+        this.guardandoHomologacion = false;
+        if (res.success) {
+          this.cancelarFormularioHomologacion();
+          this.mostrarToast(res.mensaje || 'Cuenta guardada correctamente.', 'success');
+          this.parametrosService.getCuentasHomologacion().subscribe(lista => this.cuentasHomologacion = lista);
+        } else {
+          this.homologacionError = res.mensaje || 'Error al guardar la cuenta.';
+        }
+      },
+      error: (err: any) => {
+        this.guardandoHomologacion = false;
+        const detalle: string = err?.error?.mensaje || err?.error?.message || err?.message || '';
+        this.homologacionError = detalle || 'Error de conexión al guardar la cuenta.';
+      }
+    });
+  }
+
+  solicitarDesactivarCuenta(cuenta: CuentaHomologacion): void {
+    this.homologacionDesactivarPendiente = cuenta;
+    this.homologacionError = '';
+    this.homologacionExito = '';
+  }
+
+  cerrarModalDesactivarCuenta(): void {
+    this.homologacionDesactivarPendiente = null;
+    this.desactivandoHomologacion = false;
+  }
+
+  confirmarDesactivarCuenta(): void {
+    const cuenta = this.homologacionDesactivarPendiente;
+    if (!cuenta) return;
+
+    this.desactivandoHomologacion = true;
+
+    this.parametrosService.desactivarCuentaHomologacion(cuenta.id).subscribe({
+      next: res => {
+        this.desactivandoHomologacion = false;
+        this.homologacionDesactivarPendiente = null;
+        if (res.success) {
+          this.mostrarToast(res.mensaje || 'Cuenta inactivada correctamente.', 'success');
+          this.parametrosService.getCuentasHomologacion().subscribe(lista => this.cuentasHomologacion = lista);
+        } else {
+          this.mostrarToast(res.mensaje || 'Error al inactivar la cuenta.', 'error');
+        }
+      },
+      error: (err: any) => {
+        this.desactivandoHomologacion = false;
+        this.homologacionDesactivarPendiente = null;
+        const detalle: string = err?.error?.mensaje || err?.error?.message || err?.message || '';
+        this.mostrarToast(detalle || 'Error de conexión al inactivar la cuenta.', 'error');
+      }
+    });
+  }
+
+  onArchivoHomologacionChange(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const archivo = input?.files?.[0] ?? null;
+    this.archivoHomologacion = archivo;
+    this.archivoHomologacionNombre = archivo?.name ?? '';
+    this.homologacionMasivoResultado = null;
+  }
+
+  cargarArchivoMasivoHomologacion(): void {
+    if (!this.archivoHomologacion) return;
+
+    const nombre = this.archivoHomologacion.name.toLowerCase();
+    if (!nombre.endsWith('.xlsx')) {
+      this.homologacionMasivoResultado = {
+        success: false,
+        mensaje: 'El archivo debe ser .xlsx.',
+        activados: 0,
+        desactivados: 0,
+        errores: []
+      };
+      return;
+    }
+
+    this.cargandoMasivoHomologacion = true;
+    this.homologacionMasivoResultado = null;
+
+    const formData = new FormData();
+    formData.append('archivo', this.archivoHomologacion);
+
+    this.parametrosService.cargarMasivaCuentas(formData).subscribe({
+      next: resultado => {
+        this.cargandoMasivoHomologacion = false;
+        this.homologacionMasivoResultado = resultado;
+        if (resultado.success) {
+          this.archivoHomologacion = null;
+          this.archivoHomologacionNombre = '';
+          this.parametrosService.getCuentasHomologacion().subscribe(lista => this.cuentasHomologacion = lista);
+        }
+      },
+      error: (err: any) => {
+        this.cargandoMasivoHomologacion = false;
+        const detalle: string = err?.error?.mensaje || err?.error?.message || err?.message || '';
+        this.homologacionMasivoResultado = {
+          success: false,
+          mensaje: detalle || 'Error de conexión al procesar el archivo.',
+          activados: 0,
+          desactivados: 0,
+          errores: []
+        };
+      }
+    });
+  }
+
+  limpiarResultadoMasivoHomologacion(): void {
+    this.homologacionMasivoResultado = null;
+    this.archivoHomologacion = null;
+    this.archivoHomologacionNombre = '';
   }
 
   // ── Helpers generales ─────────────────────────────────────────────────────

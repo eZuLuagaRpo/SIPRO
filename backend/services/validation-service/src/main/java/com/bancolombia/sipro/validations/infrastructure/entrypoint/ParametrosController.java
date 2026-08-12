@@ -12,6 +12,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -268,6 +269,53 @@ public class ParametrosController {
             return m;
         }).collect(java.util.stream.Collectors.toList());
         return ResponseEntity.ok(resp);
+    }
+
+    // ── Homologación Colgaap ──────────────────────────────────────────────
+
+    @GetMapping("/homologacion-colgaap")
+    public ResponseEntity<List<ParametrosService.HomologacionDto>> getCuentasHomologacion(
+            @AuthenticationPrincipal SiproAuthenticatedUser principal) {
+        parametrosService.requireParametros(principal);
+        return ResponseEntity.ok(parametrosService.listarCuentasHomologacion());
+    }
+
+    @PostMapping("/homologacion-colgaap")
+    public ResponseEntity<Map<String, Object>> crearCuentaHomologacion(
+            @AuthenticationPrincipal SiproAuthenticatedUser principal,
+            @RequestBody ParametrosService.HomologacionCuentaRequest req) {
+        parametrosService.requireParametros(principal);
+        parametrosService.crearCuentaHomologacion(req, String.valueOf(principal.idUsuario()));
+        return ResponseEntity.ok(Map.of("success", true, "mensaje", "Cuenta creada correctamente."));
+    }
+
+    @PostMapping("/homologacion-colgaap/{id}/desactivar")
+    public ResponseEntity<Map<String, Object>> desactivarCuentaHomologacion(
+            @AuthenticationPrincipal SiproAuthenticatedUser principal,
+            @PathVariable Long id) {
+        parametrosService.requireParametros(principal);
+        parametrosService.desactivarCuentaHomologacion(id);
+        return ResponseEntity.ok(Map.of("success", true, "mensaje", "Cuenta inactivada correctamente."));
+    }
+
+    @PostMapping("/homologacion-colgaap/{id}/modificar")
+    public ResponseEntity<Map<String, Object>> modificarCuentaHomologacion(
+            @AuthenticationPrincipal SiproAuthenticatedUser principal,
+            @PathVariable Long id,
+            @RequestBody ParametrosService.HomologacionCuentaRequest req) {
+        parametrosService.requireParametros(principal);
+        parametrosService.modificarCuentaHomologacion(id, req, String.valueOf(principal.idUsuario()));
+        return ResponseEntity.ok(Map.of("success", true, "mensaje", "Cuenta modificada correctamente. La cuenta anterior fue inactivada y se creó una nueva activa."));
+    }
+
+    @PostMapping(value = "/homologacion-colgaap/carga-masiva", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ParametrosService.HomologacionMasivaResultado> cargaMasivaCuentas(
+            @AuthenticationPrincipal SiproAuthenticatedUser principal,
+            @RequestPart("archivo") MultipartFile archivo) {
+        parametrosService.requireParametros(principal);
+        ParametrosService.HomologacionMasivaResultado resultado =
+                parametrosService.procesarCargaMasivaCuentas(archivo, String.valueOf(principal.idUsuario()));
+        return ResponseEntity.ok(resultado);
     }
 
     // ── Utilidades privadas ───────────────────────────────────────────────

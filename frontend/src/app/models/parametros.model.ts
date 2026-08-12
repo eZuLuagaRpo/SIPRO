@@ -141,6 +141,36 @@ export interface RolAzureResult {
   mensaje?: string | null;
 }
 
+// ─── Homologación Colgaap ────────────────────────────────────────────────────
+
+export interface CuentaHomologacion {
+  id: number;
+  cuentaSap: string;
+  cuentaBv: string;
+  estado: number; // 1 = activa, 0 = inactiva
+  creadoEn: string | null;
+  creadoPor: string | null;
+}
+
+export interface HomologacionCuentaRequest {
+  cuentaSap: string;
+  cuentaBv: string;
+}
+
+export interface HomologacionErrorFila {
+  fila: number;
+  cuentaSap: string;
+  error: string;
+}
+
+export interface HomologacionMasivaResultado {
+  success: boolean;
+  mensaje: string | null;
+  activados: number;
+  desactivados: number;
+  errores: HomologacionErrorFila[];
+}
+
 // ─── Respuestas genéricas ────────────────────────────────────────────────────
 
 export interface OperacionResultado {

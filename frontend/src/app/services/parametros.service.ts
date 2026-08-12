@@ -6,8 +6,11 @@ import {
   AsignacionUsuario,
   CambioLiderRequest,
   CambioLiderResultado,
+  CuentaHomologacion,
   ExcepcionRequest,
   ExcepcionVentanaCarga,
+  HomologacionCuentaRequest,
+  HomologacionMasivaResultado,
   MesDisponible,
   NuevoUsuarioRequest,
   OperacionResultado,
@@ -111,6 +114,28 @@ export class ParametrosService {
 
   actualizarProducto(idProducto: number, req: ProductoRequest): Observable<OperacionResultado> {
     return this.http.put<OperacionResultado>(`${this.base}/productos/${idProducto}`, req);
+  }
+
+  // ── Homologación Colgaap ──────────────────────────────────────────────────
+
+  getCuentasHomologacion(): Observable<CuentaHomologacion[]> {
+    return this.http.get<CuentaHomologacion[]>(`${this.base}/homologacion-colgaap`);
+  }
+
+  crearCuentaHomologacion(req: HomologacionCuentaRequest): Observable<OperacionResultado> {
+    return this.http.post<OperacionResultado>(`${this.base}/homologacion-colgaap`, req);
+  }
+
+  desactivarCuentaHomologacion(id: number): Observable<OperacionResultado> {
+    return this.http.post<OperacionResultado>(`${this.base}/homologacion-colgaap/${id}/desactivar`, {});
+  }
+
+  modificarCuentaHomologacion(id: number, req: HomologacionCuentaRequest): Observable<OperacionResultado> {
+    return this.http.post<OperacionResultado>(`${this.base}/homologacion-colgaap/${id}/modificar`, req);
+  }
+
+  cargarMasivaCuentas(formData: FormData): Observable<HomologacionMasivaResultado> {
+    return this.http.post<HomologacionMasivaResultado>(`${this.base}/homologacion-colgaap/carga-masiva`, formData);
   }
 
   // ── Catálogos ─────────────────────────────────────────────────────────────

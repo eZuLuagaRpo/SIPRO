@@ -870,6 +870,175 @@
         </section>
       </article>
 
+      <!-- ═══════════════════════════════════════════════════════════════════ -->
+      <!-- SECCIÓN 6 — Cuentas Contables Colgaap/Modificado                   -->
+      <!-- ═══════════════════════════════════════════════════════════════════ -->
+      <section class="card">
+        <div class="card-header">
+          <h2 class="card-title">6. Cuentas Contables Colgaap / Modificado</h2>
+          <p class="card-subtitle">Gestione las cuentas contables SAP-BV para la validación de homologación Colgaap. Solo se inactivan registros; el historial se conserva siempre.</p>
+        </div>
+        <div class="card-body">
+
+          <!-- Panel izquierdo: tabla de cuentas -->
+          <div class="grid-2-col param-catalog-split">
+            <div class="param-panel param-panel--catalog-list">
+              <div class="param-inline-header param-inline-header--compact">
+                <h3 class="form-section-title">Cuentas Registradas</h3>
+                <button class="btn-pill btn-primary btn-pill--small" type="button" (click)="iniciarNuevaCuenta()">+ Nueva cuenta</button>
+              </div>
+
+              <div class="form-group form-group--compact" style="margin-bottom: 8px;">
+                <div class="param-search-box">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  <input type="text" class="form-input form-input--compact param-search-box__input" [(ngModel)]="busquedaHomologacion" placeholder="Buscar por cuenta SAP o BV…" autocomplete="off">
+                  <button *ngIf="busquedaHomologacion" class="param-search-box__clear" type="button" (click)="busquedaHomologacion = ''" aria-label="Limpiar búsqueda">&times;</button>
+                </div>
+              </div>
+
+              <div class="table-container table-container--fixed-lg table-container--h-scroll">
+                <div *ngIf="cuentasHomologacion.length === 0" class="param-empty">Sin cuentas registradas.</div>
+                <div *ngIf="cuentasHomologacion.length > 0 && cuentasHomologacionFiltradas.length === 0" class="param-empty">Ninguna cuenta coincide con la búsqueda.</div>
+                <table *ngIf="cuentasHomologacionFiltradas.length > 0" class="param-table compact-table">
+                  <thead>
+                    <tr>
+                      <th>Cuenta SAP</th>
+                      <th>Cuenta BV</th>
+                      <th>Estado</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let c of cuentasHomologacionFiltradas">
+                      <td><strong>{{ c.cuentaSap }}</strong></td>
+                      <td>{{ c.cuentaBv }}</td>
+                      <td>
+                        <span class="badge" [class.success]="c.estado === 1" [class.warning]="c.estado === 0">
+                          {{ c.estado === 1 ? 'Activa' : 'Inactiva' }}
+                        </span>
+                      </td>
+                      <td>
+                        <div class="action-icons">
+                          <button class="btn-icon" type="button" (click)="iniciarModificarCuenta(c)" [disabled]="c.estado === 0" title="Modificar (crea nueva cuenta activa)">
+                            <img [src]="modifyIcon" class="action-icon" alt="Modificar" />
+                          </button>
+                          <button class="btn-icon" type="button" (click)="solicitarDesactivarCuenta(c)" [disabled]="c.estado === 0" title="Inactivar">
+                            <img [src]="eraseIcon" class="action-icon" alt="Inactivar" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Panel derecho: formulario individual -->
+            <div class="param-panel param-panel--catalog-form" id="homologacionAssistant">
+              <h3 class="form-section-title">
+                <ng-container *ngIf="homologacionModo === 'modificar'">Modificar Cuenta: {{ homologacionEditandoCuentaSap }}</ng-container>
+                <ng-container *ngIf="homologacionModo !== 'modificar'">Nueva Cuenta Contable</ng-container>
+              </h3>
+
+              <div *ngIf="homologacionExito" class="param-alert param-alert--success">{{ homologacionExito }}</div>
+              <div *ngIf="homologacionError" class="param-alert param-alert--error">{{ homologacionError }}</div>
+
+              <div *ngIf="!homologacionModo" class="param-alert param-alert--info">
+                Seleccione <strong>+ Nueva cuenta</strong> para registrar una cuenta, o use los botones de acción en la tabla para modificar o inactivar una cuenta existente.
+              </div>
+
+              <ng-container *ngIf="homologacionModo">
+                <div *ngIf="homologacionModo === 'modificar'" class="param-alert param-alert--info" style="margin-bottom: 12px;">
+                  La cuenta anterior <strong>{{ homologacionEditandoCuentaSap }}</strong> quedará inactiva. Se creará una nueva entrada activa con los nuevos valores.
+                </div>
+
+                <div class="form-group form-group--compact">
+                  <label class="form-label">Cuenta SAP <span class="required">*</span></label>
+                  <input type="text" class="form-input form-input--compact" [(ngModel)]="homologacionForm.cuentaSap" placeholder="9 dígitos numéricos" maxlength="9" autocomplete="off">
+                  <span class="param-field-help">Exactamente 9 dígitos numéricos.</span>
+                </div>
+
+                <div class="form-group form-group--compact">
+                  <label class="form-label">Cuenta BV <span class="required">*</span></label>
+                  <input type="text" class="form-input form-input--compact" [(ngModel)]="homologacionForm.cuentaBv" placeholder="9 dígitos numéricos" maxlength="9" autocomplete="off">
+                  <span class="param-field-help">Exactamente 9 dígitos numéricos.</span>
+                </div>
+
+                <div class="btn-action-container btn-action-container--stacked">
+                  <button class="btn-pill btn-primary btn-pill--block" type="button"
+                    (click)="guardarCuentaHomologacion()"
+                    [disabled]="guardandoHomologacion || !homologacionForm.cuentaSap || !homologacionForm.cuentaBv">
+                    {{ guardandoHomologacion ? 'Guardando…' : (homologacionModo === 'modificar' ? 'Aplicar modificación' : 'Crear cuenta') }}
+                  </button>
+                  <button class="btn-pill btn-secondary btn-pill--block" type="button" (click)="cancelarFormularioHomologacion()">
+                    Cancelar
+                  </button>
+                </div>
+              </ng-container>
+            </div>
+          </div>
+
+          <!-- Sección de carga masiva -->
+          <div class="param-bulk-section" style="margin-top: 24px;">
+            <h3 class="form-section-title">Carga Masiva por Archivo (.xlsx)</h3>
+            <p class="param-field-help" style="margin-bottom: 12px;">
+              El archivo debe tener las columnas: <code>cuenta_SAP</code>, <code>cuenta_BV</code>, <code>estado</code> (1 = activar, 0 = inactivar).
+              Si hay errores en alguna fila, no se aplica ningún cambio.
+            </p>
+
+            <div class="param-upload-row">
+              <label class="btn-pill btn-secondary" style="cursor: pointer;">
+                Seleccionar archivo
+                <input type="file" accept=".xlsx" style="display: none;" (change)="onArchivoHomologacionChange($event)">
+              </label>
+              <span class="param-field-help" style="margin-left: 8px;">{{ archivoHomologacionNombre || 'Ningún archivo seleccionado' }}</span>
+              <button class="btn-pill btn-primary" type="button"
+                [disabled]="!archivoHomologacion || cargandoMasivoHomologacion"
+                (click)="cargarArchivoMasivoHomologacion()"
+                style="margin-left: 12px;">
+                {{ cargandoMasivoHomologacion ? 'Procesando…' : 'Cargar archivo' }}
+              </button>
+            </div>
+
+            <!-- Resultado de carga masiva -->
+            <ng-container *ngIf="homologacionMasivoResultado as resultado">
+              <div *ngIf="resultado.success" class="param-alert param-alert--success" style="margin-top: 12px;">
+                {{ resultado.mensaje || 'Carga exitosa.' }}
+                Activadas: <strong>{{ resultado.activados }}</strong> | Inactivadas: <strong>{{ resultado.desactivados }}</strong>
+                <button class="util-link util-link--button" type="button" (click)="limpiarResultadoMasivoHomologacion()" style="margin-left: 12px;">Limpiar</button>
+              </div>
+
+              <ng-container *ngIf="!resultado.success">
+                <div class="param-alert param-alert--error" style="margin-top: 12px;">
+                  {{ resultado.mensaje || 'Se encontraron errores. No se aplicó ningún cambio.' }}
+                  <button class="util-link util-link--button" type="button" (click)="limpiarResultadoMasivoHomologacion()" style="margin-left: 12px;">Limpiar</button>
+                </div>
+
+                <div *ngIf="resultado.errores && resultado.errores.length > 0" class="table-container table-container--h-scroll" style="margin-top: 8px;">
+                  <table class="param-table compact-table">
+                    <thead>
+                      <tr>
+                        <th>Fila</th>
+                        <th>Cuenta SAP</th>
+                        <th>Error</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let e of resultado.errores">
+                        <td>{{ e.fila }}</td>
+                        <td>{{ e.cuentaSap || '—' }}</td>
+                        <td class="td-error">{{ e.error }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </ng-container>
+            </ng-container>
+          </div>
+
+        </div>
+      </section>
+
     </ng-container><!-- /!cargandoInicial -->
 
       <!-- Modal confirmación operación sobre Producto -->
@@ -926,6 +1095,27 @@
           </section>
         </section>
       </article>
+
+    <!-- Modal: confirmar inactivación de cuenta Colgaap -->
+    <article class="bc-modal-active" role="dialog" aria-modal="true" *ngIf="homologacionDesactivarPendiente as cuentaADesactivar">
+      <div class="bc-modal-backdrop" (click)="cerrarModalDesactivarCuenta()"></div>
+      <section class="bc-modal-container param-confirm-modal">
+        <section class="bc-modal-header centered-column">
+          <img [src]="alertIcon" alt="Confirmación" class="param-confirm-modal__icon">
+          <h4 class="modal-title-label">Confirmar inactivación</h4>
+        </section>
+        <section class="param-confirm-modal__body centered-column">
+          <p>Va a <strong>inactivar</strong> la cuenta SAP <strong>{{ cuentaADesactivar.cuentaSap }}</strong> (BV: {{ cuentaADesactivar.cuentaBv }}).</p>
+          <p class="param-confirm-modal__note">El registro permanece en la base de datos pero ya no será válido para la validación de homologación.</p>
+        </section>
+        <section class="bc-modal-footer param-confirm-modal__footer">
+          <button class="btn-pill btn-secondary" type="button" (click)="cerrarModalDesactivarCuenta()" [disabled]="desactivandoHomologacion">Cancelar</button>
+          <button class="btn-pill btn-primary" type="button" (click)="confirmarDesactivarCuenta()" [disabled]="desactivandoHomologacion">
+            {{ desactivandoHomologacion ? 'Inactivando…' : 'Inactivar cuenta' }}
+          </button>
+        </section>
+      </section>
+    </article>
 
     <!-- Toast de notificación -->
     <div *ngIf="toastMensaje" class="param-toast" [class.param-toast--success]="toastTipo === 'success'" [class.param-toast--error]="toastTipo === 'error'">

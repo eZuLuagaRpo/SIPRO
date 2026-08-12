@@ -6,6 +6,8 @@ import com.bancolombia.sipro.validations.infrastructure.repository.*;
 import com.bancolombia.sipro.validations.infrastructure.security.MicrosoftGraphDirectoryService;
 import com.bancolombia.sipro.validations.infrastructure.security.SiproAuthenticatedUser;
 import com.bancolombia.sipro.validations.shared.utils.GroupNameNormalizer;
+import com.bancolombia.sipro.validations.shared.utils.XlsxStreamingReader;
+import org.springframework.web.multipart.MultipartFile;
 import jakarta.persistence.EntityManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,7 +19,9 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.IOException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -57,6 +61,7 @@ public class ParametrosService {
     private final EntityManager entityManager;
     private final MicrosoftGraphDirectoryService graphDirectoryService;
     private final MailTemplateNotificationService mailTemplateService;
+    private final HomologacionColgaapRepository homologacionRepo;
 
     public ParametrosService(
             SiproReglaVentanaCargaRepository reglaRepo,
@@ -72,7 +77,8 @@ public class ParametrosService {
             AdminAccessService adminAccessService,
             EntityManager entityManager,
             MicrosoftGraphDirectoryService graphDirectoryService,
-            MailTemplateNotificationService mailTemplateService) {
+            MailTemplateNotificationService mailTemplateService,
+            HomologacionColgaapRepository homologacionRepo) {
         this.reglaRepo = reglaRepo;
         this.excepcionRepo = excepcionRepo;
         this.personaRepo = personaRepo;
@@ -87,6 +93,7 @@ public class ParametrosService {
         this.entityManager = entityManager;
         this.graphDirectoryService = graphDirectoryService;
         this.mailTemplateService = mailTemplateService;
+        this.homologacionRepo = homologacionRepo;
     }
 
     // ── Guard centralizado ─────────────────────────────────────────────────
@@ -863,6 +870,16 @@ public class ParametrosService {
         public void setIdLider(Long v) { this.idLider = v; }
     }
 
+    public static class HomologacionCuentaRequest {
+        private String cuentaSap;
+        private String cuentaBv;
+
+        public String getCuentaSap() { return cuentaSap; }
+        public void setCuentaSap(String v) { this.cuentaSap = v; }
+        public String getCuentaBv() { return cuentaBv; }
+        public void setCuentaBv(String v) { this.cuentaBv = v; }
+    }
+
     public static class ProductoRequest {
         private String titulo;
         private Integer idSegmento;
@@ -1166,6 +1183,252 @@ public class ParametrosService {
 
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "No fue posible resolver un líder activo para el área seleccionada.");
+    }
+
+    // ── Homologación Colgaap ──────────────────────────────────────────────
+
+    public record HomologacionDto(
+            Long id, String cuentaSap, String cuentaBv, int estado,
+            String creadoEn, String creadoPor) {}
+
+    public record HomologacionErrorFila(int fila, String cuentaSap, String error) {}
+
+    public record HomologacionMasivaResultado(
+            boolean success, String mensaje,
+            int activados, int desactivados,
+            List<HomologacionErrorFila> errores) {}
+
+    private static final String PATRON_9_DIGITOS = "^[0-9]{9}$";
+
+    public List<HomologacionDto> listarCuentasHomologacion() {
+        return homologacionRepo.findAllByOrderByEstadoDescCreadoEnDesc().stream()
+                .map(this::toHomologacionDto)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void crearCuentaHomologacion(HomologacionCuentaRequest req, String creadoPor) {
+        String cuentaSap = trimRequerido(req.getCuentaSap(), "cuenta SAP");
+        String cuentaBv  = trimRequerido(req.getCuentaBv(), "cuenta BV");
+        validarFormatoHomologacion(cuentaSap, cuentaBv);
+        if (homologacionRepo.findActivaByCuentaSap(cuentaSap).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Ya existe una cuenta activa con el código SAP '" + cuentaSap + "'.");
+        }
+        HomologacionColgaap nueva = buildNuevaHomologacion(cuentaSap, cuentaBv, creadoPor);
+        homologacionRepo.save(nueva);
+        logger.info("[Homologacion] Cuenta SAP {} creada por {}", cuentaSap, creadoPor);
+    }
+
+    @Transactional
+    public void desactivarCuentaHomologacion(Long id) {
+        HomologacionColgaap cuenta = homologacionRepo.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Cuenta con id " + id + " no encontrada."));
+        if (!Integer.valueOf(1).equals(cuenta.getEstado())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La cuenta SAP '" + cuenta.getCuentaSap() + "' ya está inactiva.");
+        }
+        cuenta.setEstado(0);
+        homologacionRepo.save(cuenta);
+        logger.info("[Homologacion] Cuenta SAP {} (id={}) desactivada", cuenta.getCuentaSap(), id);
+    }
+
+    @Transactional
+    public void modificarCuentaHomologacion(Long id, HomologacionCuentaRequest req, String creadoPor) {
+        HomologacionColgaap antigua = homologacionRepo.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Cuenta con id " + id + " no encontrada."));
+        if (!Integer.valueOf(1).equals(antigua.getEstado())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Solo se pueden modificar cuentas activas.");
+        }
+        String nuevaCuentaSap = trimRequerido(req.getCuentaSap(), "cuenta SAP");
+        String nuevaCuentaBv  = trimRequerido(req.getCuentaBv(), "cuenta BV");
+        validarFormatoHomologacion(nuevaCuentaSap, nuevaCuentaBv);
+
+        // Si cambia la cuenta SAP, verificar que no exista activa
+        if (!nuevaCuentaSap.equals(antigua.getCuentaSap())) {
+            if (homologacionRepo.findActivaByCuentaSap(nuevaCuentaSap).isPresent()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Ya existe una cuenta activa con el código SAP '" + nuevaCuentaSap + "'.");
+            }
+        }
+
+        antigua.setEstado(0);
+        homologacionRepo.save(antigua);
+
+        HomologacionColgaap nueva = buildNuevaHomologacion(nuevaCuentaSap, nuevaCuentaBv, creadoPor);
+        homologacionRepo.save(nueva);
+        logger.info("[Homologacion] Cuenta id={} modificada: SAP {} -> {} por {}", id, antigua.getCuentaSap(), nuevaCuentaSap, creadoPor);
+    }
+
+    @Transactional
+    public HomologacionMasivaResultado procesarCargaMasivaCuentas(MultipartFile archivo, String creadoPor) {
+        if (archivo == null || archivo.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El archivo no puede estar vacío.");
+        }
+        String nombre = archivo.getOriginalFilename();
+        if (nombre == null || !nombre.toLowerCase().endsWith(".xlsx")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El archivo debe ser de formato .xlsx.");
+        }
+
+        List<List<String>> filas = new ArrayList<>();
+        try {
+            XlsxStreamingReader.readFirstSheet(archivo.getInputStream(),
+                    (rowNum, valores) -> filas.add(new ArrayList<>(valores)));
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "No fue posible leer el archivo: " + e.getMessage());
+        }
+
+        if (filas.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El archivo está vacío.");
+        }
+
+        // Validar cabecera
+        List<String> cabecera = filas.get(0);
+        if (cabecera.size() < 3
+                || !cabecera.get(0).trim().equalsIgnoreCase("cuenta_SAP")
+                || !cabecera.get(1).trim().equalsIgnoreCase("cuenta_BV")
+                || !cabecera.get(2).trim().equalsIgnoreCase("estado")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El archivo no tiene el formato esperado. La primera fila debe contener exactamente las columnas: cuenta_SAP, cuenta_BV, estado.");
+        }
+
+        // Leer filas de datos
+        record FilaDato(int fila, String cuentaSap, String cuentaBv, int estado) {}
+        List<FilaDato> datos = new ArrayList<>();
+        List<HomologacionErrorFila> erroresFormato = new ArrayList<>();
+
+        for (int i = 1; i < filas.size(); i++) {
+            List<String> fila = filas.get(i);
+            int numFila = i + 1;
+            String cuentaSap = fila.size() > 0 ? fila.get(0).trim() : "";
+            String cuentaBv  = fila.size() > 1 ? fila.get(1).trim() : "";
+            String estadoStr = fila.size() > 2 ? fila.get(2).trim() : "";
+
+            if (cuentaSap.isEmpty() && cuentaBv.isEmpty() && estadoStr.isEmpty()) continue;
+
+            if (!estadoStr.equals("0") && !estadoStr.equals("1")) {
+                erroresFormato.add(new HomologacionErrorFila(numFila, cuentaSap,
+                        "Estado inválido '" + estadoStr + "'. Debe ser 0 (inactivar) o 1 (activar)."));
+                continue;
+            }
+            datos.add(new FilaDato(numFila, cuentaSap, cuentaBv, Integer.parseInt(estadoStr)));
+        }
+
+        if (!erroresFormato.isEmpty()) {
+            return new HomologacionMasivaResultado(false, null, 0, 0, erroresFormato);
+        }
+
+        if (datos.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El archivo no contiene filas de datos (solo cabecera).");
+        }
+
+        // Recopilar cuentas SAP por tipo para validación en lote
+        Set<String> cuentasParaActivar = datos.stream()
+                .filter(d -> d.estado() == 1).map(FilaDato::cuentaSap).collect(Collectors.toSet());
+        Set<String> cuentasParaDesactivar = datos.stream()
+                .filter(d -> d.estado() == 0).map(FilaDato::cuentaSap).collect(Collectors.toSet());
+
+        Set<String> existenActivas = cuentasParaActivar.isEmpty() ? Set.of()
+                : homologacionRepo.findExistingCuentasSap(cuentasParaActivar);
+        Set<String> existenActivasDesactivar = cuentasParaDesactivar.isEmpty() ? Set.of()
+                : homologacionRepo.findExistingCuentasSap(cuentasParaDesactivar);
+
+        List<HomologacionErrorFila> errores = new ArrayList<>();
+        for (FilaDato dato : datos) {
+            if (dato.estado() == 1) {
+                if (!dato.cuentaSap().matches(PATRON_9_DIGITOS)) {
+                    errores.add(new HomologacionErrorFila(dato.fila(), dato.cuentaSap(),
+                            "La cuenta SAP debe contener exactamente 9 dígitos numéricos."));
+                    continue;
+                }
+                if (!dato.cuentaBv().matches(PATRON_9_DIGITOS)) {
+                    errores.add(new HomologacionErrorFila(dato.fila(), dato.cuentaSap(),
+                            "La cuenta BV debe contener exactamente 9 dígitos numéricos."));
+                    continue;
+                }
+                if (existenActivas.contains(dato.cuentaSap())) {
+                    errores.add(new HomologacionErrorFila(dato.fila(), dato.cuentaSap(),
+                            "Ya existe una cuenta activa con este código SAP. Inactívela primero."));
+                }
+            } else {
+                if (!existenActivasDesactivar.contains(dato.cuentaSap())) {
+                    errores.add(new HomologacionErrorFila(dato.fila(), dato.cuentaSap(),
+                            "No existe una cuenta activa con este código SAP para inactivar."));
+                }
+            }
+        }
+
+        if (!errores.isEmpty()) {
+            return new HomologacionMasivaResultado(false, null, 0, 0, errores);
+        }
+
+        // Aplicar cambios
+        int activados = 0;
+        int desactivados = 0;
+
+        for (FilaDato dato : datos) {
+            if (dato.estado() == 1) {
+                homologacionRepo.save(buildNuevaHomologacion(dato.cuentaSap(), dato.cuentaBv(), creadoPor));
+                activados++;
+            } else {
+                homologacionRepo.findActivaByCuentaSap(dato.cuentaSap()).ifPresent(c -> {
+                    c.setEstado(0);
+                    homologacionRepo.save(c);
+                });
+                desactivados++;
+            }
+        }
+
+        String mensaje = "Carga completada: " + activados + " cuenta(s) activada(s) y " + desactivados + " inactivada(s).";
+        logger.info("[Homologacion] Carga masiva por {}: {} activadas, {} desactivadas", creadoPor, activados, desactivados);
+        return new HomologacionMasivaResultado(true, mensaje, activados, desactivados, List.of());
+    }
+
+    private HomologacionColgaap buildNuevaHomologacion(String cuentaSap, String cuentaBv, String creadoPor) {
+        HomologacionColgaap h = new HomologacionColgaap();
+        h.setCuentaSap(cuentaSap);
+        h.setCuentaBv(cuentaBv);
+        h.setEstado(1);
+        h.setCreadoEn(LocalDateTime.now());
+        h.setCreadoPor(creadoPor);
+        return h;
+    }
+
+    private void validarFormatoHomologacion(String cuentaSap, String cuentaBv) {
+        if (!cuentaSap.matches(PATRON_9_DIGITOS)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La cuenta SAP debe contener exactamente 9 dígitos numéricos.");
+        }
+        if (!cuentaBv.matches(PATRON_9_DIGITOS)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La cuenta BV debe contener exactamente 9 dígitos numéricos.");
+        }
+    }
+
+    private String trimRequerido(String valor, String campo) {
+        if (valor == null || valor.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El campo " + campo + " es obligatorio.");
+        }
+        return valor.trim();
+    }
+
+    private HomologacionDto toHomologacionDto(HomologacionColgaap h) {
+        String creadoEn = h.getCreadoEn() != null
+                ? h.getCreadoEn().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
+                : null;
+        return new HomologacionDto(
+                h.getIdHomologacionColgaap(),
+                h.getCuentaSap(),
+                h.getCuentaBv(),
+                h.getEstado() != null ? h.getEstado() : 0,
+                creadoEn,
+                h.getCreadoPor());
     }
 
     private boolean mismaArea(String areaActual, String areaObjetivo) {
