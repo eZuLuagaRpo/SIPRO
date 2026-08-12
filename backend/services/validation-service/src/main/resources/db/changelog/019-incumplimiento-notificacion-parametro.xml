@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.24.xsd">
+
+    <!-- ================================================================
+         019: Parámetros para el scheduler de notificación de incumplimiento
+         de carga de planillas manuales.
+         ================================================================ -->
+
+    <changeSet id="019-001" author="sipro">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM sipro_parametros_unico WHERE clave = 'INCUMPLIMIENTO_ULTIMO_PERIODO_NOTIFICADO'
+            </sqlCheck>
+        </preConditions>
+        <comment>Control de idempotencia del scheduler de incumplimiento. Guarda el último periodo notificado en formato YYYY-MM para evitar reenvíos.</comment>
+        <insert tableName="sipro_parametros_unico">
+            <column name="clave" value="INCUMPLIMIENTO_ULTIMO_PERIODO_NOTIFICADO"/>
+            <column name="valor" value=""/>
+            <column name="tipo" value="STRING"/>
+            <column name="descripcion" value="Último periodo notificado por incumplimiento de carga de planillas manuales (formato YYYY-MM). Evita reenviar correos en el mismo periodo."/>
+            <column name="creado_en" valueComputed="now()"/>
+            <column name="modificado_en" valueComputed="now()"/>
+        </insert>
+    </changeSet>
+
+    <changeSet id="019-002" author="sipro">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM sipro_parametros_unico WHERE clave = 'INCUMPLIMIENTO_SCHEDULER_FIXED_DELAY_MS'
+            </sqlCheck>
+        </preConditions>
+        <comment>Intervalo de ejecución del scheduler de incumplimiento (default: cada hora).</comment>
+        <insert tableName="sipro_parametros_unico">
+            <column name="clave" value="INCUMPLIMIENTO_SCHEDULER_FIXED_DELAY_MS"/>
+            <column name="valor" value="3600000"/>
+            <column name="tipo" value="LONG"/>
+            <column name="descripcion" value="Intervalo en milisegundos entre ejecuciones del scheduler de notificación de incumplimiento (default: 3600000 = 1 hora)."/>
+            <column name="creado_en" valueComputed="now()"/>
+            <column name="modificado_en" valueComputed="now()"/>
+        </insert>
+    </changeSet>
+
+    <changeSet id="019-003" author="sipro">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM sipro_parametros_unico WHERE clave = 'INCUMPLIMIENTO_SCHEDULER_INITIAL_DELAY_MS'
+            </sqlCheck>
+        </preConditions>
+        <comment>Delay inicial antes de la primera ejecución del scheduler de incumplimiento.</comment>
+        <insert tableName="sipro_parametros_unico">
+            <column name="clave" value="INCUMPLIMIENTO_SCHEDULER_INITIAL_DELAY_MS"/>
+            <column name="valor" value="120000"/>
+            <column name="tipo" value="LONG"/>
+            <column name="descripcion" value="Delay inicial en milisegundos antes de la primera ejecución del scheduler de incumplimiento (default: 120000 = 2 minutos)."/>
+            <column name="creado_en" valueComputed="now()"/>
+            <column name="modificado_en" valueComputed="now()"/>
+        </insert>
+    </changeSet>
+
+</databaseChangeLog>

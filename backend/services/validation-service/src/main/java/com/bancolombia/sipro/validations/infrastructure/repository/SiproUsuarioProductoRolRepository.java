@@ -112,6 +112,30 @@ public interface SiproUsuarioProductoRolRepository extends JpaRepository<SiproUs
     List<String> findDistinctActiveEmailsByGrupoAdIn(@Param("gruposAd") Collection<String> gruposAd);
 
     /**
+     * Obtiene todas las asignaciones activas de cargadores para el segmento indicado.
+     * Incluye usuario y producto pre-cargados (EAGER) para evitar N+1 al construir notificaciones.
+     */
+    @Query("SELECT upr FROM SiproUsuarioProductoRol upr " +
+           "JOIN FETCH upr.usuario " +
+           "JOIN FETCH upr.producto " +
+           "WHERE upr.activo = true " +
+           "AND upr.rol.cargarArchivos = 1 " +
+           "AND upr.id.idSegmento = :idSegmento")
+    List<SiproUsuarioProductoRol> findActivasCargadoresBySegmento(@Param("idSegmento") Long idSegmento);
+
+    /**
+     * Obtiene todas las asignaciones activas de aprobadores para el segmento indicado.
+     * Incluye usuario y producto pre-cargados (EAGER) para evitar N+1 al construir notificaciones.
+     */
+    @Query("SELECT upr FROM SiproUsuarioProductoRol upr " +
+           "JOIN FETCH upr.usuario " +
+           "JOIN FETCH upr.producto " +
+           "WHERE upr.activo = true " +
+           "AND upr.id.idRol = 2 " +
+           "AND upr.id.idSegmento = :idSegmento")
+    List<SiproUsuarioProductoRol> findActivasAprobadoresBySegmento(@Param("idSegmento") Long idSegmento);
+
+    /**
      * Obtiene los correos activos de los usuarios que tengan un rol específico.
      */
     @Query("SELECT DISTINCT LOWER(TRIM(usuario.correo)) FROM SiproUsuarioProductoRol upr " +

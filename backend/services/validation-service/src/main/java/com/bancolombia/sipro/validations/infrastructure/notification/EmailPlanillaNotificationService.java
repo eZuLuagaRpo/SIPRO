@@ -41,6 +41,8 @@ public class EmailPlanillaNotificationService implements PlanillaNotificationSer
     private static final Locale LOCALE_ES_CO = Locale.forLanguageTag("es-CO");
     private static final DateTimeFormatter FECHA_CORTE_FORMATTER =
             DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", LOCALE_ES_CO);
+    private static final DateTimeFormatter FECHA_INCUMPLIMIENTO_FORMATTER =
+            DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final MailNotificationProperties properties;
     private final ParametroUnicoService parametroUnicoService;
@@ -159,6 +161,42 @@ public class EmailPlanillaNotificationService implements PlanillaNotificationSer
                 recipients(users.usuarioCarga().email(), users.lider().email()),
                 render(template, model));
         send(email, "aprobacion", planilla.getId());
+    }
+
+    /**
+     * Notifica a un usuario que uno o más productos incumplieron la carga o aprobación de planilla manual.
+     */
+    @Override
+    public void notificarIncumplimiento(String nombreDestinatario,
+                                        String correoDestinatario,
+                                        List<String> productosIncumplidos,
+                                        String segmento,
+                                        LocalDate fechaCorte) {
+        String subject = String.format("SIPRO | Incumplimiento de carga | %s | %s",
+                textoPlano(segmento), formatFechaCorta(fechaCorte));
+
+        Map<String, String> model = new LinkedHashMap<>();
+        model.put("banner_url", escape(mailTemplateNotificationService.resolveBannerSrc()));
+        model.put("destinatario", escape(defaultIfBlank(nombreDestinatario, "Usuario SIPRO")));
+        model.put("productos_texto", formatearProductos(productosIncumplidos));
+        model.put("segmento", escape(defaultIfBlank(segmento, "No informado")));
+        model.put("fecha_corte", escape(formatFechaIncumplimiento(fechaCorte)));
+        model.put("url_sipro", escape(resolveActionUrl()));
+
+        List<String> destinatarios = recipients(correoDestinatario);
+        if (destinatarios.isEmpty()) {
+            logger.warn("[Incumplimiento] Sin destinatario válido. segmento={}, productos={}", segmento, productosIncumplidos);
+            return;
+        }
+
+        String htmlBody = render("incumplimiento-carga.html", model);
+        mailTemplateNotificationService.sendHtml(
+                new MailTemplateNotificationService.EmailPayload(subject, destinatarios, htmlBody),
+                "incumplimiento",
+                "segmento " + defaultIfBlank(segmento, "desconocido"));
+
+        logger.info("[Incumplimiento] Correo enviado a {} ({}) | segmento={} | productos={}",
+                nombreDestinatario, correoDestinatario, segmento, productosIncumplidos);
     }
 
     /**
@@ -485,6 +523,23 @@ public class EmailPlanillaNotificationService implements PlanillaNotificationSer
 
     private String textoPlano(String value) {
         return defaultIfBlank(value, "Producto");
+    }
+
+    private String formatearProductos(List<String> productos) {
+        if (productos == null || productos.isEmpty()) {
+            return "No informado";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String p : productos) {
+            if (sb.length() > 0) sb.append(", ");
+            sb.append(escape(p));
+        }
+        return sb.toString();
+    }
+
+    private String formatFechaIncumplimiento(LocalDate fecha) {
+        if (fecha == null) return "No informada";
+        return FECHA_INCUMPLIMIENTO_FORMATTER.format(fecha);
     }
 
     private record NotificationUsers(ResolvedUser usuarioCarga, ResolvedUser lider) {
