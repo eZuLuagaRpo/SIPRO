@@ -1271,12 +1271,11 @@ public class ParametrosService {
     @Transactional
     public HomologacionMasivaResultado procesarCargaMasivaCuentas(MultipartFile archivo, String creadoPor) {
         if (archivo == null || archivo.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El archivo no puede estar vacío.");
+            return new HomologacionMasivaResultado(false, "El archivo no puede estar vacío.", 0, 0, List.of());
         }
         String nombre = archivo.getOriginalFilename();
         if (nombre == null || !nombre.toLowerCase().endsWith(".xlsx")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "El archivo debe ser de formato .xlsx.");
+            return new HomologacionMasivaResultado(false, "El archivo debe ser de formato .xlsx.", 0, 0, List.of());
         }
 
         List<List<String>> filas = new ArrayList<>();
@@ -1284,26 +1283,27 @@ public class ParametrosService {
             XlsxStreamingReader.readFirstSheet(archivo.getInputStream(),
                     (rowNum, valores) -> filas.add(new ArrayList<>(valores)));
         } catch (IOException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "No fue posible leer el archivo: " + e.getMessage());
+            return new HomologacionMasivaResultado(false, "No fue posible leer el archivo: " + e.getMessage(), 0, 0, List.of());
         }
 
         if (filas.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El archivo está vacío.");
+            return new HomologacionMasivaResultado(false, "El archivo está vacío.", 0, 0, List.of());
         }
 
         // Validar cabecera
         List<String> cabecera = filas.get(0);
         if (cabecera.size() != 3) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "El archivo tiene " + cabecera.size() + " columna(s). Debe tener exactamente 3: cuenta_SAP, cuenta_BV, estado.");
+            return new HomologacionMasivaResultado(false,
+                    "El archivo tiene " + cabecera.size() + " columna(s). Debe tener exactamente 3: cuenta_SAP, cuenta_BV, estado.",
+                    0, 0, List.of());
         }
         if (!cabecera.get(0).trim().equalsIgnoreCase("cuenta_SAP")
                 || !cabecera.get(1).trim().equalsIgnoreCase("cuenta_BV")
                 || !cabecera.get(2).trim().equalsIgnoreCase("estado")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            return new HomologacionMasivaResultado(false,
                     "Los nombres de las columnas no son correctos. Se esperan: cuenta_SAP, cuenta_BV, estado. " +
-                    "Se encontraron: " + cabecera.stream().map(String::trim).collect(java.util.stream.Collectors.joining(", ")) + ".");
+                    "Se encontraron: " + cabecera.stream().map(String::trim).collect(java.util.stream.Collectors.joining(", ")) + ".",
+                    0, 0, List.of());
         }
 
         // Leer filas de datos
@@ -1334,8 +1334,7 @@ public class ParametrosService {
         }
 
         if (datos.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "El archivo no contiene filas de datos (solo cabecera).");
+            return new HomologacionMasivaResultado(false, "El archivo no contiene filas de datos (solo cabecera).", 0, 0, List.of());
         }
 
         // Recopilar cuentas SAP por tipo para validación en lote
