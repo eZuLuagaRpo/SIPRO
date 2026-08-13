@@ -1289,7 +1289,7 @@ public class ParametrosService {
 
         // Validar cabecera
         List<String> cabecera = filas.get(0);
-        if (cabecera.size() < 3
+        if (cabecera.size() != 3
                 || !cabecera.get(0).trim().equalsIgnoreCase("cuenta_SAP")
                 || !cabecera.get(1).trim().equalsIgnoreCase("cuenta_BV")
                 || !cabecera.get(2).trim().equalsIgnoreCase("estado")) {
@@ -1311,12 +1311,13 @@ public class ParametrosService {
 
             if (cuentaSap.isEmpty() && cuentaBv.isEmpty() && estadoStr.isEmpty()) continue;
 
-            if (!estadoStr.equals("0") && !estadoStr.equals("1")) {
+            String estadoNorm = estadoStr.toLowerCase();
+            if (!estadoNorm.equals("activar") && !estadoNorm.equals("inactivar")) {
                 erroresFormato.add(new HomologacionErrorFila(numFila, cuentaSap,
-                        "Estado inválido '" + estadoStr + "'. Debe ser 0 (inactivar) o 1 (activar)."));
+                        "Estado inválido '" + estadoStr + "'. Debe ser 'Activar' o 'Inactivar'."));
                 continue;
             }
-            datos.add(new FilaDato(numFila, cuentaSap, cuentaBv, Integer.parseInt(estadoStr)));
+            datos.add(new FilaDato(numFila, cuentaSap, cuentaBv, estadoNorm.equals("activar") ? 1 : 0));
         }
 
         if (!erroresFormato.isEmpty()) {
@@ -1342,9 +1343,9 @@ public class ParametrosService {
         List<HomologacionErrorFila> errores = new ArrayList<>();
         for (FilaDato dato : datos) {
             if (dato.estado() == 1) {
-                if (!dato.cuentaSap().matches(PATRON_9_DIGITOS)) {
-                    errores.add(new HomologacionErrorFila(dato.fila(), dato.cuentaSap(),
-                            "La cuenta SAP debe contener exactamente 9 dígitos numéricos."));
+                if (dato.cuentaSap().isEmpty()) {
+                    errores.add(new HomologacionErrorFila(dato.fila(), "",
+                            "La cuenta SAP no puede estar vacía."));
                     continue;
                 }
                 if (!dato.cuentaBv().matches(PATRON_9_DIGITOS)) {
@@ -1401,10 +1402,6 @@ public class ParametrosService {
     }
 
     private void validarFormatoHomologacion(String cuentaSap, String cuentaBv) {
-        if (!cuentaSap.matches(PATRON_9_DIGITOS)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "La cuenta SAP debe contener exactamente 9 dígitos numéricos.");
-        }
         if (!cuentaBv.matches(PATRON_9_DIGITOS)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "La cuenta BV debe contener exactamente 9 dígitos numéricos.");

@@ -1737,13 +1737,12 @@ export class ParametrosComponent implements OnInit {
   guardarCuentaHomologacion(): void {
     const cuentaSap = (this.homologacionForm.cuentaSap ?? '').trim();
     const cuentaBv = (this.homologacionForm.cuentaBv ?? '').trim();
-    const patron = /^[0-9]{9}$/;
 
-    if (!patron.test(cuentaSap)) {
-      this.homologacionError = 'La cuenta SAP debe tener exactamente 9 dígitos numéricos.';
+    if (!cuentaSap) {
+      this.homologacionError = 'La cuenta SAP es obligatoria.';
       return;
     }
-    if (!patron.test(cuentaBv)) {
+    if (!/^[0-9]{9}$/.test(cuentaBv)) {
       this.homologacionError = 'La cuenta BV debe tener exactamente 9 dígitos numéricos.';
       return;
     }

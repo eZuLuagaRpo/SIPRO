@@ -954,8 +954,8 @@
 
                 <div class="form-group form-group--compact">
                   <label class="form-label">Cuenta SAP <span class="required">*</span></label>
-                  <input type="text" class="form-input form-input--compact" [(ngModel)]="homologacionForm.cuentaSap" placeholder="9 dígitos numéricos" maxlength="9" autocomplete="off">
-                  <span class="param-field-help">Exactamente 9 dígitos numéricos.</span>
+                  <input type="text" class="form-input form-input--compact" [(ngModel)]="homologacionForm.cuentaSap" placeholder="Código SAP" autocomplete="off">
+                  <span class="param-field-help">Código de la cuenta SAP (sin restricción de longitud).</span>
                 </div>
 
                 <div class="form-group form-group--compact">
@@ -982,7 +982,7 @@
           <div class="param-bulk-section" style="margin-top: 24px;">
             <h3 class="form-section-title">Carga Masiva por Archivo (.xlsx)</h3>
             <p class="param-field-help" style="margin-bottom: 12px;">
-              El archivo debe tener las columnas: <code>cuenta_SAP</code>, <code>cuenta_BV</code>, <code>estado</code> (1 = activar, 0 = inactivar).
+              El archivo debe tener exactamente las columnas: <code>cuenta_SAP</code>, <code>cuenta_BV</code>, <code>estado</code>. En la columna <code>estado</code> escriba <code>Activar</code> o <code>Inactivar</code> (sin importar mayúsculas o minúsculas). La cuenta BV debe tener exactamente 9 dígitos.
               Si hay errores en alguna fila, no se aplica ningún cambio.
             </p>
 

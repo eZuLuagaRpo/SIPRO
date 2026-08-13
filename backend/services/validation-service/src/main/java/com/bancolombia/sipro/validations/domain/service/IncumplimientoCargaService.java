@@ -2,9 +2,11 @@ package com.bancolombia.sipro.validations.domain.service;
 
 import com.bancolombia.sipro.validations.domain.model.SiproDetalleCargaPlanillas;
 import com.bancolombia.sipro.validations.domain.model.SiproUsuarioProductoRol;
+import com.bancolombia.sipro.validations.domain.model.UsuarioArea;
 import com.bancolombia.sipro.validations.domain.model.UsuarioPersona;
 import com.bancolombia.sipro.validations.infrastructure.repository.SiproDetalleCargaPlanillasRepository;
 import com.bancolombia.sipro.validations.infrastructure.repository.SiproUsuarioProductoRolRepository;
+import com.bancolombia.sipro.validations.infrastructure.repository.UsuarioAreaRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -28,7 +30,9 @@ import java.util.stream.Collectors;
  * Lógica:
  * - Un producto CUMPLE si tiene al menos una planilla APROBADA en el periodo.
  * - Cargadores son notificados por productos sin aprobación (null, PENDIENTE o RECHAZADO).
- * - Aprobadores son notificados por productos con planilla PENDIENTE (requieren acción de aprobación).
+ * - Aprobadores son notificados por todos los productos no aprobados de sus cargadores,
+ *   derivados de la relación cargador → jefe en usuario_area. Un jefe con varios cargadores
+ *   recibe la unión de todos sus productos incumplidos en un solo correo.
  * - Se envía un correo por usuario agrupando todos sus productos incumplidos.
  * - La clave INCUMPLIMIENTO_ULTIMO_PERIODO_NOTIFICADO garantiza que solo se envía una vez por periodo.
  */
@@ -49,6 +53,7 @@ public class IncumplimientoCargaService {
     private final VentanaCargaService ventanaCargaService;
     private final SiproDetalleCargaPlanillasRepository planillasRepository;
     private final SiproUsuarioProductoRolRepository usuarioProductoRolRepository;
+    private final UsuarioAreaRepository areaRepository;
     private final PlanillaNotificationService planillaNotificationService;
 
     public IncumplimientoCargaService(
@@ -56,11 +61,13 @@ public class IncumplimientoCargaService {
             VentanaCargaService ventanaCargaService,
             SiproDetalleCargaPlanillasRepository planillasRepository,
             SiproUsuarioProductoRolRepository usuarioProductoRolRepository,
+            UsuarioAreaRepository areaRepository,
             PlanillaNotificationService planillaNotificationService) {
         this.parametroUnicoService = parametroUnicoService;
         this.ventanaCargaService = ventanaCargaService;
         this.planillasRepository = planillasRepository;
         this.usuarioProductoRolRepository = usuarioProductoRolRepository;
+        this.areaRepository = areaRepository;
         this.planillaNotificationService = planillaNotificationService;
     }
 
@@ -115,12 +122,6 @@ public class IncumplimientoCargaService {
                 .map(SiproDetalleCargaPlanillas::getIdProducto)
                 .collect(Collectors.toSet());
 
-        // Productos en estado PENDIENTE → aprobadores deben actuar
-        Set<Long> productosPendientes = planillas.stream()
-                .filter(p -> "PENDIENTE".equals(p.getEstadoPlanilla()))
-                .map(SiproDetalleCargaPlanillas::getIdProducto)
-                .collect(Collectors.toSet());
-
         // --- Cargadores: productos sin aprobación (null, PENDIENTE, RECHAZADO) ---
         List<SiproUsuarioProductoRol> cargadores =
                 usuarioProductoRolRepository.findActivasCargadoresBySegmento(idSegmento);
@@ -141,22 +142,43 @@ public class IncumplimientoCargaService {
 
         enviarNotificaciones(productosPorCargador, datosCargadores, nombreSegmento, periodoValoracion, "cargador");
 
-        // --- Aprobadores: productos en PENDIENTE que requieren su aprobación ---
-        List<SiproUsuarioProductoRol> aprobadores =
-                usuarioProductoRolRepository.findActivasAprobadoresBySegmento(idSegmento);
-
+        // --- Aprobadores: se derivan de la relación cargador → jefe en usuario_area ---
+        // El jefe de cada cargador recibe los mismos productos no aprobados de ese cargador.
+        // Un jefe con varios cargadores recibe la unión de todos sus productos incumplidos.
         Map<Long, Set<String>> productosPorAprobador = new LinkedHashMap<>();
         Map<Long, UsuarioPersona> datosAprobadores = new LinkedHashMap<>();
 
-        for (SiproUsuarioProductoRol upr : aprobadores) {
-            Long idProducto = upr.getProducto().getIdProducto();
-            if (!productosPendientes.contains(idProducto)) {
-                continue;
+        Set<Long> idsCargadoresIncumplidos = new LinkedHashSet<>();
+        for (SiproUsuarioProductoRol upr : cargadores) {
+            if (!productosAprobados.contains(upr.getProducto().getIdProducto())) {
+                idsCargadoresIncumplidos.add(upr.getId().getIdUsuario());
             }
-            Long idUsuario = upr.getId().getIdUsuario();
-            productosPorAprobador.computeIfAbsent(idUsuario, k -> new LinkedHashSet<>())
-                    .add(upr.getProducto().getTitulo());
-            datosAprobadores.putIfAbsent(idUsuario, upr.getUsuario());
+        }
+
+        if (!idsCargadoresIncumplidos.isEmpty()) {
+            Map<Long, UsuarioPersona> jefesPorCargador = new LinkedHashMap<>();
+            List<UsuarioArea> areas = areaRepository.findWithJefeByIdUsuarioIn(idsCargadoresIncumplidos);
+            for (UsuarioArea area : areas) {
+                if (area.getJefe() != null) {
+                    jefesPorCargador.put(area.getIdUsuario(), area.getJefe());
+                }
+            }
+
+            for (SiproUsuarioProductoRol upr : cargadores) {
+                Long idProducto = upr.getProducto().getIdProducto();
+                if (productosAprobados.contains(idProducto)) {
+                    continue;
+                }
+                Long idCargador = upr.getId().getIdUsuario();
+                UsuarioPersona jefe = jefesPorCargador.get(idCargador);
+                if (jefe == null) {
+                    continue;
+                }
+                Long idJefe = jefe.getIdUsuario();
+                productosPorAprobador.computeIfAbsent(idJefe, k -> new LinkedHashSet<>())
+                        .add(upr.getProducto().getTitulo());
+                datosAprobadores.putIfAbsent(idJefe, jefe);
+            }
         }
 
         enviarNotificaciones(productosPorAprobador, datosAprobadores, nombreSegmento, periodoValoracion, "aprobador");
