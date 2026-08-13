@@ -57,7 +57,8 @@ public class SecurityConfig {
                 .accessDeniedHandler((request, response, ex) -> response.sendError(HttpStatus.FORBIDDEN.value())))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/", "/error", "/health", "/health/s3").permitAll()
+                .requestMatchers(HttpMethod.GET, "/", "/health", "/health/s3").permitAll()
+                .requestMatchers("/error").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/auth/entra/config", "/api/auth/health").permitAll()
                 .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/info").permitAll()
