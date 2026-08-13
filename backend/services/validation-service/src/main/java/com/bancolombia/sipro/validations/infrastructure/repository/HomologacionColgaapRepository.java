@@ -17,6 +17,11 @@ public interface HomologacionColgaapRepository extends JpaRepository<Homologacio
     @Query("SELECT h.cuentaSap FROM HomologacionColgaap h WHERE h.cuentaSap IN :cuentas AND h.estado = 1")
     Set<String> findExistingCuentasSap(@Param("cuentas") Collection<String> cuentas);
 
+    @Query("SELECT h.cuentaSap FROM HomologacionColgaap h WHERE h.cuentaSap IN :cuentas")
+    Set<String> findAllExistingCuentasSap(@Param("cuentas") Collection<String> cuentas);
+
+    boolean existsByCuentaSap(String cuentaSap);
+
     List<HomologacionColgaap> findAllByOrderByEstadoDescCreadoEnDesc();
 
     @Query("SELECT h FROM HomologacionColgaap h WHERE h.cuentaSap = :cuentaSap AND h.estado = 1")

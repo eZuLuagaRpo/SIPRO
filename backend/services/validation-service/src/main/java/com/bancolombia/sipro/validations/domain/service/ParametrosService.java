@@ -1211,9 +1211,9 @@ public class ParametrosService {
         String cuentaSap = trimRequerido(req.getCuentaSap(), "cuenta SAP");
         String cuentaBv  = trimRequerido(req.getCuentaBv(), "cuenta BV");
         validarFormatoHomologacion(cuentaSap, cuentaBv);
-        if (homologacionRepo.findActivaByCuentaSap(cuentaSap).isPresent()) {
+        if (homologacionRepo.existsByCuentaSap(cuentaSap)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Ya existe una cuenta activa con el código SAP '" + cuentaSap + "'.");
+                    "Ya existe una cuenta con el código SAP '" + cuentaSap + "'.");
         }
         HomologacionColgaap nueva = buildNuevaHomologacion(cuentaSap, cuentaBv, creadoPor);
         homologacionRepo.save(nueva);
@@ -1247,20 +1247,25 @@ public class ParametrosService {
         String nuevaCuentaBv  = trimRequerido(req.getCuentaBv(), "cuenta BV");
         validarFormatoHomologacion(nuevaCuentaSap, nuevaCuentaBv);
 
-        // Si cambia la cuenta SAP, verificar que no exista activa
-        if (!nuevaCuentaSap.equals(antigua.getCuentaSap())) {
+        boolean sapCambia = !nuevaCuentaSap.equals(antigua.getCuentaSap());
+
+        if (sapCambia) {
+            // Cambia el SAP: verificar que el nuevo SAP no exista como activo, luego inactivar + crear nueva fila
             if (homologacionRepo.findActivaByCuentaSap(nuevaCuentaSap).isPresent()) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                         "Ya existe una cuenta activa con el código SAP '" + nuevaCuentaSap + "'.");
             }
+            antigua.setEstado(0);
+            homologacionRepo.save(antigua);
+            HomologacionColgaap nueva = buildNuevaHomologacion(nuevaCuentaSap, nuevaCuentaBv, creadoPor);
+            homologacionRepo.save(nueva);
+            logger.info("[Homologacion] Cuenta id={} SAP modificado: {} -> {} BV={} por {}", id, antigua.getCuentaSap(), nuevaCuentaSap, nuevaCuentaBv, creadoPor);
+        } else {
+            // Solo cambia el BV: actualizar en la misma fila para no violar la constraint única de cuenta_sap
+            antigua.setCuentaBv(nuevaCuentaBv);
+            homologacionRepo.save(antigua);
+            logger.info("[Homologacion] Cuenta id={} BV actualizado: SAP={} BV={} por {}", id, antigua.getCuentaSap(), nuevaCuentaBv, creadoPor);
         }
-
-        antigua.setEstado(0);
-        homologacionRepo.save(antigua);
-
-        HomologacionColgaap nueva = buildNuevaHomologacion(nuevaCuentaSap, nuevaCuentaBv, creadoPor);
-        homologacionRepo.save(nueva);
-        logger.info("[Homologacion] Cuenta id={} modificada: SAP {} -> {} por {}", id, antigua.getCuentaSap(), nuevaCuentaSap, creadoPor);
     }
 
     @Transactional
@@ -1336,7 +1341,7 @@ public class ParametrosService {
                 .filter(d -> d.estado() == 0).map(FilaDato::cuentaSap).collect(Collectors.toSet());
 
         Set<String> existenActivas = cuentasParaActivar.isEmpty() ? Set.of()
-                : homologacionRepo.findExistingCuentasSap(cuentasParaActivar);
+                : homologacionRepo.findAllExistingCuentasSap(cuentasParaActivar);
         Set<String> existenActivasDesactivar = cuentasParaDesactivar.isEmpty() ? Set.of()
                 : homologacionRepo.findExistingCuentasSap(cuentasParaDesactivar);
 
@@ -1355,7 +1360,7 @@ public class ParametrosService {
                 }
                 if (existenActivas.contains(dato.cuentaSap())) {
                     errores.add(new HomologacionErrorFila(dato.fila(), dato.cuentaSap(),
-                            "Ya existe una cuenta activa con este código SAP. Inactívela primero."));
+                            "Ya existe una cuenta con este código SAP. No es posible crear una cuenta duplicada."));
                 }
             } else {
                 if (!existenActivasDesactivar.contains(dato.cuentaSap())) {

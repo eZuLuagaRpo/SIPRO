@@ -305,7 +305,7 @@ public class ParametrosController {
             @RequestBody ParametrosService.HomologacionCuentaRequest req) {
         parametrosService.requireParametros(principal);
         parametrosService.modificarCuentaHomologacion(id, req, String.valueOf(principal.idUsuario()));
-        return ResponseEntity.ok(Map.of("success", true, "mensaje", "Cuenta modificada correctamente. La cuenta anterior fue inactivada y se creó una nueva activa."));
+        return ResponseEntity.ok(Map.of("success", true, "mensaje", "Cuenta modificada correctamente."));
     }
 
     @PostMapping(value = "/homologacion-colgaap/carga-masiva", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

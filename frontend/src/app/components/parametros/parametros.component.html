@@ -949,7 +949,12 @@
 
               <ng-container *ngIf="homologacionModo">
                 <div *ngIf="homologacionModo === 'modificar'" class="param-alert param-alert--info" style="margin-bottom: 12px;">
-                  La cuenta anterior <strong>{{ homologacionEditandoCuentaSap }}</strong> quedará inactiva. Se creará una nueva entrada activa con los nuevos valores.
+                  <ng-container *ngIf="(homologacionForm.cuentaSap ?? '').trim() !== homologacionEditandoCuentaSap; else soloModificaBv">
+                    La cuenta anterior <strong>{{ homologacionEditandoCuentaSap }}</strong> quedará inactiva. Se creará una nueva entrada activa con los nuevos valores.
+                  </ng-container>
+                  <ng-template #soloModificaBv>
+                    Solo se actualizará la cuenta BV. La cuenta SAP <strong>{{ homologacionEditandoCuentaSap }}</strong> permanece activa.
+                  </ng-template>
                 </div>
 
                 <div class="form-group form-group--compact">
