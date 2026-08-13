@@ -1294,12 +1294,16 @@ public class ParametrosService {
 
         // Validar cabecera
         List<String> cabecera = filas.get(0);
-        if (cabecera.size() != 3
-                || !cabecera.get(0).trim().equalsIgnoreCase("cuenta_SAP")
+        if (cabecera.size() != 3) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El archivo tiene " + cabecera.size() + " columna(s). Debe tener exactamente 3: cuenta_SAP, cuenta_BV, estado.");
+        }
+        if (!cabecera.get(0).trim().equalsIgnoreCase("cuenta_SAP")
                 || !cabecera.get(1).trim().equalsIgnoreCase("cuenta_BV")
                 || !cabecera.get(2).trim().equalsIgnoreCase("estado")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "El archivo no tiene el formato esperado. La primera fila debe contener exactamente las columnas: cuenta_SAP, cuenta_BV, estado.");
+                    "Los nombres de las columnas no son correctos. Se esperan: cuenta_SAP, cuenta_BV, estado. " +
+                    "Se encontraron: " + cabecera.stream().map(String::trim).collect(java.util.stream.Collectors.joining(", ")) + ".");
         }
 
         // Leer filas de datos
@@ -1319,7 +1323,7 @@ public class ParametrosService {
             String estadoNorm = estadoStr.toLowerCase();
             if (!estadoNorm.equals("activar") && !estadoNorm.equals("inactivar")) {
                 erroresFormato.add(new HomologacionErrorFila(numFila, cuentaSap,
-                        "Estado inválido '" + estadoStr + "'. Debe ser 'Activar' o 'Inactivar'."));
+                        "La columna estado solo acepta 'Activar' o 'Inactivar'. El valor ingresado fue: '" + estadoStr + "'."));
                 continue;
             }
             datos.add(new FilaDato(numFila, cuentaSap, cuentaBv, estadoNorm.equals("activar") ? 1 : 0));
@@ -1350,22 +1354,22 @@ public class ParametrosService {
             if (dato.estado() == 1) {
                 if (dato.cuentaSap().isEmpty()) {
                     errores.add(new HomologacionErrorFila(dato.fila(), "",
-                            "La cuenta SAP no puede estar vacía."));
+                            "La cuenta SAP es obligatoria para activar una cuenta."));
                     continue;
                 }
                 if (!dato.cuentaBv().matches(PATRON_9_DIGITOS)) {
                     errores.add(new HomologacionErrorFila(dato.fila(), dato.cuentaSap(),
-                            "La cuenta BV debe contener exactamente 9 dígitos numéricos."));
+                            "La cuenta BV '" + dato.cuentaBv() + "' no es válida. Debe contener exactamente 9 dígitos numéricos."));
                     continue;
                 }
                 if (existenActivas.contains(dato.cuentaSap())) {
                     errores.add(new HomologacionErrorFila(dato.fila(), dato.cuentaSap(),
-                            "Ya existe una cuenta con este código SAP. No es posible crear una cuenta duplicada."));
+                            "Ya existe una cuenta con el código SAP '" + dato.cuentaSap() + "'. No se pueden crear cuentas duplicadas."));
                 }
             } else {
                 if (!existenActivasDesactivar.contains(dato.cuentaSap())) {
                     errores.add(new HomologacionErrorFila(dato.fila(), dato.cuentaSap(),
-                            "No existe una cuenta activa con este código SAP para inactivar."));
+                            "No se encontró ninguna cuenta activa con el código SAP '" + dato.cuentaSap() + "' para inactivar."));
                 }
             }
         }
