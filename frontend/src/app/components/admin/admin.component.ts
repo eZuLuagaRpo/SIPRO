@@ -158,7 +158,6 @@ export class AdminComponent implements OnInit, OnDestroy {
 
     this.updateDateTime();
     this.dateTimeInterval = setInterval(() => this.updateDateTime(), 60000);
-    this.fetchPublicIP();
   }
 
   ngOnDestroy(): void {
@@ -1598,19 +1597,6 @@ export class AdminComponent implements OnInit, OnDestroy {
       dateStyle: 'short',
       timeStyle: 'short'
     }).format(new Date());
-  }
-
-  private fetchPublicIP(): void {
-    fetch('https://api.ipify.org?format=json')
-      .then(res => res.json())
-      .then(data => {
-        if (data && typeof data.ip === 'string' && data.ip.trim().length > 0) {
-          this.currentIp = data.ip.trim();
-        }
-      })
-      .catch(() => {
-        this.currentIp = '127.0.0.1';
-      });
   }
 
   private logMatchesDateRange(log: AdminLogItem): boolean {

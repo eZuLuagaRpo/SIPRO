@@ -181,7 +181,6 @@ export class InicioComponent implements OnInit, OnDestroy {
     });
     this.updateDateTime();
     this.dateTimeInterval = setInterval(() => this.updateDateTime(), 60000);
-    this.fetchPublicIP();
   }
 
   ngOnDestroy(): void {
@@ -423,19 +422,6 @@ export class InicioComponent implements OnInit, OnDestroy {
     if (diffDias < 30) return `Hace ${diffDias} día${diffDias > 1 ? 's' : ''}`;
     if (diffMeses < 12) return `Hace ${diffMeses} mes${diffMeses > 1 ? 'es' : ''}`;
     return `Hace ${diffAnios} año${diffAnios > 1 ? 's' : ''}`;
-  }
-
-  private fetchPublicIP() {
-    fetch('https://api.ipify.org?format=json')
-      .then(res => res.json())
-      .then(data => {
-        if (data && typeof data.ip === 'string' && data.ip.trim().length > 0) {
-          this.currentIp = data.ip.trim();
-        }
-      })
-      .catch(() => {
-        this.currentIp = '127.0.0.1';
-      });
   }
 
   logout() {

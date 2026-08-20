@@ -49,7 +49,6 @@ export class LoginComponent implements OnInit, OnDestroy {
       sessionStorage.removeItem('sipro_logout');
       this.mostrarPantalla = true;
       this.iniciarClock();
-      this.fetchPublicIP();
       return;
     }
 
@@ -87,7 +86,6 @@ export class LoginComponent implements OnInit, OnDestroy {
         this.mostrarPantalla = true;
         if (!this.clockInterval) {
           this.iniciarClock();
-          this.fetchPublicIP();
         }
       }
     });
@@ -128,7 +126,6 @@ export class LoginComponent implements OnInit, OnDestroy {
           this.loading = false;
           this.mostrarPantalla = true;
           this.iniciarClock();
-          this.fetchPublicIP();
           return;
         }
 
@@ -140,7 +137,6 @@ export class LoginComponent implements OnInit, OnDestroy {
         this.loading = false;
         this.mostrarPantalla = true;
         this.iniciarClock();
-        this.fetchPublicIP();
       }
     });
   }
@@ -173,14 +169,4 @@ export class LoginComponent implements OnInit, OnDestroy {
     this.currentDateTime = `${diaNombre}, ${dia} de ${mesNombre} de ${anio}, ${horas}:${minutos} ${ampm}`;
   }
 
-  private fetchPublicIP(): void {
-    fetch('https://api.ipify.org?format=json')
-      .then(res => res.json())
-      .then((data: { ip?: string }) => {
-        this.currentIp = (data?.ip ?? '').trim() || 'No disponible';
-      })
-      .catch(() => {
-        this.currentIp = 'No disponible';
-      });
-  }
 }
