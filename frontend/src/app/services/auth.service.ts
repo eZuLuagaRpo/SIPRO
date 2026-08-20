@@ -366,6 +366,22 @@ export class AuthService {
   }
 
   private getEntraConfig(forceRefresh = false): Observable<EntraConfigResponse> {
+    const envClientId = environment.azureClientId?.trim();
+    const envTenantId = environment.azureTenantId?.trim();
+
+    if (envClientId && envTenantId) {
+      const config: EntraConfigResponse = {
+        enabled: true,
+        clientId: envClientId,
+        tenantId: envTenantId,
+        apiScope: environment.azureApiScope?.trim() || '',
+        apiAudience: `api://${envClientId}`
+      };
+      this.cachedEntraConfig = config;
+      sessionStorage.setItem(AuthService.ENTRA_CONFIG_STORAGE_KEY, JSON.stringify(config));
+      return of(config);
+    }
+
     if (!forceRefresh && this.isUsableEntraConfig(this.cachedEntraConfig)) {
       return of(this.cachedEntraConfig as EntraConfigResponse);
     }
