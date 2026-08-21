@@ -184,6 +184,12 @@ sipro:
       default-query-limit: ${APP_ADMIN_LOGS_DEFAULT_QUERY_LIMIT:500}
       max-query-limit: ${APP_ADMIN_LOGS_MAX_QUERY_LIMIT:5000}
 
+# Credenciales de BD principal vía Secrets Manager (vacío en local → usa DB_USER/DB_PASS)
+db:
+  secrets:
+    name: ${DB_SECRETS_NAME:}
+    region: ${DB_SECRETS_REGION:us-east-1}
+
 # 2. CONFIGURACIÓN TÉCNICA DE CONEXIÓN LZ (Impala On-Prem - Solo Lectura)
 #    LzJdbcService construye la URL JDBC dinamicamente:
 #      jdbc:impala://host:port;AuthMech=3;KrbHostFQDN=host;...

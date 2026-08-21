@@ -31,8 +31,6 @@ spring:
       max-request-size: 300MB
   datasource:
     url: '#{JDBC_URL}#'
-    username: '#{DB_USER}#'
-    password: '#{DB_PASS}#'
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 30
@@ -180,6 +178,12 @@ sipro:
     banner-resource-path: classpath:static/email-assets/SIPRO_BannerCorreo.png
     outlook-powershell-path: powershell.exe
     log-preview: false
+
+# Credenciales de BD principal — inyectadas por DbSecretsPostProcessor al arrancar
+db:
+  secrets:
+    name: '#{DB_SECRETS_NAME}#'
+    region: '#{DB_SECRETS_REGION}#'
 
 lz:
   # Host tokenizado: DEV/QA usan 10.8.85.237, PDN usa impala.bancolombia.corp

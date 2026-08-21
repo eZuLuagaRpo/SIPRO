@@ -38,7 +38,7 @@ import java.util.Map;
  * NO corre en PDN — excluido por @Profile({"dev", "qa"}).
  */
 @Component
-@Profile({"dev", "qa"})
+// @Profile({"dev", "qa"})
 @Order(2)
 public class LzDevSeedService implements ApplicationRunner {
 

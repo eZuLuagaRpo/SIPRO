@@ -39,7 +39,7 @@ import java.util.List;
  *   WHERE nombre_columna IN ('CLASEGTIA', 'CALIFICPUC');
  */
 @Component
-@Profile("dev")
+// @Profile("dev")
 @Order(3)
 public class CreffosDevSeedService implements ApplicationRunner {
 
