@@ -37,7 +37,7 @@ import java.util.TreeSet;
  * Siembra archivos XLSX de apoyo para la maqueta del panel admin en entorno local.
  */
 @Service
-// @Profile("dev")
+@Profile("dev")
 public class AdminDashboardDevSeedService {
 
     private static final Logger logger = LoggerFactory.getLogger(AdminDashboardDevSeedService.class);
