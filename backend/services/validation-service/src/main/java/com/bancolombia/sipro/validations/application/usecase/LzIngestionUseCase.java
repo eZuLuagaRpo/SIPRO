@@ -71,6 +71,7 @@ public class LzIngestionUseCase {
     private static final int DEFAULT_LZ_INGESTION_MAX_ROWS = 0;
     private static final int DEFAULT_LZ_INGESTION_STALE_RUN_TIMEOUT_MINUTES = 60;
     private static final long DEFAULT_MINIMUM_EXPECTED_ROWS = 100;
+    private static final int DEFAULT_LZ_INGESTION_GUARD_DAYS = 7;
     private static final Set<String> REQUIRED_LZ_COLUMNS = Set.of(
         "llave_mdm", "year", "month", "day"
     );
@@ -152,27 +153,30 @@ public class LzIngestionUseCase {
         //    Cubre: usuario limpio manualmente sipro_lz_ingestion_run.
         cleanOrphanedData(param);
 
-        // 3. Guard mensual
+        // 3. Guard por dias: evita re-ingestas innecesarias si ya hubo SUCCESS reciente.
+        //    LZ_INGESTION_GUARD_DAYS controla el intervalo minimo (default 7 dias).
         if (!req.isForceOverwrite()) {
-            Optional<SiproLzIngestionRun> existing = runRepo.findSuccess(idTabla, year, month);
-            if (existing.isPresent()) {
-                log.info("Guard: ya existe SUCCESS run_id={} para {}/{}-{}. SKIP.",
-                    existing.get().getRunId(), tablaCatalogo, year, month);
+            int guardDays = parametroUnicoService.getInt("LZ_INGESTION_GUARD_DAYS", DEFAULT_LZ_INGESTION_GUARD_DAYS);
+            Integer recentSuccess = pg.queryForObject(
+                "SELECT COUNT(*) FROM sipro_lz_ingestion_run "
+                + "WHERE id_tabla = ? AND status = 'SUCCESS' "
+                + "AND ended_at >= now() - make_interval(days => ?)",
+                Integer.class, idTabla, guardDays);
+            if (recentSuccess != null && recentSuccess > 0) {
+                log.info("Guard: ya existe SUCCESS en los ultimos {} dias para {}. SKIP.", guardDays, tablaCatalogo);
                 return LzIngestionResponse.skipped(
-                    "Ya existe ejecucion exitosa run_id=" + existing.get().getRunId()
-                    + " para " + tablaCatalogo + " periodo " + year + "/" + month
+                    "Ya existe ejecucion exitosa en los ultimos " + guardDays + " dias para " + tablaCatalogo
                     + ". Usa forceOverwrite=true para repetir.");
             }
         }
 
-        // No se deja correr el mismo periodo en paralelo porque dos procesos podrían
-        // limpiarse o promoverse entre sí y dejar resultados mezclados.
-        String lockKey = tablaCatalogo + "(id_tabla=" + idTabla + "):" + year + ":" + month;
+        // No se deja correr la misma tabla en paralelo porque dos procesos podrian
+        // limpiarse o promoverse entre si y dejar resultados mezclados.
+        String lockKey = tablaCatalogo + "(id_tabla=" + idTabla + ")";
         Integer startedCount = pg.queryForObject(
             "SELECT COUNT(*) FROM sipro_lz_ingestion_run "
-            + "WHERE id_tabla = ? AND period_year = ? AND period_month = ? "
-            + "AND status = 'STARTED'",
-            Integer.class, idTabla, year, month);
+            + "WHERE id_tabla = ? AND status = 'STARTED'",
+            Integer.class, idTabla);
         if (startedCount != null && startedCount > 0) {
             log.warn("Guard concurrencia: ya hay {} run(s) STARTED para {}", startedCount, lockKey);
             return LzIngestionResponse.skipped(
@@ -591,20 +595,17 @@ public class LzIngestionUseCase {
         allCols.add("inserted_at");
         String columns = String.join(", ", allCols);
 
-        // Se borra primero y se inserta después dentro de la misma transacción para que el
-        // periodo quede siempre en un estado consistente: viejo completo o nuevo completo.
-        int prevDeleted = pg.update(
-            "DELETE FROM " + finalTable + " WHERE period_year = ? AND period_month = ?",
-            year, month);
-        log.info("Final: borradas {} filas previas del periodo {}/{}", prevDeleted, year, month);
+        // Reemplazo total: borra TODA la tabla y la repuebla con la ultima ingesta de LZ.
+        // La query_sql ya filtra solo la ultima ingesta (max year/month/day en LZ).
+        int prevDeleted = pg.update("DELETE FROM " + finalTable);
+        log.info("Final: borradas {} filas previas (reemplazo total)", prevDeleted);
 
         // INSERT desde staging SOLO para ESTE run_id, con columnas explicitas
         String sql = "INSERT INTO " + finalTable + " (" + columns + ") "
             + "SELECT " + columns + " FROM " + stgTable
-            + " WHERE ingestion_run_id = ? AND period_year = ? AND period_month = ?";
-        int inserted = pg.update(sql, runId, year, month);
-        log.info("Final: insertadas {} filas en {} run_id={} periodo {}/{}",
-            inserted, finalTable, runId, year, month);
+            + " WHERE ingestion_run_id = ?";
+        int inserted = pg.update(sql, runId);
+        log.info("Final: insertadas {} filas en {} run_id={}", inserted, finalTable, runId);
         return (long) inserted;
     }
 
