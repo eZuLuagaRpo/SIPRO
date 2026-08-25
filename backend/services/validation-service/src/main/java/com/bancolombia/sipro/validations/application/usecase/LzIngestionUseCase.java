@@ -655,9 +655,10 @@ public class LzIngestionUseCase {
         String columns = String.join(", ", allCols);
 
         // Reemplazo total: borra TODA la tabla y la repuebla con la ultima ingesta de LZ.
-        // La query_sql ya filtra solo la ultima ingesta (max year/month/day en LZ).
-        int prevDeleted = pg.update("DELETE FROM " + finalTable);
-        log.info("Final: borradas {} filas previas (reemplazo total)", prevDeleted);
+        // TRUNCATE es equivalente a DELETE sin WHERE pero no genera WAL por fila → mucho mas rapido.
+        // Es transaccional en PostgreSQL: si el INSERT falla, el TRUNCATE se revierte automaticamente.
+        pg.execute("TRUNCATE TABLE " + finalTable);
+        log.info("Final: tabla {} truncada (reemplazo total)", finalTable);
 
         // INSERT desde staging SOLO para ESTE run_id, con columnas explicitas
         String sql = "INSERT INTO " + finalTable + " (" + columns + ") "
