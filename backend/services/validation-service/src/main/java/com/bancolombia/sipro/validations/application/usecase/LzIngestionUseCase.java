@@ -271,7 +271,7 @@ public class LzIngestionUseCase {
 
         } catch (Exception e) {
             log.error("RUN FAILED id={}: {}", run.getRunId(), e.getMessage(), e);
-            run.markFailed(e.getMessage());
+            run.markFailed(sanitizeStr(e.getMessage()));
             runRepo.save(run);
 
             // Limpiar datos parciales de STG para este run
@@ -572,11 +572,23 @@ public class LzIngestionUseCase {
         return inserted;
     }
 
-    // Elimina caracteres de control ASCII (0x00-0x1F) y C1 (0x80-0x9F) que PostgreSQL
-    // en encoding WIN1252 rechaza cuando vienen codificados como UTF-8 desde Impala.
+    // La BD PostgreSQL esta en encoding WIN1252. Cualquier caracter sin equivalente
+    // en WIN1252 (U+FFFD, U+0091, etc.) es rechazado al hacer INSERT/UPDATE.
+    // Se verifica caracter a caracter con el encoder de WIN1252 para cubrir cualquier caso.
+    private static final java.nio.charset.CharsetEncoder WIN1252_ENCODER =
+        java.nio.charset.Charset.forName("windows-1252").newEncoder();
+
+    private static String sanitizeStr(String s) {
+        if (s == null || s.isEmpty()) return s;
+        StringBuilder sb = new StringBuilder(s.length());
+        for (char c : s.toCharArray()) {
+            if (WIN1252_ENCODER.canEncode(c)) sb.append(c);
+        }
+        return sb.toString();
+    }
+
     private static Object sanitizeForPg(Object value) {
-        if (!(value instanceof String s)) return value;
-        return s.replaceAll("[\u0000-\u001F\u0080-\u009F]", "");
+        return (value instanceof String s) ? sanitizeStr(s) : value;
     }
 
     // ── Promocion STG → Final ────────────────────────────────────────────────
