@@ -1,4 +1,4 @@
-package com.bancolombia.sipro.validations.application.usecase;
+﻿package com.bancolombia.sipro.validations.application.usecase;
 
 import com.bancolombia.sipro.validations.application.dto.LzIngestionRequest;
 import com.bancolombia.sipro.validations.application.dto.LzIngestionResponse;
@@ -561,7 +561,7 @@ public class LzIngestionUseCase {
             args[1] = month;
             args[2] = runId;
             for (int i = 0; i < colsNegocio.size(); i++) {
-                args[3 + i] = row.get(colsNegocio.get(i));
+                args[3 + i] = sanitizeForPg(row.get(colsNegocio.get(i)));
             }
             batch.add(args);
         }
@@ -570,6 +570,13 @@ public class LzIngestionUseCase {
         long inserted = Arrays.stream(counts).asLongStream().sum();
         log.info("Staging: insertadas {} filas en {} para run_id={}", inserted, stgTable, runId);
         return inserted;
+    }
+
+    // Elimina caracteres de control ASCII (0x00-0x1F) y C1 (0x80-0x9F) que PostgreSQL
+    // en encoding WIN1252 rechaza cuando vienen codificados como UTF-8 desde Impala.
+    private static Object sanitizeForPg(Object value) {
+        if (!(value instanceof String s)) return value;
+        return s.replaceAll("[\u0000-\u001F\u0080-\u009F]", "");
     }
 
     // ── Promocion STG → Final ────────────────────────────────────────────────
