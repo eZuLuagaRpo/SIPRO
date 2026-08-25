@@ -56,6 +56,12 @@ public class LzJdbcService {
     @Value("${lz.ssl.truststore-type:${LZ_TRUSTSTORE_TYPE:JKS}}")
     private String truststoreType;
 
+    @Value("${lz.connect-timeout:120}")
+    private int connectTimeoutSeconds;
+
+    @Value("${lz.socket-timeout:1800}")
+    private int socketTimeoutSeconds;
+
     private final LzSecretsService secretsService;
     private Path resolvedTruststorePath;
 
@@ -167,9 +173,9 @@ public class LzJdbcService {
             "jdbc:impala://%s:%d;"
             + "AuthMech=3;"
             + "SSL=1;AllowSelfSignedCerts=1;"
-            + "ConnectTimeout=30;SocketTimeout=120;"
+            + "ConnectTimeout=%d;SocketTimeout=%d;"
             + "UID=%s;PWD=%s",
-            lzHost, lzPort, user, password
+            lzHost, lzPort, connectTimeoutSeconds, socketTimeoutSeconds, user, password
         );
     }
 
@@ -213,7 +219,7 @@ public class LzJdbcService {
 
         // Segundo cinturón de seguridad: si la red corporativa no responde o el driver
         // se queda esperando más de la cuenta, este timeout evita que el intento quede colgado.
-        DriverManager.setLoginTimeout(35);
+        DriverManager.setLoginTimeout(connectTimeoutSeconds);
 
         List<Map<String, Object>> rows = new ArrayList<>();
 
@@ -276,7 +282,7 @@ public class LzJdbcService {
             throw new IllegalStateException("Driver Impala no encontrado.", e);
         }
 
-        DriverManager.setLoginTimeout(35);
+        DriverManager.setLoginTimeout(connectTimeoutSeconds);
 
         try (Connection conn = openConnection(fullUrl);
              Statement  stmt = conn.createStatement();
@@ -319,7 +325,7 @@ public class LzJdbcService {
             throw new IllegalStateException("Driver Impala no encontrado.", e);
         }
 
-        DriverManager.setLoginTimeout(35);
+        DriverManager.setLoginTimeout(connectTimeoutSeconds);
 
         try (Connection conn = openConnection(fullUrl);
              Statement  stmt = conn.createStatement()) {
@@ -327,6 +333,91 @@ public class LzJdbcService {
             log.info("DDL/DML ejecutado OK en LZ");
         } catch (SQLException e) {
             throw new RuntimeException("Error ejecutando DDL/DML en LZ: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Interfaz funcional para procesar lotes de filas leidas desde LZ.
+     * Usada por executeQueryStreaming para evitar cargar todo en memoria.
+     */
+    @FunctionalInterface
+    public interface LzBatchConsumer {
+        void accept(List<Map<String, Object>> batch);
+    }
+
+    /**
+     * Ejecuta un SELECT en LZ y procesa las filas por lotes sin cargarlas todas en memoria.
+     * Util para volumenes grandes (millones de filas): cada lote se procesa y descarta
+     * antes de leer el siguiente.
+     *
+     * @param sql        Query completa a ejecutar en Impala
+     * @param batchSize  Filas por lote (recomendado: 5000-10000)
+     * @param consumer   Callback invocado por cada lote; puede lanzar RuntimeException
+     * @return total de filas leidas
+     */
+    public long executeQueryStreaming(String sql, int batchSize, LzBatchConsumer consumer) {
+        if (!isEnabled()) {
+            throw new IllegalStateException("LZ no configurado: lz.host esta vacio.");
+        }
+
+        Map<String, String> creds = secretsService.getLzCredentials();
+        String fullUrl = buildJdbcUrl(creds.get("user"), creds.get("password"));
+
+        log.info("Conectando a LZ (streaming) [{}:{}] usuario={}", lzHost, lzPort, creds.get("user"));
+        log.debug("SQL streaming: {}", sql);
+
+        try {
+            Class.forName(DRIVER);
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException("Driver Impala no encontrado.", e);
+        }
+
+        DriverManager.setLoginTimeout(connectTimeoutSeconds);
+
+        long totalRows = 0;
+        try (Connection conn = openConnection(fullUrl)) {
+            log.info("Conexion LZ (streaming) establecida OK");
+
+            try (Statement stmt = conn.createStatement()) {
+                stmt.setFetchSize(Math.min(batchSize, 1000));
+                log.info("Ejecutando query streaming en Impala (lote={} filas)...", batchSize);
+
+                try (ResultSet rs = stmt.executeQuery(sql)) {
+                    ResultSetMetaData meta = rs.getMetaData();
+                    int cols = meta.getColumnCount();
+                    List<String> colNames = new ArrayList<>();
+                    for (int i = 1; i <= cols; i++) {
+                        colNames.add(meta.getColumnName(i).toLowerCase());
+                    }
+
+                    List<Map<String, Object>> batch = new ArrayList<>(batchSize);
+                    while (rs.next()) {
+                        Map<String, Object> row = new LinkedHashMap<>();
+                        for (int i = 1; i <= cols; i++) {
+                            row.put(colNames.get(i - 1), rs.getObject(i));
+                        }
+                        batch.add(row);
+
+                        if (batch.size() >= batchSize) {
+                            consumer.accept(batch);
+                            totalRows += batch.size();
+                            log.info("  ... {} filas procesadas de LZ", totalRows);
+                            batch = new ArrayList<>(batchSize);
+                        }
+                    }
+
+                    if (!batch.isEmpty()) {
+                        consumer.accept(batch);
+                        totalRows += batch.size();
+                    }
+                }
+            }
+
+            log.info("LZ streaming completo: {} filas en total", totalRows);
+            return totalRows;
+
+        } catch (SQLException e) {
+            throw new RuntimeException("Error ejecutando query streaming en LZ: " + e.getMessage(), e);
         }
     }
 

@@ -209,5 +209,8 @@ lz:
     truststore-password: '#{LZ_TRUSTSTORE_PWD}#'
     truststore-type: JKS
 
+  connect-timeout: 120
+  socket-timeout: 1800
+
   ingestion:
     validate-on-startup: true

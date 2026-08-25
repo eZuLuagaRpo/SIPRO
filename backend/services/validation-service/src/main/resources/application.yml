@@ -208,6 +208,10 @@ lz:
     # Nombre del secreto. JSON esperado: {"user":"...","password":"..."}
     name:     ${LZ_SECRETS_NAME:lz/creds}
 
+  # Timeouts de conexion JDBC a Impala (segundos)
+  connect-timeout: ${LZ_CONNECT_TIMEOUT:120}
+  socket-timeout:  ${LZ_SOCKET_TIMEOUT:1800}
+
   ingestion:
     # Ejecutar validacion de secrets al arrancar el backend.
     validate-on-startup: ${LZ_VALIDATE_ON_STARTUP:true}

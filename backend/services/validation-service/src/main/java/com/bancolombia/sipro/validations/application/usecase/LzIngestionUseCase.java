@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 /**
@@ -72,6 +74,7 @@ public class LzIngestionUseCase {
     private static final int DEFAULT_LZ_INGESTION_STALE_RUN_TIMEOUT_MINUTES = 60;
     private static final long DEFAULT_MINIMUM_EXPECTED_ROWS = 100;
     private static final int DEFAULT_LZ_INGESTION_GUARD_DAYS = 7;
+    private static final int LZ_STREAMING_BATCH_SIZE = 5_000;
     private static final Set<String> REQUIRED_LZ_COLUMNS = Set.of(
         "llave_mdm", "year", "month", "day"
     );
@@ -218,19 +221,28 @@ public class LzIngestionUseCase {
                     maxRows, maxRows, totalLzCount);
             }
 
-            // 7. Extraer desde LZ (con LIMIT si maxRows > 0)
-            log.info("Ejecutando SELECT en LZ: {}", sql);
-            List<Map<String, Object>> lzRows = lzJdbc.executeQuery(sql);
-            List<String> businessColumns = resolveBusinessColumns(param, stgTable, lzRows);
-            long lzCount = lzRows.size();
-            run.setLzRowCount(lzCount);
-            runRepo.save(run);
-
-            // 8. Limpiar STG para este run_id antes de insertar
+            // 7-9. Limpiar STG y cargar desde LZ en streaming (5000 filas/lote, sin cargar todo en memoria)
             cleanStagingForRun(param, run.getRunId());
 
-            // 9. Cargar a staging
-            long stgCount = loadToStaging(param, lzRows, businessColumns, run.getRunId(), year, month);
+            Long runId = run.getRunId();
+            AtomicReference<List<String>> businessColsRef = new AtomicReference<>();
+            AtomicLong stgCountRef = new AtomicLong();
+
+            log.info("Ejecutando SELECT streaming en LZ: {}", sql);
+            long lzCount = lzJdbc.executeQueryStreaming(sql, LZ_STREAMING_BATCH_SIZE, batch -> {
+                if (businessColsRef.get() == null) {
+                    businessColsRef.set(resolveBusinessColumns(param, stgTable, batch));
+                }
+                stgCountRef.addAndGet(loadToStaging(param, batch, businessColsRef.get(), runId, year, month));
+            });
+
+            if (businessColsRef.get() == null) {
+                throw new IllegalStateException("La query en LZ no devolvio filas — revisa query_sql en sipro_parametros_tablas_lz.");
+            }
+            List<String> businessColumns = businessColsRef.get();
+            long stgCount = stgCountRef.get();
+
+            run.setLzRowCount(lzCount);
             run.setPgStgRowCount(stgCount);
             runRepo.save(run);
 
