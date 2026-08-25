@@ -174,6 +174,7 @@ public class LzJdbcService {
             + "AuthMech=3;"
             + "SSL=1;AllowSelfSignedCerts=1;"
             + "ConnectTimeout=%d;SocketTimeout=%d;"
+            + "QueryTimeout=0;"
             + "UID=%s;PWD=%s",
             lzHost, lzPort, connectTimeoutSeconds, socketTimeoutSeconds, user, password
         );
@@ -380,6 +381,7 @@ public class LzJdbcService {
 
             try (Statement stmt = conn.createStatement()) {
                 stmt.setFetchSize(Math.min(batchSize, 1000));
+                stmt.setQueryTimeout(0);
                 log.info("Ejecutando query streaming en Impala (lote={} filas)...", batchSize);
 
                 try (ResultSet rs = stmt.executeQuery(sql)) {

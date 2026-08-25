@@ -575,14 +575,15 @@ public class LzIngestionUseCase {
     // La BD PostgreSQL esta en encoding WIN1252. Cualquier caracter sin equivalente
     // en WIN1252 (U+FFFD, U+0091, etc.) es rechazado al hacer INSERT/UPDATE.
     // Se verifica caracter a caracter con el encoder de WIN1252 para cubrir cualquier caso.
-    private static final java.nio.charset.CharsetEncoder WIN1252_ENCODER =
-        java.nio.charset.Charset.forName("windows-1252").newEncoder();
+    private static final java.nio.charset.Charset WIN1252 =
+        java.nio.charset.Charset.forName("windows-1252");
 
     private static String sanitizeStr(String s) {
         if (s == null || s.isEmpty()) return s;
+        java.nio.charset.CharsetEncoder encoder = WIN1252.newEncoder();
         StringBuilder sb = new StringBuilder(s.length());
         for (char c : s.toCharArray()) {
-            if (WIN1252_ENCODER.canEncode(c)) sb.append(c);
+            if (encoder.canEncode(c)) sb.append(c);
         }
         return sb.toString();
     }
