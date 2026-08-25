@@ -74,7 +74,7 @@ public class LzIngestionUseCase {
     private static final int DEFAULT_LZ_INGESTION_STALE_RUN_TIMEOUT_MINUTES = 60;
     private static final long DEFAULT_MINIMUM_EXPECTED_ROWS = 100;
     private static final int DEFAULT_LZ_INGESTION_GUARD_DAYS = 7;
-    private static final int LZ_STREAMING_BATCH_SIZE = 5_000;
+    private static final int LZ_STREAMING_BATCH_SIZE = 15_000;
     private static final Set<String> REQUIRED_LZ_COLUMNS = Set.of(
         "llave_mdm", "year", "month", "day"
     );
@@ -221,20 +221,39 @@ public class LzIngestionUseCase {
                     maxRows, maxRows, totalLzCount);
             }
 
-            // 7-9. Limpiar STG y cargar desde LZ en streaming (5000 filas/lote, sin cargar todo en memoria)
+            // 7-9. Limpiar STG y cargar desde LZ en streaming por chunks (sin cargar todo en memoria)
             cleanStagingForRun(param, run.getRunId());
 
             Long runId = run.getRunId();
             AtomicReference<List<String>> businessColsRef = new AtomicReference<>();
             AtomicLong stgCountRef = new AtomicLong();
 
-            log.info("Ejecutando SELECT streaming en LZ: {}", sql);
-            long lzCount = lzJdbc.executeQueryStreaming(sql, LZ_STREAMING_BATCH_SIZE, batch -> {
-                if (businessColsRef.get() == null) {
-                    businessColsRef.set(resolveBusinessColumns(param, stgTable, batch));
+            int    chunkCount = parametroUnicoService.getInt("LZ_INGESTION_CHUNK_COUNT", 1);
+            String chunkCol   = parametroUnicoService.getString("LZ_INGESTION_CHUNK_COLUMN", "llave_mdm");
+
+            if (chunkCount > 1) {
+                log.info("Chunking habilitado: {} chunks sobre columna '{}'. SQL base: {}", chunkCount, chunkCol, sql);
+            } else {
+                log.info("Ejecutando SELECT streaming en LZ: {}", sql);
+            }
+
+            long lzCount = 0;
+            for (int chunk = 0; chunk < chunkCount; chunk++) {
+                String chunkSql = buildChunkSql(sql, chunkCol, chunk, chunkCount);
+                if (chunkCount > 1) {
+                    log.info("Iniciando chunk {}/{} en LZ", chunk + 1, chunkCount);
                 }
-                stgCountRef.addAndGet(loadToStaging(param, batch, businessColsRef.get(), runId, year, month));
-            });
+                long chunkRows = lzJdbc.executeQueryStreaming(chunkSql, LZ_STREAMING_BATCH_SIZE, batch -> {
+                    if (businessColsRef.get() == null) {
+                        businessColsRef.set(resolveBusinessColumns(param, stgTable, batch));
+                    }
+                    stgCountRef.addAndGet(loadToStaging(param, batch, businessColsRef.get(), runId, year, month));
+                });
+                lzCount += chunkRows;
+                if (chunkCount > 1) {
+                    log.info("Chunk {}/{} completado: {} filas (acumulado: {})", chunk + 1, chunkCount, chunkRows, lzCount);
+                }
+            }
 
             if (businessColsRef.get() == null) {
                 throw new IllegalStateException("La query en LZ no devolvio filas — revisa query_sql en sipro_parametros_tablas_lz.");
@@ -451,6 +470,14 @@ public class LzIngestionUseCase {
         return sql.replaceAll(
             "(?i)EXTRACT\\(\\s*" + extractPart + "\\s+FROM\\s+NOW\\(\\)\\s*\\)",
             impalaFunction + "(now())");
+    }
+
+    private String buildChunkSql(String baseSql, String chunkColumn, int chunkIndex, int totalChunks) {
+        if (totalChunks <= 1) return baseSql;
+        return String.format(
+            "SELECT * FROM (%s) _lz_chunk WHERE pmod(fnv_hash(COALESCE(CAST(%s AS STRING), '')), %d) = %d",
+            baseSql, chunkColumn, totalChunks, chunkIndex
+        );
     }
 
     private String buildLzCountQuery(SiproParametroTablaLz param) {
