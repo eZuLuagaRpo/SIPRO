@@ -166,6 +166,11 @@ public class ConsolidacionManualAsyncService {
             response.setTerminal(true);
             response.setExito(false);
             response.setMensaje("La consolidación terminó con error para el periodo " + response.getPeriodo() + ".");
+        } else if ("ELIMINADA".equalsIgnoreCase(estado)) {
+            response.setTerminal(true);
+            response.setExito(false);
+            response.setFase2EnCurso(false);
+            response.setMensaje("La consolidación del periodo " + response.getPeriodo() + " fue eliminada por un administrador.");
         } else {
             response.setTerminal(false);
             response.setExito(false);

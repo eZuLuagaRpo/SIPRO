@@ -150,7 +150,13 @@ public class AdminConsolidacionService {
         } while (eliminadosLote > 0);
 
         int archivosEliminados = consolidacionArchivoRepository.deleteByIdConsolidacion(cabecera.getIdConsolidacion());
-        consolidacionRepository.delete(cabecera);
+
+        // Soft-delete: mantiene la cabecera como "tombstone" con estado ELIMINADA.
+        // Esto impide que el scheduler automático re-consolide el periodo al detectar
+        // que las planillas siguen aprobadas pero no hay consolidación activa.
+        cabecera.setEstadoConsolidacion("ELIMINADA");
+        cabecera.setModificadoEn(OffsetDateTime.now());
+        consolidacionRepository.save(cabecera);
         consolidacionRepository.flush();
 
         return new DbDeleteSummary(registrosEliminados, archivosEliminados);

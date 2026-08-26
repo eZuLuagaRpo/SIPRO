@@ -29,7 +29,7 @@ public class ConsolidacionPlanillasService {
     private static final Long SISTEMA_USUARIO_ID = 1L;
     private static final Long SEGMENTO_COLGAAP_MODIFICADO_ID = 1L;
     private static final List<String> ESTADOS_EN_PROCESO = List.of("INICIADO", "EN_PROCESO");
-    private static final List<String> ESTADOS_NO_DUPLICABLES = List.of("COMPLETADO", "COMPLETADO_CON_ADVERTENCIAS", "INICIADO", "EN_PROCESO");
+    private static final List<String> ESTADOS_NO_DUPLICABLES = List.of("COMPLETADO", "COMPLETADO_CON_ADVERTENCIAS", "INICIADO", "EN_PROCESO", "ELIMINADA");
     private static final List<String> ESTADOS_COMPLETADOS = List.of("COMPLETADO", "COMPLETADO_CON_ADVERTENCIAS");
     private static final long DEFAULT_POST_CLOSE_DELAY_HOURS = 1L;
     private static final long DEFAULT_MAX_POST_CLOSE_DAYS = 5L;
