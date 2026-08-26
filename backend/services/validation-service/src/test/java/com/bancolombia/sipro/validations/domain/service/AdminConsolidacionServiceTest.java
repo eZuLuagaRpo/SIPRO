@@ -103,7 +103,6 @@ class AdminConsolidacionServiceTest {
         when(fileStorageService.listObjects("consolidados/2026-05-31/")).thenReturn(List.of());
         when(fileStorageService.getAbsolutePath("consolidados/2026-05-31/")).thenReturn(Path.of("C:/tmp/consolidados/2026-05-31"));
         when(parametroUnicoService.getString("CREFFSOS_RUTA_SALIDA", "")).thenReturn("");
-        doNothing().when(consolidacionRepository).delete(cabecera);
         doNothing().when(consolidacionRepository).flush();
 
         AdminDeleteConsolidacionResponse response = service.eliminarConsolidacion(
