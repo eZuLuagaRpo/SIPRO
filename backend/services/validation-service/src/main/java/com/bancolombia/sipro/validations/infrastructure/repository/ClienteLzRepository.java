@@ -29,12 +29,16 @@ public interface ClienteLzRepository extends JpaRepository<SiproLzMdmCliente, Si
     long countByPeriod(@Param("year") int year, @Param("month") int month);
 
     /**
-     * Busca los NITs (numeroid_externo) que SÍ existen en la tabla para un periodo y conjunto dados.
+     * Busca los NITs (numero_id) que SÍ existen en la tabla para un periodo y conjunto dados.
      * Retorna solo los que existen; los ausentes en el resultado son los que no cruzan.
+     * TRIM en ambos lados para manejar espacios que puedan venir del MDM o del Excel.
      */
-    @Query("SELECT DISTINCT c.numeroidExterno FROM SiproLzMdmCliente c " +
-           "WHERE c.periodYear = :year AND c.periodMonth = :month " +
-           "AND c.numeroidExterno IN :nits")
+    @Query(value = """
+            SELECT DISTINCT TRIM(c.numero_id)
+            FROM sipro_lz_mdm_datos_generales_clientes c
+            WHERE c.period_year = :year AND c.period_month = :month
+            AND TRIM(c.numero_id) IN :nits
+            """, nativeQuery = true)
     Set<String> findExistingNits(@Param("year") int year,
                                   @Param("month") int month,
                                   @Param("nits") Collection<String> nits);
