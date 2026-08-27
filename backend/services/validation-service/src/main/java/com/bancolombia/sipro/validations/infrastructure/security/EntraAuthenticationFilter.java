@@ -20,7 +20,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Valida el bearer token de Entra ID para todos los endpoints protegidos.
@@ -29,8 +28,6 @@ import java.util.Set;
 public class EntraAuthenticationFilter extends OncePerRequestFilter {
 
     private static final Logger logger = LoggerFactory.getLogger(EntraAuthenticationFilter.class);
-    private static final String GRAPH_ACCESS_TOKEN_HEADER = "X-Graph-Access-Token";
-
     private static final List<RequestMatcher> PUBLIC_MATCHERS = List.of(
             new AntPathRequestMatcher("/", "GET"),
             new AntPathRequestMatcher("/error"),
@@ -45,14 +42,11 @@ public class EntraAuthenticationFilter extends OncePerRequestFilter {
 
     private final EntraIdTokenService entraIdTokenService;
     private final LocalUserProvisioningService localUserProvisioningService;
-    private final MicrosoftGraphDirectoryService microsoftGraphDirectoryService;
 
     public EntraAuthenticationFilter(EntraIdTokenService entraIdTokenService,
-                                     LocalUserProvisioningService localUserProvisioningService,
-                                     MicrosoftGraphDirectoryService microsoftGraphDirectoryService) {
+                                     LocalUserProvisioningService localUserProvisioningService) {
         this.entraIdTokenService = entraIdTokenService;
         this.localUserProvisioningService = localUserProvisioningService;
-        this.microsoftGraphDirectoryService = microsoftGraphDirectoryService;
     }
 
     @Override
@@ -80,21 +74,6 @@ public class EntraAuthenticationFilter extends OncePerRequestFilter {
             UsuarioLogin usuario = localUserProvisioningService.findExistingUser(entraUser)
                     .orElseThrow(() -> new IllegalArgumentException("Debes iniciar sesión en SIPRO antes de consumir APIs protegidas"));
 
-            Set<String> gruposAd = entraUser.groupNames();
-            String graphAccessToken = request.getHeader(GRAPH_ACCESS_TOKEN_HEADER);
-            if (graphAccessToken != null && !graphAccessToken.isBlank()) {
-            try {
-                gruposAd = microsoftGraphDirectoryService.resolveCurrentUserGroupNamesCached(
-                    entraUser.objectId(),
-                    graphAccessToken,
-                    entraUser.groupNames(),
-                    entraUser.groupsOverage());
-            } catch (Exception ex) {
-                logger.warn("No se pudieron refrescar grupos delegados para usuario {}. Se usarán claims del token. Motivo: {}",
-                    usuario.getIdUsuario(), ex.getMessage());
-            }
-            }
-
             SiproAuthenticatedUser principal = new SiproAuthenticatedUser(
                     usuario.getIdUsuario(),
                     usuario.getUsuario(),
@@ -102,8 +81,9 @@ public class EntraAuthenticationFilter extends OncePerRequestFilter {
                     entraUser.preferredUsername(),
                     entraUser.email(),
                     entraUser.objectId(),
-                gruposAd,
-                    entraUser.groupsOverage());
+                    entraUser.groupNames(),
+                    entraUser.groupsOverage(),
+                    entraUser.roles());
 
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                     principal,

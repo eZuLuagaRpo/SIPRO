@@ -59,7 +59,6 @@ public class MicrosoftGraphDirectoryService {
         Map<String, Object> manager = getOptionalMap(headers,
                 GRAPH_BASE_URL + "/me/manager?$select=id,displayName,mail,userPrincipalName,jobTitle");
 
-        Set<String> groups = resolveCurrentUserGroupNames(graphAccessToken, entraUser.groupNames(), entraUser.groupsOverage());
         String displayName = firstNonBlank(asString(profile.get("displayName")), entraUser.displayName());
         String email = firstNonBlank(asString(profile.get("mail")), asString(profile.get("userPrincipalName")), entraUser.email());
         String managerName = manager == null ? null : asString(manager.get("displayName"));
@@ -80,7 +79,7 @@ public class MicrosoftGraphDirectoryService {
                 managerEmail,
                 managerPrincipal,
                 managerJobTitle,
-                Set.copyOf(groups));
+                Set.of());
     }
 
     public DirectoryUserContext resolveUserContext(EntraAuthenticatedUser entraUser, String graphAccessToken) {

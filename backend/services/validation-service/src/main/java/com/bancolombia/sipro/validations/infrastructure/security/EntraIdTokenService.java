@@ -70,6 +70,7 @@ public class EntraIdTokenService {
         String objectId = jwt.getClaimAsString("oid");
         Set<String> groupNames = extractGroupNames(jwt);
         boolean groupsOverage = hasGroupsOverage(jwt);
+        Set<String> roles = extractRoles(jwt);
 
         if (preferredUsername == null) {
             throw new IllegalArgumentException("El token de Entra ID no contiene un identificador de usuario usable");
@@ -82,7 +83,8 @@ public class EntraIdTokenService {
                 displayName,
                 objectId,
                 Set.copyOf(groupNames),
-                groupsOverage);
+                groupsOverage,
+                Set.copyOf(roles));
     }
 
     private JwtDecoder getDecoder(String tenantId,
@@ -176,6 +178,20 @@ public class EntraIdTokenService {
         return groups;
     }
 
+    private Set<String> extractRoles(Jwt jwt) {
+        LinkedHashSet<String> roles = new LinkedHashSet<>();
+        List<String> rawRoles = jwt.getClaimAsStringList("roles");
+        if (rawRoles == null) {
+            return roles;
+        }
+        for (String role : rawRoles) {
+            if (role != null && !role.isBlank()) {
+                roles.add(role.trim().toLowerCase(Locale.ROOT));
+            }
+        }
+        return roles;
+    }
+
     private boolean hasGroupsOverage(Jwt jwt) {
         Object hasGroups = jwt.getClaims().get("hasgroups");
         if (Boolean.TRUE.equals(hasGroups) || "true".equalsIgnoreCase(String.valueOf(hasGroups))) {
@@ -239,6 +255,7 @@ public class EntraIdTokenService {
             String displayName,
             String objectId,
             Set<String> groupNames,
-            boolean groupsOverage) {
+            boolean groupsOverage,
+            Set<String> roles) {
     }
 }

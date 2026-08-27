@@ -6,7 +6,6 @@ import com.bancolombia.sipro.validations.application.dto.UsuarioPermisosResponse
 import com.bancolombia.sipro.validations.application.usecase.LoginUseCase;
 import com.bancolombia.sipro.validations.domain.service.ParametroUnicoService;
 import com.bancolombia.sipro.validations.domain.service.RbacService;
-import com.bancolombia.sipro.validations.infrastructure.security.MicrosoftGraphDirectoryService;
 import com.bancolombia.sipro.validations.infrastructure.security.SiproAuthenticatedUser;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
@@ -17,7 +16,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -32,16 +30,13 @@ public class AuthController {
     private final LoginUseCase loginUseCase;
     private final RbacService rbacService;
     private final ParametroUnicoService parametroUnicoService;
-    private final MicrosoftGraphDirectoryService microsoftGraphDirectoryService;
 
     public AuthController(LoginUseCase loginUseCase,
                           RbacService rbacService,
-                          ParametroUnicoService parametroUnicoService,
-                          MicrosoftGraphDirectoryService microsoftGraphDirectoryService) {
+                          ParametroUnicoService parametroUnicoService) {
         this.loginUseCase = loginUseCase;
         this.rbacService = rbacService;
         this.parametroUnicoService = parametroUnicoService;
-        this.microsoftGraphDirectoryService = microsoftGraphDirectoryService;
     }
 
     /**
@@ -134,7 +129,6 @@ public class AuthController {
      */
     @GetMapping("/permisos/{idUsuario}")
     public ResponseEntity<UsuarioPermisosResponse> getPermisos(@PathVariable Long idUsuario,
-                                                               @RequestHeader(name = "X-Graph-Access-Token", required = false) String graphAccessToken,
                                                                Authentication authentication) {
         try {
             if (!(authentication != null && authentication.getPrincipal() instanceof SiproAuthenticatedUser principal)) {
@@ -146,23 +140,9 @@ public class AuthController {
             }
 
             logger.info("Consultando permisos para usuario autenticado: {}", principal.idUsuario());
-            Set<String> gruposAd = principal.groupNames();
-            if (graphAccessToken != null && !graphAccessToken.isBlank()) {
-                try {
-                    gruposAd = microsoftGraphDirectoryService.resolveCurrentUserGroupNamesCached(
-                            principal.objectId(),
-                            graphAccessToken,
-                            principal.groupNames(),
-                            principal.groupsOverage());
-                } catch (Exception ex) {
-                    logger.warn("No se pudieron refrescar grupos delegados para usuario {}. Se usarán claims del token. Motivo: {}",
-                            principal.idUsuario(), ex.getMessage());
-                }
-            }
-
             UsuarioPermisosResponse permisos = rbacService.obtenerPermisosUsuario(
                     principal.idUsuario(),
-                    gruposAd);
+                    principal.roles());
             return ResponseEntity.ok(permisos);
         } catch (Exception e) {
             logger.error("Error al consultar permisos del usuario {}: ", idUsuario, e);

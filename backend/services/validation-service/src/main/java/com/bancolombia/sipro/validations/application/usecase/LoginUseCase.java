@@ -99,7 +99,7 @@ public class LoginUseCase {
             try {
             UsuarioPermisosResponse permisos = rbacService.obtenerPermisosUsuario(
                 usuario.getIdUsuario(),
-                directoryUser.groupNames());
+                entraUser.roles());
                 response.setPermisos(permisos);
                 logger.info("Permisos RBAC cargados para usuario: {} (cargar={}, aprobar={})",
                         usuario.getUsuario(), permisos.isPuedeCargar(), permisos.isPuedeAprobar());

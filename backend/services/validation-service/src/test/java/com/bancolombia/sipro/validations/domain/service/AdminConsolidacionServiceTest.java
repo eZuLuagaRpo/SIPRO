@@ -94,7 +94,8 @@ class AdminConsolidacionServiceTest {
                 "junortiz@bancolombia.com.co",
                 null,
                 Set.of(),
-                false
+                false,
+                Set.of()
         );
 
         when(consolidacionRepository.findById(91L)).thenReturn(Optional.of(cabecera));

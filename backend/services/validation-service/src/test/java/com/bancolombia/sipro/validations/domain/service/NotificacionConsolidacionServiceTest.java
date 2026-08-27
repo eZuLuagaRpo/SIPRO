@@ -167,7 +167,8 @@ class NotificacionConsolidacionServiceTest {
                 "daeorti@bancolombia.com.co",
                 null,
                 Set.of(),
-                false
+                false,
+                Set.of()
         );
 
         when(usuarioProductoRolRepository.findDistinctActiveEmailsByRolId(6))

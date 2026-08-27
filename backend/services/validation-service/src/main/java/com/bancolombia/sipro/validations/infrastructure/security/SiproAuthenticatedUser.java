@@ -13,5 +13,6 @@ public record SiproAuthenticatedUser(
         String email,
         String objectId,
         Set<String> groupNames,
-        boolean groupsOverage) {
+        boolean groupsOverage,
+        Set<String> roles) {
 }

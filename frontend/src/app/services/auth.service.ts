@@ -22,7 +22,7 @@ export class AuthService {
   private static readonly DEFAULT_SESSION_TIMEOUT_MINUTES = 5;
   private static readonly SESSION_ACTIVITY_REFRESH_THROTTLE_MS = 30000;
   private static readonly ENTRA_LOGIN_BASE_SCOPES = ['openid', 'profile', 'email', 'offline_access', 'User.Read'];
-  private static readonly ENTRA_GRAPH_SCOPES = ['User.Read', 'User.Read.All', 'Directory.Read.All'];
+  private static readonly ENTRA_GRAPH_SCOPES = ['User.Read'];
   private static readonly ENTRA_CONFIG_STORAGE_KEY = 'entraConfig';
   private static readonly ENTRA_ID_TOKEN_STORAGE_KEY = 'entraIdToken';
   private static readonly ENTRA_API_ACCESS_TOKEN_STORAGE_KEY = 'entraApiAccessToken';
