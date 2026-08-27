@@ -1,31 +1,26 @@
 package com.bancolombia.sipro.validations.infrastructure.config;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import co.com.bancolombia.secretsmanager.api.GenericManager;
+import co.com.bancolombia.secretsmanager.api.exceptions.SecretException;
+import co.com.bancolombia.secretsmanager.connector.AWSSecretManagerConnector;
+import com.google.gson.annotations.SerializedName;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.env.EnvironmentPostProcessor;
 import org.springframework.core.Ordered;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.MapPropertySource;
-import software.amazon.awssdk.regions.Region;
-import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
-import software.amazon.awssdk.services.secretsmanager.model.GetSecretValueRequest;
-import software.amazon.awssdk.services.secretsmanager.model.GetSecretValueResponse;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Lee las credenciales de la BD principal desde AWS Secrets Manager al arrancar
- * en ambientes cloud (profile=cloud). En local (db.secrets.name vacío) no hace nada
- * y Spring usa los defaults de application.yml (DB_USER / DB_PASS).
+ * Lee las credenciales y URL de la BD principal desde AWS Secrets Manager al arrancar
+ * en ambientes cloud (cuando db.secrets.name está configurado). En local no hace nada.
  *
- * Se registra en META-INF/spring/org.springframework.boot.env.EnvironmentPostProcessor.imports
- * para que Spring Boot lo descubra antes de crear cualquier bean.
+ * Usa la misma librería Bancolombia (aws-secrets-manager-sync) que el proyecto ABA.
+ * El secreto debe tener los campos: host, port, dbname, username, password.
  */
 public class DbSecretsPostProcessor implements EnvironmentPostProcessor, Ordered {
-
-    private static final Logger log = LoggerFactory.getLogger(DbSecretsPostProcessor.class);
 
     @Override
     public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {
@@ -35,36 +30,40 @@ public class DbSecretsPostProcessor implements EnvironmentPostProcessor, Ordered
         }
 
         String region = environment.getProperty("db.secrets.region", "us-east-1").trim();
-        log.info("[DB-SECRETS] Obteniendo credenciales de BD desde Secrets Manager: secreto={}, region={}", secretName, region);
+        System.out.println("[DB-SECRETS] Obteniendo credenciales de BD desde Secrets Manager: secreto=" + secretName + ", region=" + region);
 
-        try (SecretsManagerClient client = SecretsManagerClient.builder()
-                .region(Region.of(region))
-                .build()) {
+        try {
+            GenericManager connector = new AWSSecretManagerConnector(region);
+            DbSecretFields secret = connector.getSecret(secretName, DbSecretFields.class);
 
-            GetSecretValueResponse response = client.getSecretValue(
-                    GetSecretValueRequest.builder().secretId(secretName).build());
-
-            String secretJson = response.secretString();
-            String username = extractJsonField(secretJson, "username");
-            String password = extractJsonField(secretJson, "password");
-
-            if (username == null || username.isBlank()) {
+            if (secret.getUsername() == null || secret.getUsername().isBlank()) {
                 throw new IllegalStateException("El secreto '" + secretName + "' no contiene el campo 'username'.");
             }
-            if (password == null || password.isBlank()) {
+            if (secret.getPassword() == null || secret.getPassword().isBlank()) {
                 throw new IllegalStateException("El secreto '" + secretName + "' no contiene el campo 'password'.");
             }
+            if (secret.getHost() == null || secret.getHost().isBlank()) {
+                throw new IllegalStateException("El secreto '" + secretName + "' no contiene el campo 'host'.");
+            }
+
+            String jdbcUrl = "jdbc:postgresql://" + secret.getHost().trim()
+                    + ":" + secret.getPort().trim()
+                    + "/" + secret.getDbname().trim();
 
             Map<String, Object> props = new LinkedHashMap<>();
-            props.put("spring.datasource.username", username);
-            props.put("spring.datasource.password", password);
+            props.put("spring.datasource.url", jdbcUrl);
+            props.put("spring.datasource.username", secret.getUsername());
+            props.put("spring.datasource.password", secret.getPassword());
             environment.getPropertySources().addFirst(new MapPropertySource("dbSecretsManager", props));
 
-            log.info("[DB-SECRETS] Credenciales de BD cargadas correctamente (usuario={}).", username);
+            System.out.println("[DB-SECRETS] Credenciales de BD cargadas correctamente (usuario=" + secret.getUsername() + ", host=" + secret.getHost() + ").");
 
+        } catch (SecretException e) {
+            throw new RuntimeException(
+                    "[DB-SECRETS] No se pudieron obtener las credenciales de BD desde Secrets Manager: " + e.getMessage(), e);
         } catch (Exception e) {
             throw new RuntimeException(
-                "[DB-SECRETS] No se pudieron obtener las credenciales de BD desde Secrets Manager: " + e.getMessage(), e);
+                    "[DB-SECRETS] Error procesando credenciales de BD: " + e.getMessage(), e);
         }
     }
 
@@ -73,24 +72,17 @@ public class DbSecretsPostProcessor implements EnvironmentPostProcessor, Ordered
         return Ordered.LOWEST_PRECEDENCE;
     }
 
-    private static String extractJsonField(String json, String field) {
-        String key = "\"" + field + "\"";
-        int idx = json.indexOf(key);
-        if (idx < 0) return null;
-        int colon = json.indexOf(':', idx + key.length());
-        if (colon < 0) return null;
-        int open = json.indexOf('"', colon + 1);
-        if (open < 0) return null;
-        StringBuilder val = new StringBuilder();
-        for (int i = open + 1; i < json.length(); i++) {
-            char c = json.charAt(i);
-            if (c == '\\' && i + 1 < json.length()) {
-                val.append(json.charAt(++i));
-                continue;
-            }
-            if (c == '"') break;
-            val.append(c);
-        }
-        return val.toString();
+    private static class DbSecretFields {
+        @SerializedName("host")     private String host;
+        @SerializedName("port")     private String port;
+        @SerializedName("dbname")   private String dbname;
+        @SerializedName("username") private String username;
+        @SerializedName("password") private String password;
+
+        public String getHost()     { return host; }
+        public String getPort()     { return port; }
+        public String getDbname()   { return dbname; }
+        public String getUsername() { return username; }
+        public String getPassword() { return password; }
     }
 }

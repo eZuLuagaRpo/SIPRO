@@ -49,8 +49,9 @@ dependencies {
     // AWS SDK v2 para envio de correo via SES (API, no SMTP) en PDN
     implementation 'software.amazon.awssdk:sesv2'
 
-    // AWS SDK v2 para leer credenciales de BD desde Secrets Manager en cloud
-    implementation 'software.amazon.awssdk:secretsmanager'
+    // Librería Bancolombia para Secrets Manager (misma que usa ABA)
+    implementation 'com.github.bancolombia:aws-secrets-manager-sync:4.0.0'
+    implementation 'com.google.code.gson:gson:2.10.1'
 
     // Caché en memoria para permisos RBAC (evita queries a BD en cada request)
     implementation 'org.springframework.boot:spring-boot-starter-cache'

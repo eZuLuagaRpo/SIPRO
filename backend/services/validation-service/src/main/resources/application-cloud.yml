@@ -30,7 +30,6 @@ spring:
       max-file-size: 300MB
       max-request-size: 300MB
   datasource:
-    url: '#{JDBC_URL}#'
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 30
