@@ -70,7 +70,7 @@ public class AdminAccessService {
             return null;
         }
         try {
-            return rbacService.obtenerPermisosUsuario(principal.idUsuario(), principal.groupNames());
+            return rbacService.obtenerPermisosUsuario(principal.idUsuario(), principal.roles());
         } catch (Exception ex) {
             logger.warn("No fue posible validar RBAC admin para usuario {}: {}",
                     principal.idUsuario(), ex.getMessage());
