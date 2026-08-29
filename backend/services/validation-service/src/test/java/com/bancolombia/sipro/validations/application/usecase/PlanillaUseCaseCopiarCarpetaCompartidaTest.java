@@ -1,4 +1,5 @@
 package com.bancolombia.sipro.validations.application.usecase;
+import com.bancolombia.sipro.validations.domain.service.HomologacionFullIfrsService;
 import com.bancolombia.sipro.validations.domain.service.ParametroUnicoService;
 import com.bancolombia.sipro.validations.domain.service.PlanillaNotificationService;
 import com.bancolombia.sipro.validations.domain.service.ExcelMetadataService;
@@ -47,6 +48,7 @@ class PlanillaUseCaseCopyToSharedFolderTest {
     @Mock private ProductoRepository productoRepository;
     @Mock private SegmentoRepository segmentoRepository;
     @Mock private ParametroUnicoService parametroUnicoService;
+    @Mock private HomologacionFullIfrsService homologacionFullIfrsService;
 
     private PlanillaUseCase useCase;
 
@@ -66,7 +68,8 @@ class PlanillaUseCaseCopyToSharedFolderTest {
                 loteMemoryStore,
                 productoRepository,
                 segmentoRepository,
-                parametroUnicoService
+                parametroUnicoService,
+                homologacionFullIfrsService
         );
     }
 

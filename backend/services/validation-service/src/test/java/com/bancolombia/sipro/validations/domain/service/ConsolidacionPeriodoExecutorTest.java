@@ -104,6 +104,9 @@ class ConsolidacionPeriodoExecutorTest {
     @Mock
     private ArchivosBloqueadosFase2Service archivosBloqueadosFase2Service;
 
+    @Mock
+    private ConsolidacionFullIfrsService consolidacionFullIfrsService;
+
     private ConsolidacionPeriodoExecutor service;
 
     @BeforeEach
@@ -124,7 +127,8 @@ class ConsolidacionPeriodoExecutorTest {
                 parametroUnicoService,
                 entityManager,
                 environment,
-                archivosBloqueadosFase2Service
+                archivosBloqueadosFase2Service,
+                consolidacionFullIfrsService
         );
 
             lenient().when(parametroUnicoService.getLong("APP_CONSOLIDACION_POST_CLOSE_DELAY_HOURS", 1L))

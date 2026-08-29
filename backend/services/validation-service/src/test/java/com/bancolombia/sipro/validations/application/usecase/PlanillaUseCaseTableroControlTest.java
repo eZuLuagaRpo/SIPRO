@@ -6,6 +6,7 @@ import com.bancolombia.sipro.validations.domain.model.SiproDetalleCargaPlanillas
 import com.bancolombia.sipro.validations.domain.service.ConsolidacionPlanillasService;
 import com.bancolombia.sipro.validations.domain.service.ExcelMetadataService;
 import com.bancolombia.sipro.validations.domain.service.FileStorageService;
+import com.bancolombia.sipro.validations.domain.service.HomologacionFullIfrsService;
 import com.bancolombia.sipro.validations.domain.service.ParametroUnicoService;
 import com.bancolombia.sipro.validations.domain.service.PlanillaNotificationService;
 import com.bancolombia.sipro.validations.domain.service.VentanaCargaService;
@@ -45,6 +46,7 @@ class PlanillaUseCaseTableroControlTest {
     @Mock private ProductoRepository productoRepository;
     @Mock private SegmentoRepository segmentoRepository;
         @Mock private ParametroUnicoService parametroUnicoService;
+        @Mock private HomologacionFullIfrsService homologacionFullIfrsService;
 
     private PlanillaUseCase useCase;
 
@@ -55,7 +57,8 @@ class PlanillaUseCaseTableroControlTest {
                 uprRepository, usuarioLoginRepository,
                 fileStorageService, excelMetadataService, ventanaCargaService,
                 consolidacionPlanillasService, planillaNotificationService,
-                                loteMemoryStore, productoRepository, segmentoRepository, parametroUnicoService
+                                loteMemoryStore, productoRepository, segmentoRepository, parametroUnicoService,
+                                homologacionFullIfrsService
         );
     }
 

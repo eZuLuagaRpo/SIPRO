@@ -9,6 +9,7 @@ import com.bancolombia.sipro.validations.domain.service.PlanillaNotificationServ
 import com.bancolombia.sipro.validations.infrastructure.repository.SiproDetalleCargaPlanillasRepository;
 import com.bancolombia.sipro.validations.infrastructure.repository.UsuarioLoginRepository;
 import com.bancolombia.sipro.validations.service.LoteMemoryStore;
+import com.bancolombia.sipro.validations.domain.service.HomologacionFullIfrsService;
 import com.bancolombia.sipro.validations.domain.service.ParametroUnicoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,6 +42,7 @@ class PlanillaUseCaseSinDatosFullIfrsTest {
     @Mock private com.bancolombia.sipro.validations.infrastructure.repository.ProductoRepository productoRepository;
     @Mock private com.bancolombia.sipro.validations.infrastructure.repository.SegmentoRepository segmentoRepository;
     @Mock private ParametroUnicoService parametroUnicoService;
+    @Mock private HomologacionFullIfrsService homologacionFullIfrsService;
 
     private PlanillaUseCase useCase;
 
@@ -60,7 +62,8 @@ class PlanillaUseCaseSinDatosFullIfrsTest {
                 loteMemoryStore,
                 productoRepository,
                 segmentoRepository,
-                parametroUnicoService
+                parametroUnicoService,
+                homologacionFullIfrsService
         );
     }
 
