@@ -854,6 +854,17 @@ public class ConsolidacionPeriodoExecutor {
         CreffosParametricGenerator.GeneratedCreffosFile creffosFile = null;
 
         try {
+            String advertenciaFullIfrs = consolidacionFullIfrsService.generarConsolidado(periodoValoracion);
+            if (advertenciaFullIfrs != null && !advertenciaFullIfrs.isBlank()) {
+                advertencias.add(advertenciaFullIfrs);
+            }
+        } catch (Exception ex) {
+            logger.error("No se pudo generar el consolidado Full IFRS para el periodo {}: {}",
+                    periodoValoracion, ex.getMessage(), ex);
+            advertencias.add("Consolidado Full IFRS no generado: " + resumirMensaje(ex));
+        }
+
+        try {
             CreffosConsolidationService.PublicationResult publicationResult =
                     creffosConsolidationService.generarYPublicarCreffsos(periodoValoracion);
             creffosFile = publicationResult.generatedFile();
@@ -871,17 +882,6 @@ public class ConsolidacionPeriodoExecutor {
             logger.error("No se pudo generar el reporte de conciliación para el periodo {}: {}",
                     periodoValoracion, ex.getMessage(), ex);
             advertencias.add("Reporte de conciliación no generado: " + resumirMensaje(ex));
-        }
-
-        try {
-            String advertenciaFullIfrs = consolidacionFullIfrsService.generarConsolidado(periodoValoracion);
-            if (advertenciaFullIfrs != null && !advertenciaFullIfrs.isBlank()) {
-                advertencias.add(advertenciaFullIfrs);
-            }
-        } catch (Exception ex) {
-            logger.error("No se pudo generar el consolidado Full IFRS para el periodo {}: {}",
-                    periodoValoracion, ex.getMessage(), ex);
-            advertencias.add("Consolidado Full IFRS no generado: " + resumirMensaje(ex));
         }
 
         return new PostProcesamientoResult(advertencias, creffosFile);
