@@ -76,10 +76,9 @@ public class ConsolidacionPeriodoExecutor {
     private static final List<String> ESTADOS_EXITOSOS = List.of(ESTADO_COMPLETADO, ESTADO_COMPLETADO_CON_ADVERTENCIAS);
     private static final List<String> ESTADOS_EN_CURSO = List.of(ESTADO_INICIADO, ESTADO_EN_PROCESO);
     private static final String CONSOLIDADOS_PREFIX = "consolidados/";
-    /** Nombre fijo del Excel consolidado en la ruta compartida: cada periodo reemplaza al anterior. */
-    private static final String CONSOLIDADO_NOMBRE_ARCHIVO_COMPARTIDO = "CONSOLIDADO.xlsx";
     private static final String CONTENT_TYPE_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     private static final DateTimeFormatter FECHA_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private static final DateTimeFormatter FECHA_COMPACT_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final DateTimeFormatter FECHA_HORA_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final int DEFAULT_BATCH_INSERT_SIZE = 500;
     private static final int DEFAULT_LZ_LOOKUP_CHUNK_SIZE = 1000;
@@ -158,6 +157,7 @@ public class ConsolidacionPeriodoExecutor {
     private final ParametroUnicoService parametroUnicoService;
     private final EntityManager entityManager;
     private final ArchivosBloqueadosFase2Service archivosBloqueadosFase2Service;
+    private final ConsolidacionFullIfrsService consolidacionFullIfrsService;
 
     private static final long DEFAULT_POST_CLOSE_DELAY_HOURS = 1;
     private static final long DEFAULT_MAX_POST_CLOSE_DAYS = 5;
@@ -178,7 +178,8 @@ public class ConsolidacionPeriodoExecutor {
                                         ParametroUnicoService parametroUnicoService,
                                         EntityManager entityManager,
                                         Environment environment,
-                                        ArchivosBloqueadosFase2Service archivosBloqueadosFase2Service) {
+                                        ArchivosBloqueadosFase2Service archivosBloqueadosFase2Service,
+                                        ConsolidacionFullIfrsService consolidacionFullIfrsService) {
         this.planillaRepository = planillaRepository;
         this.validacionRepository = validacionRepository;
         this.clienteLzRepository = clienteLzRepository;
@@ -195,6 +196,7 @@ public class ConsolidacionPeriodoExecutor {
         this.entityManager = entityManager;
         this.environment = environment;
         this.archivosBloqueadosFase2Service = archivosBloqueadosFase2Service;
+        this.consolidacionFullIfrsService = consolidacionFullIfrsService;
     }
 
     private final Environment environment;
@@ -802,14 +804,6 @@ public class ConsolidacionPeriodoExecutor {
         batch.clear();
     }
 
-    /**
-     * Guarda el Excel consolidado en el storage interno (con nombre por fecha, para el histórico del
-     * panel admin) y lo publica en la misma ruta compartida que usa CREFFSOS ({@code CREFFSOS_RUTA_SALIDA})
-     * con nombre fijo ({@link #CONSOLIDADO_NOMBRE_ARCHIVO_COMPARTIDO}): cada consolidación nueva
-     * reemplaza ahí a la del periodo anterior, igual que ya ocurre con CREFFSOS.
-     *
-     * @return advertencia si falló la copia a la ruta compartida, o {@code null} si todo salió bien.
-     */
     private String guardarExcelConsolidado(LocalDate periodoValoracion,
                                            ConsolidatedExcelWriter excelWriter) throws IOException {
         byte[] contenidoExcel = excelWriter.toByteArray();
@@ -817,19 +811,27 @@ public class ConsolidacionPeriodoExecutor {
         fileStorageService.storeBytes(contenidoExcel, rutaExcel, CONTENT_TYPE_XLSX);
         logger.info("Excel consolidado generado para periodo {} en {}", periodoValoracion, rutaExcel);
 
-        return publicarConsolidadoEnRutaCompartida(contenidoExcel);
+        return publicarConsolidadoEnRutaCompartida(contenidoExcel, periodoValoracion);
     }
 
-    private String publicarConsolidadoEnRutaCompartida(byte[] contenidoExcel) {
+    /**
+     * Publica el Excel consolidado en la ruta de red derivada de {@code CREFFSOS_RUTA_SALIDA}:
+     * sube un nivel y entra a la carpeta {@code Consolidado/{yyyy-MM-dd}/}.
+     * El archivo se nombra {@code CONSOLIDADO_COLGAAP_yyyyMMdd.xlsx}.
+     */
+    private String publicarConsolidadoEnRutaCompartida(byte[] contenidoExcel, LocalDate periodoValoracion) {
         String outputDir = parametroUnicoService.getString("CREFFSOS_RUTA_SALIDA", "");
         if (outputDir == null || outputDir.isBlank()) {
             return null;
         }
 
         try {
-            Path targetDir = Path.of(outputDir.trim());
-            Files.createDirectories(targetDir);
-            Path targetFile = targetDir.resolve(CONSOLIDADO_NOMBRE_ARCHIVO_COMPARTIDO);
+            Path periodoDir = Path.of(outputDir.trim()).getParent()
+                    .resolve("Consolidado")
+                    .resolve(periodoValoracion.format(FECHA_FMT));
+            Files.createDirectories(periodoDir);
+            String nombreArchivo = "CONSOLIDADO_COLGAAP_" + periodoValoracion.format(FECHA_COMPACT_FMT) + ".xlsx";
+            Path targetFile = periodoDir.resolve(nombreArchivo);
             Files.write(targetFile,
                     contenidoExcel,
                     StandardOpenOption.CREATE,
@@ -870,6 +872,18 @@ public class ConsolidacionPeriodoExecutor {
                     periodoValoracion, ex.getMessage(), ex);
             advertencias.add("Reporte de conciliación no generado: " + resumirMensaje(ex));
         }
+
+        try {
+            String advertenciaFullIfrs = consolidacionFullIfrsService.generarConsolidado(periodoValoracion);
+            if (advertenciaFullIfrs != null && !advertenciaFullIfrs.isBlank()) {
+                advertencias.add(advertenciaFullIfrs);
+            }
+        } catch (Exception ex) {
+            logger.error("No se pudo generar el consolidado Full IFRS para el periodo {}: {}",
+                    periodoValoracion, ex.getMessage(), ex);
+            advertencias.add("Consolidado Full IFRS no generado: " + resumirMensaje(ex));
+        }
+
         return new PostProcesamientoResult(advertencias, creffosFile);
     }
 
