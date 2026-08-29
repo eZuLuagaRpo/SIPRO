@@ -11,10 +11,13 @@ import { ParametrosService } from '../../services/parametros.service';
 import { User } from '../../models/user.model';
 import {
   CuentaHomologacion,
+  CuentaHomologacionFullIfrs,
   ExcepcionVentanaCarga,
   ExcepcionRequest,
   HomologacionCuentaRequest,
   HomologacionErrorFila,
+  HomologacionFullIfrsMasivaResultado,
+  HomologacionFullIfrsRequest,
   HomologacionMasivaResultado,
   MesDisponible,
   ReglaVentanaBase,
@@ -224,6 +227,27 @@ export class ParametrosComponent implements OnInit {
   cargandoMasivoHomologacion = false;
   homologacionMasivoResultado: HomologacionMasivaResultado | null = null;
 
+  // ─── Sección 7: Cuentas Contables Full IFRS ──────────────────────────────
+  cuentasFullIfrs: CuentaHomologacionFullIfrs[] = [];
+  busquedaFullIfrs = '';
+  cargandoFullIfrs = false;
+
+  fullIfrsModo: 'nueva' | 'modificar' | null = null;
+  fullIfrsForm: HomologacionFullIfrsRequest = { cuentaPlanilla: '', cuentaSap: '' };
+  fullIfrsEditandoId: number | null = null;
+  fullIfrsEditandoCuentaPlanilla = '';
+  guardandoFullIfrs = false;
+  fullIfrsError = '';
+  fullIfrsExito = '';
+
+  fullIfrsDesactivarPendiente: CuentaHomologacionFullIfrs | null = null;
+  desactivandoFullIfrs = false;
+
+  archivoFullIfrs: File | null = null;
+  archivoFullIfrsNombre = '';
+  cargandoMasivoFullIfrs = false;
+  fullIfrsMasivoResultado: HomologacionFullIfrsMasivaResultado | null = null;
+
   readonly modifyIcon = '/assets/images/modify_edit.png';
   readonly eraseIcon = '/assets/images/erase.png';
   readonly viewIcon = '/assets/images/view.png';
@@ -330,9 +354,10 @@ export class ParametrosComponent implements OnInit {
       productos: this.cargarConFallback(this.parametrosService.getProductos(), [], 'productos', erroresCarga),
       roles: this.cargarConFallback(this.parametrosService.getRoles(), [], 'roles', erroresCarga),
       segmentos: this.cargarConFallback(this.parametrosService.getSegmentos(), [], 'segmentos', erroresCarga),
-      cuentasHomologacion: this.cargarConFallback(this.parametrosService.getCuentasHomologacion(), [], 'cuentas de homologación Colgaap', erroresCarga)
+      cuentasHomologacion: this.cargarConFallback(this.parametrosService.getCuentasHomologacion(), [], 'cuentas de homologación Colgaap', erroresCarga),
+      cuentasFullIfrs: this.cargarConFallback(this.parametrosService.getCuentasFullIfrs(), [], 'cuentas de homologación Full IFRS', erroresCarga)
     }).subscribe({
-      next: ({ reglaBase, excepciones, meses, usuarios, productos, roles, segmentos, cuentasHomologacion }) => {
+      next: ({ reglaBase, excepciones, meses, usuarios, productos, roles, segmentos, cuentasHomologacion, cuentasFullIfrs }) => {
         this.reglaBase = reglaBase;
         this.excepciones = excepciones;
         this.mesesDisponibles = meses;
@@ -341,6 +366,7 @@ export class ParametrosComponent implements OnInit {
         this.roles = this.normalizarRoles(roles);
         this.segmentos = this.normalizarSegmentos(segmentos);
         this.cuentasHomologacion = cuentasHomologacion;
+        this.cuentasFullIfrs = cuentasFullIfrs;
 
         if (!this.usuarioSeleccionadoId && this.usuarios.length > 0) {
           this.usuarioSeleccionadoId = this.usuarios[0].idUsuario;
@@ -1870,6 +1896,187 @@ export class ParametrosComponent implements OnInit {
     this.homologacionMasivoResultado = null;
     this.archivoHomologacion = null;
     this.archivoHomologacionNombre = '';
+  }
+
+  // ─── Sección 7: Cuentas Contables Full IFRS ──────────────────────────────
+
+  get cuentasFullIfrsFiltradas(): CuentaHomologacionFullIfrs[] {
+    const q = (this.busquedaFullIfrs || '').trim().toLowerCase();
+    if (!q) return this.cuentasFullIfrs;
+    return this.cuentasFullIfrs.filter(c =>
+      (c.cuentaPlanilla || '').toLowerCase().includes(q) ||
+      (c.cuentaSap || '').toLowerCase().includes(q)
+    );
+  }
+
+  abrirNuevaCuentaFullIfrs(): void {
+    this.fullIfrsModo = 'nueva';
+    this.fullIfrsForm = { cuentaPlanilla: '', cuentaSap: '' };
+    this.fullIfrsEditandoId = null;
+    this.fullIfrsEditandoCuentaPlanilla = '';
+    this.fullIfrsError = '';
+    this.fullIfrsExito = '';
+  }
+
+  cancelarFormularioFullIfrs(): void {
+    this.fullIfrsModo = null;
+    this.fullIfrsForm = { cuentaPlanilla: '', cuentaSap: '' };
+    this.fullIfrsEditandoId = null;
+    this.fullIfrsEditandoCuentaPlanilla = '';
+    this.fullIfrsError = '';
+    this.fullIfrsExito = '';
+  }
+
+  abrirModificarCuentaFullIfrs(cuenta: CuentaHomologacionFullIfrs): void {
+    this.fullIfrsModo = 'modificar';
+    this.fullIfrsEditandoId = cuenta.id;
+    this.fullIfrsEditandoCuentaPlanilla = cuenta.cuentaPlanilla;
+    this.fullIfrsForm = { cuentaPlanilla: cuenta.cuentaPlanilla, cuentaSap: cuenta.cuentaSap };
+    this.fullIfrsError = '';
+    this.fullIfrsExito = '';
+  }
+
+  guardarCuentaFullIfrs(): void {
+    const cuentaPlanilla = (this.fullIfrsForm.cuentaPlanilla ?? '').trim();
+    const cuentaSap = (this.fullIfrsForm.cuentaSap ?? '').trim();
+    if (!cuentaPlanilla) {
+      this.fullIfrsError = 'La cuenta planilla es obligatoria.';
+      return;
+    }
+    if (!/^[0-9]{10}$/.test(cuentaSap)) {
+      this.fullIfrsError = 'La cuenta SAP debe tener exactamente 10 dígitos numéricos.';
+      return;
+    }
+    this.fullIfrsError = '';
+    this.fullIfrsExito = '';
+    this.guardandoFullIfrs = true;
+    const req: HomologacionFullIfrsRequest = { cuentaPlanilla, cuentaSap };
+    const obs = this.fullIfrsModo === 'modificar' && this.fullIfrsEditandoId != null
+      ? this.parametrosService.modificarCuentaFullIfrs(this.fullIfrsEditandoId, req)
+      : this.parametrosService.crearCuentaFullIfrs(req);
+    obs.subscribe({
+      next: res => {
+        this.guardandoFullIfrs = false;
+        if (res.success !== false) {
+          this.fullIfrsExito = res.mensaje || 'Cuenta guardada correctamente.';
+          this.fullIfrsModo = null;
+          this.parametrosService.getCuentasFullIfrs().subscribe(lista => this.cuentasFullIfrs = lista);
+        } else {
+          this.fullIfrsError = res.mensaje || 'Error al guardar la cuenta.';
+        }
+      },
+      error: (err: any) => {
+        this.guardandoFullIfrs = false;
+        const detalle: string = err?.error?.mensaje || err?.error?.message || err?.message || '';
+        this.fullIfrsError = detalle || 'Error de conexión al guardar la cuenta.';
+      }
+    });
+  }
+
+  solicitarDesactivarCuentaFullIfrs(cuenta: CuentaHomologacionFullIfrs): void {
+    this.fullIfrsDesactivarPendiente = cuenta;
+    this.fullIfrsError = '';
+    this.fullIfrsExito = '';
+  }
+
+  cancelarDesactivarFullIfrs(): void {
+    this.fullIfrsDesactivarPendiente = null;
+  }
+
+  confirmarDesactivarFullIfrs(): void {
+    const cuenta = this.fullIfrsDesactivarPendiente;
+    if (!cuenta) return;
+    this.desactivandoFullIfrs = true;
+    this.parametrosService.desactivarCuentaFullIfrs(cuenta.id).subscribe({
+      next: () => {
+        this.desactivandoFullIfrs = false;
+        this.fullIfrsDesactivarPendiente = null;
+        this.parametrosService.getCuentasFullIfrs().subscribe(lista => this.cuentasFullIfrs = lista);
+      },
+      error: (err: any) => {
+        this.desactivandoFullIfrs = false;
+        this.fullIfrsDesactivarPendiente = null;
+        const detalle: string = err?.error?.mensaje || err?.error?.message || err?.message || '';
+        this.mostrarMensajeGlobal(detalle || 'Error al inactivar la cuenta.', 'error');
+      }
+    });
+  }
+
+  onArchivoFullIfrsSeleccionado(event: Event): void {
+    this.fullIfrsMasivoResultado = null;
+    const input = event.target as HTMLInputElement;
+    if (!input.files?.length) return;
+    const archivo = input.files[0];
+    if (!archivo.name.toLowerCase().endsWith('.xlsx')) {
+      this.fullIfrsMasivoResultado = {
+        success: false,
+        mensaje: 'El archivo debe ser .xlsx.',
+        activados: 0,
+        desactivados: 0,
+        errores: []
+      };
+      return;
+    }
+    this.archivoFullIfrs = archivo;
+    this.archivoFullIfrsNombre = archivo.name;
+  }
+
+  procesarCargaMasivaFullIfrs(): void {
+    if (!this.archivoFullIfrs) {
+      this.fullIfrsMasivoResultado = {
+        success: false,
+        mensaje: 'Seleccione un archivo .xlsx primero.',
+        activados: 0,
+        desactivados: 0,
+        errores: []
+      };
+      return;
+    }
+    if (!this.archivoFullIfrs.name.toLowerCase().endsWith('.xlsx')) {
+      this.fullIfrsMasivoResultado = {
+        success: false,
+        mensaje: 'El archivo debe ser .xlsx.',
+        activados: 0,
+        desactivados: 0,
+        errores: []
+      };
+      return;
+    }
+
+    this.cargandoMasivoFullIfrs = true;
+    this.fullIfrsMasivoResultado = null;
+
+    const formData = new FormData();
+    formData.append('archivo', this.archivoFullIfrs);
+
+    this.parametrosService.cargarMasivaFullIfrs(formData).subscribe({
+      next: resultado => {
+        this.cargandoMasivoFullIfrs = false;
+        this.fullIfrsMasivoResultado = resultado;
+        if (resultado.success) {
+          this.archivoFullIfrs = null;
+          this.archivoFullIfrsNombre = '';
+          this.parametrosService.getCuentasFullIfrs().subscribe(lista => this.cuentasFullIfrs = lista);
+        }
+      },
+      error: (err: any) => {
+        this.cargandoMasivoFullIfrs = false;
+        const detalle: string = err?.error?.mensaje || err?.error?.message || err?.message || '';
+        this.fullIfrsMasivoResultado = {
+          success: false,
+          mensaje: detalle || 'Error de conexión al procesar el archivo.',
+          activados: 0,
+          desactivados: 0,
+          errores: []
+        };
+      }
+    });
+  }
+
+  limpiarResultadoMasivoFullIfrs(): void {
+    this.fullIfrsMasivoResultado = null;
+    this.archivoFullIfrs = null;
+    this.archivoFullIfrsNombre = '';
   }
 
   // ── Helpers generales ─────────────────────────────────────────────────────

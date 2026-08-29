@@ -1044,6 +1044,179 @@
         </div>
       </section>
 
+      <!-- ═══════════════════════════════════════════════════════════════════ -->
+      <!-- SECCIÓN 7 — Cuentas Contables Full IFRS                           -->
+      <!-- ═══════════════════════════════════════════════════════════════════ -->
+      <section class="card">
+        <div class="card-header">
+          <h2 class="card-title">7. Cuentas Contables Full IFRS</h2>
+          <p class="card-subtitle">Gestione las cuentas contables planilla-SAP para la homologación Full IFRS. La cuenta SAP debe tener exactamente 10 dígitos. Solo se inactivan registros; el historial se conserva siempre.</p>
+        </div>
+        <div class="card-body">
+
+          <!-- Panel izquierdo: tabla de cuentas -->
+          <div class="grid-2-col param-catalog-split">
+            <div class="param-panel param-panel--catalog-list">
+              <div class="param-inline-header param-inline-header--compact">
+                <h3 class="form-section-title">Cuentas Registradas</h3>
+                <button class="btn-pill btn-primary btn-pill--small" type="button" (click)="abrirNuevaCuentaFullIfrs()">+ Nueva cuenta</button>
+              </div>
+
+              <div class="form-group form-group--compact" style="margin-bottom: 8px;">
+                <div class="param-search-box">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  <input type="text" class="form-input form-input--compact param-search-box__input" [(ngModel)]="busquedaFullIfrs" placeholder="Buscar por cuenta planilla o SAP…" autocomplete="off">
+                  <button *ngIf="busquedaFullIfrs" class="param-search-box__clear" type="button" (click)="busquedaFullIfrs = ''" aria-label="Limpiar búsqueda">&times;</button>
+                </div>
+              </div>
+
+              <div class="table-container table-container--fixed-lg table-container--h-scroll">
+                <div *ngIf="cuentasFullIfrs.length === 0" class="param-empty">Sin cuentas registradas.</div>
+                <div *ngIf="cuentasFullIfrs.length > 0 && cuentasFullIfrsFiltradas.length === 0" class="param-empty">Ninguna cuenta coincide con la búsqueda.</div>
+                <table *ngIf="cuentasFullIfrsFiltradas.length > 0" class="param-table compact-table">
+                  <thead>
+                    <tr>
+                      <th>Cuenta Planilla</th>
+                      <th>Cuenta SAP</th>
+                      <th>Estado</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let c of cuentasFullIfrsFiltradas">
+                      <td><strong>{{ c.cuentaPlanilla }}</strong></td>
+                      <td>{{ c.cuentaSap }}</td>
+                      <td>
+                        <span class="badge" [class.success]="c.estado === 1" [class.warning]="c.estado === 0">
+                          {{ c.estado === 1 ? 'Activa' : 'Inactiva' }}
+                        </span>
+                      </td>
+                      <td>
+                        <div class="action-icons">
+                          <button class="btn-icon" type="button" (click)="abrirModificarCuentaFullIfrs(c)" [disabled]="c.estado === 0" title="Modificar">
+                            <img [src]="modifyIcon" class="action-icon" alt="Modificar" />
+                          </button>
+                          <button class="btn-icon" type="button" (click)="solicitarDesactivarCuentaFullIfrs(c)" [disabled]="c.estado === 0" title="Inactivar">
+                            <img [src]="eraseIcon" class="action-icon" alt="Inactivar" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Panel derecho: formulario individual -->
+            <div class="param-panel param-panel--catalog-form">
+              <h3 class="form-section-title">
+                <ng-container *ngIf="fullIfrsModo === 'modificar'">Modificar Cuenta: {{ fullIfrsEditandoCuentaPlanilla }}</ng-container>
+                <ng-container *ngIf="fullIfrsModo !== 'modificar'">Nueva Cuenta Contable Full IFRS</ng-container>
+              </h3>
+
+              <div *ngIf="fullIfrsExito" class="param-alert param-alert--success">{{ fullIfrsExito }}</div>
+              <div *ngIf="fullIfrsError" class="param-alert param-alert--error">{{ fullIfrsError }}</div>
+
+              <div *ngIf="!fullIfrsModo" class="param-alert param-alert--info">
+                Seleccione <strong>+ Nueva cuenta</strong> para registrar una cuenta, o use los botones de acción en la tabla para modificar o inactivar una cuenta existente.
+              </div>
+
+              <ng-container *ngIf="fullIfrsModo">
+                <div *ngIf="fullIfrsModo === 'modificar'" class="param-alert param-alert--info" style="margin-bottom: 12px;">
+                  <ng-container *ngIf="(fullIfrsForm.cuentaPlanilla ?? '').trim() !== fullIfrsEditandoCuentaPlanilla; else soloModificaSap">
+                    La cuenta planilla anterior <strong>{{ fullIfrsEditandoCuentaPlanilla }}</strong> quedará inactiva. Se creará una nueva entrada activa con los nuevos valores.
+                  </ng-container>
+                  <ng-template #soloModificaSap>
+                    Solo se actualizará la cuenta SAP. La cuenta planilla <strong>{{ fullIfrsEditandoCuentaPlanilla }}</strong> permanece activa.
+                  </ng-template>
+                </div>
+
+                <div class="form-group form-group--compact">
+                  <label class="form-label">Cuenta Planilla <span class="required">*</span></label>
+                  <input type="text" class="form-input form-input--compact" [(ngModel)]="fullIfrsForm.cuentaPlanilla" placeholder="Código de cuenta en la planilla" autocomplete="off">
+                </div>
+
+                <div class="form-group form-group--compact">
+                  <label class="form-label">Cuenta SAP <span class="required">*</span></label>
+                  <input type="text" class="form-input form-input--compact" [(ngModel)]="fullIfrsForm.cuentaSap" placeholder="10 dígitos numéricos" maxlength="10" autocomplete="off">
+                  <span class="param-field-help">Exactamente 10 dígitos numéricos.</span>
+                </div>
+
+                <div class="btn-action-container btn-action-container--stacked">
+                  <button class="btn-pill btn-primary btn-pill--block" type="button"
+                    (click)="guardarCuentaFullIfrs()"
+                    [disabled]="guardandoFullIfrs || !fullIfrsForm.cuentaPlanilla || !fullIfrsForm.cuentaSap">
+                    {{ guardandoFullIfrs ? 'Guardando…' : (fullIfrsModo === 'modificar' ? 'Aplicar modificación' : 'Crear cuenta') }}
+                  </button>
+                  <button class="btn-pill btn-secondary btn-pill--block" type="button" (click)="cancelarFormularioFullIfrs()">
+                    Cancelar
+                  </button>
+                </div>
+              </ng-container>
+            </div>
+          </div>
+
+          <!-- Sección de carga masiva -->
+          <div class="param-bulk-section" style="margin-top: 24px;">
+            <h3 class="form-section-title">Carga Masiva por Archivo (.xlsx)</h3>
+            <p class="param-field-help" style="margin-bottom: 12px;">
+              El archivo debe tener exactamente las columnas: <code>cuenta_planilla</code>, <code>cuenta_SAP</code>, <code>estado</code>. En la columna <code>estado</code> escriba <code>Activar</code> o <code>Inactivar</code>. La cuenta SAP debe tener exactamente 10 dígitos.
+              Si hay errores en alguna fila, no se aplica ningún cambio.
+            </p>
+
+            <div class="param-upload-row">
+              <label class="btn-pill btn-secondary" style="cursor: pointer;">
+                Seleccionar archivo
+                <input type="file" accept=".xlsx" style="display: none;" (change)="onArchivoFullIfrsSeleccionado($event)">
+              </label>
+              <span class="param-field-help" style="margin-left: 8px;">{{ archivoFullIfrsNombre || 'Ningún archivo seleccionado' }}</span>
+              <button class="btn-pill btn-primary" type="button"
+                [disabled]="!archivoFullIfrs || cargandoMasivoFullIfrs"
+                (click)="procesarCargaMasivaFullIfrs()"
+                style="margin-left: 12px;">
+                {{ cargandoMasivoFullIfrs ? 'Procesando…' : 'Cargar archivo' }}
+              </button>
+            </div>
+
+            <!-- Resultado de carga masiva -->
+            <ng-container *ngIf="fullIfrsMasivoResultado as resultado">
+              <div *ngIf="resultado.success" class="param-alert param-alert--success" style="margin-top: 12px;">
+                {{ resultado.mensaje || 'Carga exitosa.' }}
+                Activadas: <strong>{{ resultado.activados }}</strong> | Inactivadas: <strong>{{ resultado.desactivados }}</strong>
+                <button class="util-link util-link--button" type="button" (click)="limpiarResultadoMasivoFullIfrs()" style="margin-left: 12px;">Limpiar</button>
+              </div>
+
+              <ng-container *ngIf="!resultado.success">
+                <div class="param-alert param-alert--error" style="margin-top: 12px;">
+                  {{ resultado.mensaje || 'Se encontraron errores. No se aplicó ningún cambio.' }}
+                  <button class="util-link util-link--button" type="button" (click)="limpiarResultadoMasivoFullIfrs()" style="margin-left: 12px;">Limpiar</button>
+                </div>
+
+                <div *ngIf="resultado.errores && resultado.errores.length > 0" class="table-container table-container--h-scroll" style="margin-top: 8px;">
+                  <table class="param-table compact-table">
+                    <thead>
+                      <tr>
+                        <th>Fila</th>
+                        <th>Cuenta Planilla</th>
+                        <th>Error</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let e of resultado.errores">
+                        <td>{{ e.fila }}</td>
+                        <td>{{ e.cuentaPlanilla || '—' }}</td>
+                        <td class="td-error">{{ e.error }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </ng-container>
+            </ng-container>
+          </div>
+
+        </div>
+      </section>
+
     </ng-container><!-- /!cargandoInicial -->
 
       <!-- Modal confirmación operación sobre Producto -->
@@ -1117,6 +1290,27 @@
           <button class="btn-pill btn-secondary" type="button" (click)="cerrarModalDesactivarCuenta()" [disabled]="desactivandoHomologacion">Cancelar</button>
           <button class="btn-pill btn-primary" type="button" (click)="confirmarDesactivarCuenta()" [disabled]="desactivandoHomologacion">
             {{ desactivandoHomologacion ? 'Inactivando…' : 'Inactivar cuenta' }}
+          </button>
+        </section>
+      </section>
+    </article>
+
+    <!-- Modal: confirmar inactivación de cuenta Full IFRS -->
+    <article class="bc-modal-active" role="dialog" aria-modal="true" *ngIf="fullIfrsDesactivarPendiente as cuentaADesactivar">
+      <div class="bc-modal-backdrop" (click)="cancelarDesactivarFullIfrs()"></div>
+      <section class="bc-modal-container param-confirm-modal">
+        <section class="bc-modal-header centered-column">
+          <img [src]="alertIcon" alt="Confirmación" class="param-confirm-modal__icon">
+          <h4 class="modal-title-label">Confirmar inactivación</h4>
+        </section>
+        <section class="param-confirm-modal__body centered-column">
+          <p>Va a <strong>inactivar</strong> la cuenta planilla <strong>{{ cuentaADesactivar.cuentaPlanilla }}</strong> (SAP: {{ cuentaADesactivar.cuentaSap }}).</p>
+          <p class="param-confirm-modal__note">El registro permanece en la base de datos pero ya no será incluido en el archivo TXT de homologación.</p>
+        </section>
+        <section class="bc-modal-footer param-confirm-modal__footer">
+          <button class="btn-pill btn-secondary" type="button" (click)="cancelarDesactivarFullIfrs()" [disabled]="desactivandoFullIfrs">Cancelar</button>
+          <button class="btn-pill btn-primary" type="button" (click)="confirmarDesactivarFullIfrs()" [disabled]="desactivandoFullIfrs">
+            {{ desactivandoFullIfrs ? 'Inactivando…' : 'Inactivar cuenta' }}
           </button>
         </section>
       </section>

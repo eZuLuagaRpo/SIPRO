@@ -36,6 +36,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import com.bancolombia.sipro.validations.domain.service.HomologacionFullIfrsService;
 import com.bancolombia.sipro.validations.domain.service.ParametroUnicoService;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -79,6 +80,7 @@ public class PlanillaUseCase {
     private final ProductoRepository productoRepository;
     private final SegmentoRepository segmentoRepository;
     private final ParametroUnicoService parametroUnicoService;
+    private final HomologacionFullIfrsService homologacionFullIfrsService;
 
     private static final String[] MESES_ES = {
         "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -98,7 +100,8 @@ public class PlanillaUseCase {
             LoteMemoryStore loteMemoryStore,
             ProductoRepository productoRepository,
             SegmentoRepository segmentoRepository,
-            ParametroUnicoService parametroUnicoService) {
+            ParametroUnicoService parametroUnicoService,
+            HomologacionFullIfrsService homologacionFullIfrsService) {
         this.planillaRepository = planillaRepository;
         this.validacionRepository = validacionRepository;
         this.rechazoRepository = rechazoRepository;
@@ -113,6 +116,7 @@ public class PlanillaUseCase {
         this.productoRepository = productoRepository;
         this.segmentoRepository = segmentoRepository;
         this.parametroUnicoService = parametroUnicoService;
+        this.homologacionFullIfrsService = homologacionFullIfrsService;
     }
 
     @Transactional
@@ -535,10 +539,17 @@ public class PlanillaUseCase {
                     || planilla.getSegmento().toLowerCase().contains("ifrs"));
 
         if (isFullIfrsAprobacion && rutaXlsxAprobado != null && !rutaXlsxAprobado.isEmpty()) {
+            final LocalDate fechaCorteFullIfrs = planilla.getFechaCorteInformacion();
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
                     copiarACarpertaCompartidaFullIfrs(rutaXlsxAprobado, rutaCtrlAprobado, nombreArchivoXlsx);
+                    long pendientes = planillaRepository
+                            .countPlanillasNoAprobadasByFechaCorteAndSegmentoId(fechaCorteFullIfrs, 2L);
+                    if (pendientes == 0) {
+                        logger.info("[HomologacionFullIfrs] Todas las planillas Full IFRS del período {} aprobadas. Generando TXT.", fechaCorteFullIfrs);
+                        homologacionFullIfrsService.generarYPublicarTxt(fechaCorteFullIfrs);
+                    }
                 }
             });
         }

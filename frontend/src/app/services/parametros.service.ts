@@ -7,9 +7,12 @@ import {
   CambioLiderRequest,
   CambioLiderResultado,
   CuentaHomologacion,
+  CuentaHomologacionFullIfrs,
   ExcepcionRequest,
   ExcepcionVentanaCarga,
   HomologacionCuentaRequest,
+  HomologacionFullIfrsMasivaResultado,
+  HomologacionFullIfrsRequest,
   HomologacionMasivaResultado,
   MesDisponible,
   NuevoUsuarioRequest,
@@ -136,6 +139,28 @@ export class ParametrosService {
 
   cargarMasivaCuentas(formData: FormData): Observable<HomologacionMasivaResultado> {
     return this.http.post<HomologacionMasivaResultado>(`${this.base}/homologacion-colgaap/carga-masiva`, formData);
+  }
+
+  // ── Homologación Full IFRS ────────────────────────────────────────────────
+
+  getCuentasFullIfrs(): Observable<CuentaHomologacionFullIfrs[]> {
+    return this.http.get<CuentaHomologacionFullIfrs[]>(`${this.base}/homologacion-full-ifrs`);
+  }
+
+  crearCuentaFullIfrs(req: HomologacionFullIfrsRequest): Observable<OperacionResultado> {
+    return this.http.post<OperacionResultado>(`${this.base}/homologacion-full-ifrs`, req);
+  }
+
+  desactivarCuentaFullIfrs(id: number): Observable<OperacionResultado> {
+    return this.http.post<OperacionResultado>(`${this.base}/homologacion-full-ifrs/${id}/desactivar`, {});
+  }
+
+  modificarCuentaFullIfrs(id: number, req: HomologacionFullIfrsRequest): Observable<OperacionResultado> {
+    return this.http.post<OperacionResultado>(`${this.base}/homologacion-full-ifrs/${id}/modificar`, req);
+  }
+
+  cargarMasivaFullIfrs(formData: FormData): Observable<HomologacionFullIfrsMasivaResultado> {
+    return this.http.post<HomologacionFullIfrsMasivaResultado>(`${this.base}/homologacion-full-ifrs/carga-masiva`, formData);
   }
 
   // ── Catálogos ─────────────────────────────────────────────────────────────

@@ -5,6 +5,8 @@ import com.bancolombia.sipro.validations.domain.model.Segmento;
 import com.bancolombia.sipro.validations.domain.model.SiproExcepcionVentanaCarga;
 import com.bancolombia.sipro.validations.domain.model.SiproReglaVentanaCarga;
 import com.bancolombia.sipro.validations.domain.model.SiproRolesPermisos;
+import com.bancolombia.sipro.validations.domain.service.HomologacionFullIfrsService;
+import com.bancolombia.sipro.validations.domain.service.HomologacionFullIfrsService.*;
 import com.bancolombia.sipro.validations.domain.service.ParametrosService;
 import com.bancolombia.sipro.validations.domain.service.ParametrosService.*;
 import com.bancolombia.sipro.validations.infrastructure.security.SiproAuthenticatedUser;
@@ -26,9 +28,12 @@ import java.util.Map;
 public class ParametrosController {
 
     private final ParametrosService parametrosService;
+    private final HomologacionFullIfrsService homologacionFullIfrsService;
 
-    public ParametrosController(ParametrosService parametrosService) {
+    public ParametrosController(ParametrosService parametrosService,
+                                 HomologacionFullIfrsService homologacionFullIfrsService) {
         this.parametrosService = parametrosService;
+        this.homologacionFullIfrsService = homologacionFullIfrsService;
     }
 
     // ── Ventana de Carga: Regla Base ──────────────────────────────────────
@@ -315,6 +320,53 @@ public class ParametrosController {
         parametrosService.requireParametros(principal);
         ParametrosService.HomologacionMasivaResultado resultado =
                 parametrosService.procesarCargaMasivaCuentas(archivo, String.valueOf(principal.idUsuario()));
+        return ResponseEntity.ok(resultado);
+    }
+
+    // ── Homologación Full IFRS ────────────────────────────────────────────
+
+    @GetMapping("/homologacion-full-ifrs")
+    public ResponseEntity<List<HomologacionFullIfrsDto>> getCuentasFullIfrs(
+            @AuthenticationPrincipal SiproAuthenticatedUser principal) {
+        parametrosService.requireParametros(principal);
+        return ResponseEntity.ok(homologacionFullIfrsService.listar());
+    }
+
+    @PostMapping("/homologacion-full-ifrs")
+    public ResponseEntity<Map<String, Object>> crearCuentaFullIfrs(
+            @AuthenticationPrincipal SiproAuthenticatedUser principal,
+            @RequestBody HomologacionFullIfrsRequest req) {
+        parametrosService.requireParametros(principal);
+        homologacionFullIfrsService.crear(req, String.valueOf(principal.idUsuario()));
+        return ResponseEntity.ok(Map.of("success", true, "mensaje", "Cuenta creada correctamente."));
+    }
+
+    @PostMapping("/homologacion-full-ifrs/{id}/desactivar")
+    public ResponseEntity<Map<String, Object>> desactivarCuentaFullIfrs(
+            @AuthenticationPrincipal SiproAuthenticatedUser principal,
+            @PathVariable Long id) {
+        parametrosService.requireParametros(principal);
+        homologacionFullIfrsService.desactivar(id);
+        return ResponseEntity.ok(Map.of("success", true, "mensaje", "Cuenta inactivada correctamente."));
+    }
+
+    @PostMapping("/homologacion-full-ifrs/{id}/modificar")
+    public ResponseEntity<Map<String, Object>> modificarCuentaFullIfrs(
+            @AuthenticationPrincipal SiproAuthenticatedUser principal,
+            @PathVariable Long id,
+            @RequestBody HomologacionFullIfrsRequest req) {
+        parametrosService.requireParametros(principal);
+        homologacionFullIfrsService.modificar(id, req, String.valueOf(principal.idUsuario()));
+        return ResponseEntity.ok(Map.of("success", true, "mensaje", "Cuenta modificada correctamente."));
+    }
+
+    @PostMapping(value = "/homologacion-full-ifrs/carga-masiva", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<HomologacionFullIfrsMasivaResultado> cargaMasivaFullIfrs(
+            @AuthenticationPrincipal SiproAuthenticatedUser principal,
+            @RequestPart("archivo") MultipartFile archivo) {
+        parametrosService.requireParametros(principal);
+        HomologacionFullIfrsMasivaResultado resultado =
+                homologacionFullIfrsService.procesarCargaMasiva(archivo, String.valueOf(principal.idUsuario()));
         return ResponseEntity.ok(resultado);
     }
 

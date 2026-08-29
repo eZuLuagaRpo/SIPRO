@@ -171,6 +171,36 @@ export interface HomologacionMasivaResultado {
   errores: HomologacionErrorFila[];
 }
 
+// ─── Homologación Full IFRS ──────────────────────────────────────────────────
+
+export interface CuentaHomologacionFullIfrs {
+  id: number;
+  cuentaPlanilla: string;
+  cuentaSap: string;
+  estado: number; // 1 = activa, 0 = inactiva
+  creadoEn: string | null;
+  creadoPor: string | null;
+}
+
+export interface HomologacionFullIfrsRequest {
+  cuentaPlanilla: string;
+  cuentaSap: string;
+}
+
+export interface HomologacionFullIfrsErrorFila {
+  fila: number;
+  cuentaPlanilla: string;
+  error: string;
+}
+
+export interface HomologacionFullIfrsMasivaResultado {
+  success: boolean;
+  mensaje: string | null;
+  activados: number;
+  desactivados: number;
+  errores: HomologacionFullIfrsErrorFila[];
+}
+
 // ─── Respuestas genéricas ────────────────────────────────────────────────────
 
 export interface OperacionResultado {
