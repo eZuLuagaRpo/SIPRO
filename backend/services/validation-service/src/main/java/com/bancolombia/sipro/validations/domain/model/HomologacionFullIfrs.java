@@ -10,7 +10,7 @@ public class HomologacionFullIfrs {
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "homologacion_full_ifrs_gen")
     @SequenceGenerator(name = "homologacion_full_ifrs_gen",
-            sequenceName = "sipro_parametros_homologacion_full_ifrs_id_homologacion_full_if",
+            sequenceName = "sipro_parametros_homologacion_ful_id_homologacion_full_ifrs_seq",
             allocationSize = 1)
     @Column(name = "id_homologacion_full_ifrs")
     private Long idHomologacionFullIfrs;
