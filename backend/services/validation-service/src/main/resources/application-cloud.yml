@@ -212,4 +212,4 @@ lz:
   socket-timeout: 1800
 
   ingestion:
-    validate-on-startup: true
+    validate-on-startup: '#{LZ_VALIDATE_ON_STARTUP}#'
