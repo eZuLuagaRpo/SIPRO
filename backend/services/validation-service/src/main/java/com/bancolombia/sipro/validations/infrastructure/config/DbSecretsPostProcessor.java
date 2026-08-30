@@ -10,6 +10,8 @@ import org.springframework.core.Ordered;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.MapPropertySource;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -30,7 +32,7 @@ public class DbSecretsPostProcessor implements EnvironmentPostProcessor, Ordered
         }
 
         String region = environment.getProperty("db.secrets.region", "us-east-1").trim();
-        System.out.println("[DB-SECRETS] Obteniendo credenciales de BD desde Secrets Manager: secreto=" + secretName + ", region=" + region);
+        syslog("INFO", "[DB-SECRETS] Obteniendo credenciales de BD — secreto=" + secretName + ", region=" + region);
 
         try {
             GenericManager connector = new AWSSecretManagerConnector(region);
@@ -56,7 +58,7 @@ public class DbSecretsPostProcessor implements EnvironmentPostProcessor, Ordered
             props.put("spring.datasource.password", secret.getPassword());
             environment.getPropertySources().addFirst(new MapPropertySource("dbSecretsManager", props));
 
-            System.out.println("[DB-SECRETS] Credenciales de BD cargadas correctamente (usuario=" + secret.getUsername() + ", host=" + secret.getHost() + ").");
+            syslog("INFO", "[DB-SECRETS] Credenciales de BD cargadas OK — usuario=" + secret.getUsername() + ", host=" + secret.getHost());
 
         } catch (SecretException e) {
             throw new RuntimeException(
@@ -70,6 +72,13 @@ public class DbSecretsPostProcessor implements EnvironmentPostProcessor, Ordered
     @Override
     public int getOrder() {
         return Ordered.LOWEST_PRECEDENCE;
+    }
+
+    /** Imita el formato de logback para logs que ocurren antes de que el sistema de logging arranque. */
+    private static void syslog(String level, String msg) {
+        System.out.printf("%s %-5s [main] DbSecretsPostProcessor - %s%n",
+                LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS")),
+                level, msg);
     }
 
     private static class DbSecretFields {

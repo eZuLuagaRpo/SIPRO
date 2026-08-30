@@ -1,5 +1,6 @@
 package com.bancolombia.sipro.validations.infrastructure.config;
 
+import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -40,6 +41,7 @@ public class PartitionInitializer implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
+        logDatabaseConnection();
         log.info("=== Partition Initializer ===");
 
         try {
@@ -92,6 +94,24 @@ public class PartitionInitializer implements ApplicationRunner {
             log.error("=== Partition Initializer FALLO: {} ===", e.getMessage(), e);
             log.error("No se pudo completar la inicialización. Causa probable: el usuario "
                 + "JDBC no es dueño de alguna tabla. Ejecute los ALTER manualmente como superusuario.");
+        }
+    }
+
+    // ── DB connection health log ───────────────────────────────────────────
+
+    private void logDatabaseConnection() {
+        try {
+            String dbName = pg.queryForObject("SELECT current_database()", String.class);
+            javax.sql.DataSource ds = pg.getDataSource();
+            String url = (ds instanceof HikariDataSource hds) ? hds.getJdbcUrl() : "?";
+            String displayUrl = url.length() > 44 ? "..." + url.substring(url.length() - 41) : url;
+            log.info("┌─────────────────────────────────────────────────────┐");
+            log.info(String.format("│  %-51s│", "[DB] Conexión PostgreSQL OK"));
+            log.info(String.format("│  URL  : %-44s│", displayUrl));
+            log.info(String.format("│  BD   : %-44s│", dbName != null ? dbName : "?"));
+            log.info("└─────────────────────────────────────────────────────┘");
+        } catch (Exception e) {
+            log.error("[DB] Conexión PostgreSQL FALLIDA al arrancar: {}", e.getMessage());
         }
     }
 

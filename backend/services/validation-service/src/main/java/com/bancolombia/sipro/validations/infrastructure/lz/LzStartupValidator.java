@@ -50,14 +50,15 @@ public class LzStartupValidator implements ApplicationRunner {
         String perfil     = profiles.length > 0 ? String.join(",", profiles).toUpperCase() : "DEFAULT";
         String lzHost     = lzJdbcService.isEnabled() ? "10.8.85.237:21050" : "(no configurado)";
 
+        String ambienteInfo = (perfil.equals("PDN") ? "PRODUCCION" : "PREPRODUCTIVO")
+                + " — LZ " + (perfil.equals("PDN") ? "productivo" : "preproductivo");
+
         log.info("");
-        log.info("+============================================================+");
-        log.info(String.format("|  SIPRO -- Perfil activo: %-30s    |", perfil));
-        log.info(String.format("|  LZ Host  : %-43s|", lzHost));
-        log.info("|  Ambiente : {} -- LZ {} |",
-            perfil.equals("PDN") ? "PRODUCCION    " : "PREPRODUCTIVO (10.8.85.237)",
-            perfil.equals("PDN") ? "productivo    " : "preproductivo");
-        log.info("+============================================================+");
+        log.info("┌─────────────────────────────────────────────────────┐");
+        log.info(String.format("│  %-51s│", "SIPRO — Perfil activo: " + perfil));
+        log.info(String.format("│  %-51s│", "LZ Host  : " + lzHost));
+        log.info(String.format("│  %-51s│", "Ambiente : " + ambienteInfo));
+        log.info("└─────────────────────────────────────────────────────┘");
         log.info("");
         log.info("=== LZ Startup Validator ===");
 
