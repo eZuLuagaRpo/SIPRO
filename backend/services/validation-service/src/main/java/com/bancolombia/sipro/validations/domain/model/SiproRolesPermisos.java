@@ -8,7 +8,7 @@ import java.io.Serializable;
  * Cada rol define un conjunto de permisos (cargar, aprobar, visualizar, etc.).
  */
 @Entity
-@Table(name = "sipro_roles_permisos")
+@Table(name = "sipro_roles_permisos", schema = "schsipro")
 public class SiproRolesPermisos implements Serializable {
 
     @Id

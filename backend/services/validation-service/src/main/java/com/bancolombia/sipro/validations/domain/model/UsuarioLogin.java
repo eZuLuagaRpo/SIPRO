@@ -7,7 +7,7 @@ import java.io.Serializable;
  * Guarda las credenciales del usuario y enlaza sus datos personales y de área.
  */
 @Entity
-@Table(name = "usuario_login")
+@Table(name = "usuario_login", schema = "schsipro")
 public class UsuarioLogin implements Serializable {
 
     @Id

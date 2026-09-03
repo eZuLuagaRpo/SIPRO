@@ -9,7 +9,7 @@ import java.util.Objects;
  * Se usa exclusivamente para validar existencia de clientes (NIT) en LZ.
  */
 @Entity
-@Table(name = "sipro_lz_mdm_datos_generales_clientes")
+@Table(name = "sipro_lz_mdm_datos_generales_clientes", schema = "schsipro")
 @IdClass(SiproLzMdmCliente.PK.class)
 public class SiproLzMdmCliente {
 

@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
  *   - QUÉ HACE: El Rol (sipro_roles_permisos)
  */
 @Entity
-@Table(name = "sipro_usuario_producto_rol")
+@Table(name = "sipro_usuario_producto_rol", schema = "schsipro")
 public class SiproUsuarioProductoRol implements Serializable {
 
     @EmbeddedId

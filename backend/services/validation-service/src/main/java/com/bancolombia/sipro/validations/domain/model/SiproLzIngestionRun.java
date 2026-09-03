@@ -8,7 +8,7 @@ import java.time.Instant;
  * status: STARTED | SUCCESS | FAILED | INCOMPLETE
  */
 @Entity
-@Table(name = "sipro_lz_ingestion_run")
+@Table(name = "sipro_lz_ingestion_run", schema = "schsipro")
 public class SiproLzIngestionRun {
 
     @Id

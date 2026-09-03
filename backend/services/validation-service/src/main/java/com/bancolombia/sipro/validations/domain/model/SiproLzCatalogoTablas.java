@@ -21,7 +21,7 @@ import java.time.LocalDateTime;
  *   fecha_modificacion TIMESTAMP
  */
 @Entity
-@Table(name = "sipro_lz_catalogo_tablas")
+@Table(name = "sipro_lz_catalogo_tablas", schema = "schsipro")
 public class SiproLzCatalogoTablas {
 
     @Id

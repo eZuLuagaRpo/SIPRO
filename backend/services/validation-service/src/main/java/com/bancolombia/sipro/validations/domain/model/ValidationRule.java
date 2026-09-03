@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
  * - DATE_RELATION: Comparar fechas entre sí o contra variables runtime
  */
 @Entity
-@Table(name = "data_validation_rule")
+@Table(name = "data_validation_rule", schema = "schsipro")
 public class ValidationRule implements Serializable {
 
     @Id

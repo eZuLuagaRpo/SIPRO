@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
  * vigente y su referencia obligatoria al catalogo de tablas.
  */
 @Entity
-@Table(name = "sipro_parametros_tablas_lz")
+@Table(name = "sipro_parametros_tablas_lz", schema = "schsipro")
 public class SiproParametroTablaLz {
 
     @Id

@@ -7,7 +7,7 @@ import java.io.Serializable;
  * Relaciona al usuario con su área organizacional y el líder asociado.
  */
 @Entity
-@Table(name = "usuario_area")
+@Table(name = "usuario_area", schema = "schsipro")
 public class UsuarioArea implements Serializable {
 
     @Id

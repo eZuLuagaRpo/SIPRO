@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
  * Guarda métricas técnicas y de calidad calculadas durante la validación de un archivo.
  */
 @Entity
-@Table(name = "sipro_detalle_archivo_validacion")
+@Table(name = "sipro_detalle_archivo_validacion", schema = "schsipro")
 public class SiproDetalleArchivoValidacion {
 
     @Id

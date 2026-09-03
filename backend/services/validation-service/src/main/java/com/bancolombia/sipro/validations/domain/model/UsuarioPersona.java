@@ -7,7 +7,7 @@ import java.io.Serializable;
  * Contiene los datos personales básicos del usuario autenticado en SIPRO.
  */
 @Entity
-@Table(name = "usuario_persona")
+@Table(name = "usuario_persona", schema = "schsipro")
 public class UsuarioPersona implements Serializable {
 
     @Id
