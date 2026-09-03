@@ -27,7 +27,7 @@ lz:
   # ── Host/Puerto del ambiente PREPRODUCTIVO de LZ ─────────────────────────
   # DEV y QA usan el mismo ambiente intermedio (10.8.85.237:21050).
   # PDN hereda impala.bancolombia.corp desde application.yml — NO tocar.
-  host: ${LZ_HOST:10.8.85.237}
+  host: ${LZ_HOST:impala.bancolombia.corp}
   port: ${LZ_PORT:21050}
 
   secrets:
@@ -41,7 +41,7 @@ lz:
   #   LZ_DEV_PASSWORD=<tu-clave-ambientesBC>
   # NUNCA poner la contrasena real aqui. En QA/PDN dejar vacio para usar Secrets Manager.
   dev:
-    user:     ${LZ_DEV_USER:emzulu@ambientesbc.com}
+    user:     ${LZ_DEV_USER:}
     password: ${LZ_DEV_PASSWORD:}
 
   # ── SSL / Truststore ─────────────────────────────────────────────────────

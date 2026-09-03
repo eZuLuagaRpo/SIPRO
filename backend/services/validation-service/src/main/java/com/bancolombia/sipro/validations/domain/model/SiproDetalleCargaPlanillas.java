@@ -10,7 +10,7 @@ import java.time.OffsetDateTime;
  * Entidad principal que representa una planilla cargada y su estado dentro del flujo.
  */
 @Entity
-@Table(name = "sipro_detalle_carga_planillas", schema = "public")
+@Table(name = "sipro_detalle_carga_planillas", schema = "schsipro")
 public class SiproDetalleCargaPlanillas implements Serializable {
 
     @Id

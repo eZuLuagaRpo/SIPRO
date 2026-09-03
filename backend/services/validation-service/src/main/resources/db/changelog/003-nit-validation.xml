@@ -20,4 +20,19 @@
         </rollback>
     </changeSet>
 
+    <!-- ================================================================
+         003-002: Indice para el cruce de NIT por numero_id.
+         La validacion de planillas usa numero_id como identificador
+         oficial del cliente.
+    ================================================================ -->
+    <changeSet id="003-002" author="sipro">
+        <sql>
+            CREATE INDEX IF NOT EXISTS ix_sipro_lz_mdm_clientes_numero_id
+                ON sipro_lz_mdm_datos_generales_clientes (period_year, period_month, numero_id);
+        </sql>
+        <rollback>
+            DROP INDEX IF EXISTS ix_sipro_lz_mdm_clientes_numero_id;
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

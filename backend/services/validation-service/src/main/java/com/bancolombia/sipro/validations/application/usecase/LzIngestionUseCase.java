@@ -1,4 +1,4 @@
-﻿package com.bancolombia.sipro.validations.application.usecase;
+package com.bancolombia.sipro.validations.application.usecase;
 
 import com.bancolombia.sipro.validations.application.dto.LzIngestionRequest;
 import com.bancolombia.sipro.validations.application.dto.LzIngestionResponse;
@@ -81,6 +81,7 @@ public class LzIngestionUseCase {
     private static final Set<String> SYSTEM_COLUMNS = Set.of(
         "period_year", "period_month", "ingestion_run_id", "inserted_at"
     );
+    private static final String PG_SCHEMA = "schsipro";
 
     public LzIngestionUseCase(SiproParametroTablaLzRepository paramRepo,
                                SiproLzIngestionRunRepository   runRepo,
@@ -120,8 +121,8 @@ public class LzIngestionUseCase {
         //     Si no existen (ej: nombre derivado incorrecto en catalogo), se aborta
         //     con mensaje claro. El scheduler reintenta en 24h; el admin corrige
         //     sipro_lz_catalogo_tablas.tabla_destino_pg / tabla_staging_pg.
-        String stgTable   = param.getTablaStagingPg();
-        String finalTable = param.getTablaDestinoPg();
+        String stgTable   = qualifyTable(param.getTablaStagingPg());
+        String finalTable = qualifyTable(param.getTablaDestinoPg());
         if (finalTable == null || finalTable.isBlank()) {
             String msg = "El catalogo no resolvio tabla_destino_pg para tabla_origen='" + tablaCatalogo
                 + "' (id_tabla=" + idTabla + ").";
@@ -161,7 +162,7 @@ public class LzIngestionUseCase {
         if (!req.isForceOverwrite()) {
             int guardDays = parametroUnicoService.getInt("LZ_INGESTION_GUARD_DAYS", DEFAULT_LZ_INGESTION_GUARD_DAYS);
             Integer recentSuccess = pg.queryForObject(
-                "SELECT COUNT(*) FROM sipro_lz_ingestion_run "
+                "SELECT COUNT(*) FROM schsipro.sipro_lz_ingestion_run "
                 + "WHERE id_tabla = ? AND status = 'SUCCESS' "
                 + "AND ended_at >= now() - make_interval(days => ?)",
                 Integer.class, idTabla, guardDays);
@@ -177,7 +178,7 @@ public class LzIngestionUseCase {
         // limpiarse o promoverse entre si y dejar resultados mezclados.
         String lockKey = tablaCatalogo + "(id_tabla=" + idTabla + ")";
         Integer startedCount = pg.queryForObject(
-            "SELECT COUNT(*) FROM sipro_lz_ingestion_run "
+            "SELECT COUNT(*) FROM schsipro.sipro_lz_ingestion_run "
             + "WHERE id_tabla = ? AND status = 'STARTED'",
             Integer.class, idTabla);
         if (startedCount != null && startedCount > 0) {
@@ -316,7 +317,7 @@ public class LzIngestionUseCase {
                 "LZ_INGESTION_STALE_RUN_TIMEOUT_MINUTES",
                 DEFAULT_LZ_INGESTION_STALE_RUN_TIMEOUT_MINUTES);
         int updated = pg.update(
-            "UPDATE sipro_lz_ingestion_run "
+            "UPDATE schsipro.sipro_lz_ingestion_run "
             + "SET status = 'FAILED', "
             + "    message = 'Auto-recuperado: STARTED > ' || ? || ' minutos (servidor interrumpido)', "
             + "    ended_at = now() "
@@ -343,15 +344,15 @@ public class LzIngestionUseCase {
      * La tabla de control (ingestion_run) esta RANGE-particionada por started_at.
      */
     private void cleanOrphanedData(SiproParametroTablaLz param) {
-        String stgTable   = param.getTablaStagingPg();
-        String finalTable = param.getTablaDestinoPg();
+        String stgTable   = qualifyTable(param.getTablaStagingPg());
+        String finalTable = qualifyTable(param.getTablaDestinoPg());
 
         // 1. Datos en STG cuyo run_id no existe en run table
         if (tableExistsInPg(stgTable)) {
             int stgOrphans = pg.update(
                 "DELETE FROM " + stgTable + " d "
                 + "WHERE NOT EXISTS ("
-                + "  SELECT 1 FROM sipro_lz_ingestion_run r "
+                + "  SELECT 1 FROM schsipro.sipro_lz_ingestion_run r "
                 + "  WHERE r.run_id = d.ingestion_run_id)");
             if (stgOrphans > 0) {
                 log.warn("CLEANUP: eliminadas {} filas huerfanas de {} (run_id inexistente)",
@@ -361,7 +362,7 @@ public class LzIngestionUseCase {
             // 2. Datos en STG cuyo run esta en FAILED (parciales, nunca promovidos)
             int stgFailed = pg.update(
                 "DELETE FROM " + stgTable + " d "
-                + "USING sipro_lz_ingestion_run r "
+                + "USING schsipro.sipro_lz_ingestion_run r "
                 + "WHERE d.ingestion_run_id = r.run_id AND r.status = 'FAILED'");
             if (stgFailed > 0) {
                 log.warn("CLEANUP: eliminadas {} filas de {} de runs FAILED", stgFailed, stgTable);
@@ -375,7 +376,7 @@ public class LzIngestionUseCase {
             int finalOrphans = pg.update(
                 "DELETE FROM " + finalTable + " d "
                 + "WHERE NOT EXISTS ("
-                + "  SELECT 1 FROM sipro_lz_ingestion_run r "
+                + "  SELECT 1 FROM schsipro.sipro_lz_ingestion_run r "
                 + "  WHERE r.run_id = d.ingestion_run_id)");
             if (finalOrphans > 0) {
                 log.warn("CLEANUP: eliminadas {} filas huerfanas de {} (run_id inexistente)",
@@ -397,7 +398,7 @@ public class LzIngestionUseCase {
      *          (c) tras promocion exitosa (datos ya estan en Final).
      */
     private void cleanStagingForRun(SiproParametroTablaLz param, Long runId) {
-        String stgTable = param.getTablaStagingPg();
+        String stgTable = qualifyTable(param.getTablaStagingPg());
         int deleted = pg.update(
             "DELETE FROM " + stgTable + " WHERE ingestion_run_id = ?", runId);
         if (deleted > 0) {
@@ -415,7 +416,7 @@ public class LzIngestionUseCase {
     private boolean tableExistsInPg(String tableName) {
         if (tableName == null || tableName.isBlank()) return false;
         Boolean exists = pg.queryForObject(
-            "SELECT EXISTS (SELECT 1 FROM pg_class WHERE relname = ? AND relkind IN ('p','r'))",
+            "SELECT to_regclass(?) IS NOT NULL",
             Boolean.class, tableName.trim().toLowerCase());
         return Boolean.TRUE.equals(exists);
     }
@@ -567,7 +568,7 @@ public class LzIngestionUseCase {
 
         if (lzRows.isEmpty()) return 0L;
 
-        String stgTable = param.getTablaStagingPg();
+        String stgTable = qualifyTable(param.getTablaStagingPg());
 
         // Columnas completas de la INSERT
         List<String> insertCols = new ArrayList<>();
@@ -642,8 +643,8 @@ public class LzIngestionUseCase {
                                Long runId,
                                int year,
                                int month) {
-        String stgTable   = param.getTablaStagingPg();
-        String finalTable = param.getTablaDestinoPg();
+        String stgTable   = qualifyTable(param.getTablaStagingPg());
+        String finalTable = qualifyTable(param.getTablaDestinoPg());
 
         // Columnas derivadas dinamicamente de la tabla staging/final + columnas de sistema.
         List<String> allCols = new ArrayList<>();
@@ -677,9 +678,20 @@ public class LzIngestionUseCase {
             String normalized = qualifiedName.trim().toLowerCase();
             int dot = normalized.indexOf('.');
             if (dot < 0) {
-                return new PgTableRef("public", normalized);
+                return new PgTableRef(PG_SCHEMA, normalized);
             }
             return new PgTableRef(normalized.substring(0, dot), normalized.substring(dot + 1));
         }
+    }
+
+    private static String qualifyTable(String tableName) {
+        if (tableName == null || tableName.isBlank()) {
+            return tableName;
+        }
+        PgTableRef tableRef = PgTableRef.parse(tableName);
+        if (!PG_SCHEMA.equals(tableRef.schema())) {
+            throw new IllegalArgumentException("La tabla PostgreSQL debe pertenecer al esquema " + PG_SCHEMA);
+        }
+        return tableRef.schema() + "." + tableRef.table();
     }
 }

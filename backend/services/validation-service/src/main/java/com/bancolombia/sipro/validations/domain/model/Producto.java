@@ -7,12 +7,12 @@ import java.io.Serializable;
  * Catálogo de productos disponibles para cargar y validar en SIPRO.
  */
 @Entity
-@Table(name = "productos", schema = "public")
+@Table(name = "productos", schema = "schsipro")
 public class Producto implements Serializable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "productos_seq")
-    @SequenceGenerator(name = "productos_seq", sequenceName = "productos_id_producto_seq", allocationSize = 1)
+    @SequenceGenerator(name = "productos_seq", sequenceName = "schsipro.productos_id_producto_seq", allocationSize = 1)
     @Column(name = "id_producto")
     private Long idProducto;
 

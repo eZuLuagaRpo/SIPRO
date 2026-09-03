@@ -49,7 +49,7 @@ public class CreffosParametroColumnasRepository {
                 estado,
                 descripcion,
                 observaciones
-            FROM public.sipro_parametros_columnas_creffsos
+            FROM schsipro.sipro_parametros_columnas_creffsos
             WHERE estado = 1
               AND incluir_salida = true
             ORDER BY orden ASC
@@ -177,7 +177,7 @@ public class CreffosParametroColumnasRepository {
 
             String[] parts = value.split("\\.", 2);
             if (parts.length == 1) {
-                return new QualifiedTable("public", sanitize(parts[0]));
+                return new QualifiedTable("schsipro", sanitize(parts[0]));
             }
             return new QualifiedTable(sanitize(parts[0]), sanitize(parts[1]));
         }

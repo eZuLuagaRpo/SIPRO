@@ -21,6 +21,5 @@
     <include file="db/changelog/014-lz-f-ult-actualizacion.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/015-ifrs-planillas-ruta-compartida.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/017-archivos-bloqueados-ruta-salida.xml" relativeToChangelogFile="false"/>
-    <include file="db/changelog/019-incumplimiento-notificacion-parametro.xml" relativeToChangelogFile="false"/>
 
 </databaseChangeLog>

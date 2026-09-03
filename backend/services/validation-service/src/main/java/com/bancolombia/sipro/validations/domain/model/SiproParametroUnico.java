@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
  * Almacena parámetros simples clave-valor usados para controlar comportamiento del sistema.
  */
 @Entity
-@Table(name = "sipro_parametros_unico", schema = "public")
+@Table(name = "sipro_parametros_unico", schema = "schsipro")
 public class SiproParametroUnico implements Serializable {
 
     @Id

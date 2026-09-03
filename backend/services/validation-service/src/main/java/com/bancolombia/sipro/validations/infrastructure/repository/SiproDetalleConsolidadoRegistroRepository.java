@@ -51,10 +51,10 @@ public interface SiproDetalleConsolidadoRegistroRepository extends JpaRepository
 	 * Elimina un lote acotado de registros asociados a una consolidación.
 	 */
 	@Modifying(clearAutomatically = true, flushAutomatically = true)
-	@Query(value = "DELETE FROM public.sipro_detalle_consolidado_registros "
+	@Query(value = "DELETE FROM schsipro.sipro_detalle_consolidado_registros "
 			+ "WHERE id_consolidado_registro IN ("
 			+ "    SELECT id_consolidado_registro "
-			+ "    FROM public.sipro_detalle_consolidado_registros "
+			+ "    FROM schsipro.sipro_detalle_consolidado_registros "
 			+ "    WHERE id_consolidacion = :idConsolidacion "
 			+ "    ORDER BY id_consolidado_registro "
 			+ "    LIMIT :batchSize"

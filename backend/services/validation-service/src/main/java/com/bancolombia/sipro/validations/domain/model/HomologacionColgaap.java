@@ -4,13 +4,13 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "sipro_parametros_homologacion_colgaap", schema = "public")
+@Table(name = "sipro_parametros_homologacion_colgaap", schema = "schsipro")
 public class HomologacionColgaap {
 
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "homologacion_colgaap_gen")
     @SequenceGenerator(name = "homologacion_colgaap_gen",
-            sequenceName = "sipro_parametros_homologacion_colga_id_homologacion_colgaap_seq",
+            sequenceName = "schsipro.sipro_parametros_homologacion_colga_id_homologacion_colgaap_seq",
             allocationSize = 1)
     @Column(name = "id_homologacion_colgaap")
     private Long idHomologacionColgaap;

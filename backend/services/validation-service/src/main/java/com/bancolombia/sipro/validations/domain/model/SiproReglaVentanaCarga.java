@@ -12,7 +12,7 @@ import java.time.OffsetDateTime;
  * de carga de información por periodo de valoración.
  */
 @Entity
-@Table(name = "sipro_parametros_reglaventanacarga", schema = "public")
+@Table(name = "sipro_parametros_reglaventanacarga", schema = "schsipro")
 public class SiproReglaVentanaCarga implements Serializable {
 
     @Id

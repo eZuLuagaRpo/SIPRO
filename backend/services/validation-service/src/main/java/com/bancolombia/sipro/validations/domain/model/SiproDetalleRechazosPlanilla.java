@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
  * Audita cada rechazo aplicado a una planilla y el motivo registrado.
  */
 @Entity
-@Table(name = "sipro_detalle_rechazos_planilla", schema = "public")
+@Table(name = "sipro_detalle_rechazos_planilla", schema = "schsipro")
 public class SiproDetalleRechazosPlanilla implements Serializable {
 
     @Id

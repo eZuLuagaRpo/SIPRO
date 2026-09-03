@@ -142,7 +142,7 @@ public class AuthController {
             logger.info("Consultando permisos para usuario autenticado: {}", principal.idUsuario());
             UsuarioPermisosResponse permisos = rbacService.obtenerPermisosUsuario(
                     principal.idUsuario(),
-                    principal.roles());
+                    principal.groupNames());
             return ResponseEntity.ok(permisos);
         } catch (Exception e) {
             logger.error("Error al consultar permisos del usuario {}: ", idUsuario, e);

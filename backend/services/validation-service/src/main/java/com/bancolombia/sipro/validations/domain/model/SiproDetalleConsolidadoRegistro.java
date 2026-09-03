@@ -15,7 +15,7 @@ import java.time.LocalDate;
  * Representa cada fila ya consolidada que alimenta resúmenes y comparaciones del periodo.
  */
 @Entity
-@Table(name = "sipro_detalle_consolidado_registros", schema = "public")
+@Table(name = "sipro_detalle_consolidado_registros", schema = "schsipro")
 public class SiproDetalleConsolidadoRegistro implements Serializable {
 
     @Id

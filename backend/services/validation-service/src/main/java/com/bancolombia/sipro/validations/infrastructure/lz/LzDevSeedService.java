@@ -37,6 +37,7 @@ import java.util.Map;
  *
  * NO corre en PDN — excluido por @Profile({"dev", "qa"}).
  */
+
 @Component
 @Profile({"dev", "qa"})
 @Order(2)

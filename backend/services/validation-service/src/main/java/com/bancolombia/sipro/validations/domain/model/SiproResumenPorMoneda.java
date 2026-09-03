@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
  * Resume los resultados de validación o consolidación agrupados por tipo de moneda.
  */
 @Entity
-@Table(name = "sipro_resumen_por_moneda", schema = "public")
+@Table(name = "sipro_resumen_por_moneda", schema = "schsipro")
 public class SiproResumenPorMoneda implements Serializable {
 
     @Id

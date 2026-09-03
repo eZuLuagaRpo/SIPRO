@@ -4,13 +4,13 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "sipro_parametros_homologacion_full_ifrs", schema = "public")
+@Table(name = "sipro_parametros_homologacion_full_ifrs", schema = "schsipro")
 public class HomologacionFullIfrs {
 
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "homologacion_full_ifrs_gen")
     @SequenceGenerator(name = "homologacion_full_ifrs_gen",
-            sequenceName = "sipro_parametros_homologacion_ful_id_homologacion_full_ifrs_seq",
+            sequenceName = "schsipro.sipro_parametros_homologacion_ful_id_homologacion_full_ifrs_seq",
             allocationSize = 1)
     @Column(name = "id_homologacion_full_ifrs")
     private Long idHomologacionFullIfrs;

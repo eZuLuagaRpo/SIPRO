@@ -12,7 +12,7 @@ import java.time.OffsetDateTime;
  * de ventana de carga. Los campos override son opcionales (excepciones parciales).
  */
 @Entity
-@Table(name = "sipro_parametros_excepcionventanacarga", schema = "public")
+@Table(name = "sipro_parametros_excepcionventanacarga", schema = "schsipro")
 public class SiproExcepcionVentanaCarga implements Serializable {
 
     @Id

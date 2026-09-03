@@ -10,7 +10,7 @@ import java.time.OffsetDateTime;
  * Contiene la configuración del rango de meses permitidos para el selector de fecha de corte.
  */
 @Entity
-@Table(name = "sipro_parametros_rango_habilitado", schema = "public")
+@Table(name = "sipro_parametros_rango_habilitado", schema = "schsipro")
 public class SiproParametrosRangoHabilitado implements Serializable {
 
     @Id

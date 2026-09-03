@@ -38,6 +38,7 @@ import java.util.List;
  *   SET parametros_json = jsonb_set(parametros_json, '{lookupSchema}', '"proceso"')
  *   WHERE nombre_columna IN ('CLASEGTIA', 'CALIFICPUC');
  */
+
 @Component
 @Profile("dev")
 @Order(3)

@@ -16,7 +16,7 @@ import java.time.OffsetDateTime;
  * Cabecera que resume una ejecución de consolidación manual o automática por periodo.
  */
 @Entity
-@Table(name = "sipro_detalle_consolidaciones_planillas", schema = "public")
+@Table(name = "sipro_detalle_consolidaciones_planillas", schema = "schsipro")
 public class SiproDetalleConsolidacionesPlanillas implements Serializable {
 
     @Id

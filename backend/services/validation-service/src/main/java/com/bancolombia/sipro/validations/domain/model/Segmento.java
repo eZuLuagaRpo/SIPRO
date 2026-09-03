@@ -7,7 +7,7 @@ import java.io.Serializable;
  * Catálogo de segmentos funcionales asociados a productos y cargas.
  */
 @Entity
-@Table(name = "segmentos", schema = "public")
+@Table(name = "segmentos", schema = "schsipro")
 public class Segmento implements Serializable {
 
     @Id

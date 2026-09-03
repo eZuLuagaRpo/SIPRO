@@ -37,6 +37,7 @@ spring:
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
+      connection-init-sql: SET search_path TO schsipro
   jpa:
     hibernate:
       ddl-auto: none
@@ -45,6 +46,7 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        default_schema: schsipro
         temp:
           use_jdbc_metadata_defaults: false
       connection.characterEncoding: utf-8

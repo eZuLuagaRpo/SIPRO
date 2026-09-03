@@ -34,13 +34,14 @@ public class HomologacionFullIfrsService {
     private static final DateTimeFormatter FMT_YYYYMMDD = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final DateTimeFormatter FMT_DISPLAY = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
-    private final HomologacionFullIfrsRepository repo;
-    private final ParametroUnicoService parametroUnicoService;
+    // Ruta fija de la carpeta de red donde se publica el TXT de homologación de cuentas Full IFRS.
+    // Independiente de IFRS_PLANILLAS_RUTA_SALIDA (esa es solo para las planillas aprobadas).
+    private static final String HOMOLOGACION_RUTA_SALIDA = "\\\\SBMDEBNS03\\BFT\\SIPRO\\HomologacionIFRS";
 
-    public HomologacionFullIfrsService(HomologacionFullIfrsRepository repo,
-                                       ParametroUnicoService parametroUnicoService) {
+    private final HomologacionFullIfrsRepository repo;
+
+    public HomologacionFullIfrsService(HomologacionFullIfrsRepository repo) {
         this.repo = repo;
-        this.parametroUnicoService = parametroUnicoService;
     }
 
     // ── DTOs ─────────────────────────────────────────────────────────────────
@@ -257,15 +258,9 @@ public class HomologacionFullIfrsService {
     // ── Generación TXT ────────────────────────────────────────────────────────
 
     public void generarYPublicarTxt(LocalDate fechaCorte) {
-        String rutaRaiz = parametroUnicoService.getString("IFRS_PLANILLAS_RUTA_SALIDA", "");
-        if (rutaRaiz.isBlank()) {
-            logger.info("[HomologacionFullIfrs] IFRS_PLANILLAS_RUTA_SALIDA no configurado. Se omite generación del TXT.");
-            return;
-        }
-
-        Path carpeta = Path.of(rutaRaiz);
+        Path carpeta = Path.of(HOMOLOGACION_RUTA_SALIDA);
         if (!Files.isDirectory(carpeta)) {
-            logger.warn("[HomologacionFullIfrs] La carpeta '{}' no existe o no es accesible. Se omite generación del TXT.", rutaRaiz);
+            logger.warn("[HomologacionFullIfrs] La carpeta '{}' no existe o no es accesible. Se omite generación del TXT.", HOMOLOGACION_RUTA_SALIDA);
             return;
         }
 

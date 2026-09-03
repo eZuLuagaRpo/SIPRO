@@ -1,6 +1,7 @@
 package com.bancolombia.sipro.validations.domain.service;
 
 import com.bancolombia.sipro.validations.application.dto.ConsolidacionResumenResponse;
+import com.bancolombia.sipro.validations.application.dto.ProductoAgregadoDto;
 import com.bancolombia.sipro.validations.domain.model.SiproDetalleArchivoValidacion;
 import com.bancolombia.sipro.validations.domain.model.SiproDetalleCargaPlanillas;
 import com.bancolombia.sipro.validations.domain.model.SiproDetalleConsolidacionesPlanillas;
@@ -81,6 +82,14 @@ class ConsolidacionResumenServiceTest {
         registro.setTipoId(" ");
         registro.setClasificacion(null);
 
+        ProductoAgregadoDto productoAgregado = new ProductoAgregadoDto(
+                7L,
+                "Leasing",
+                1L,
+                new BigDecimal("1040060.00"),
+                1L
+        );
+
         ConsolidacionResumenResponse.CreffosArchivoResumen archivo =
                 new ConsolidacionResumenResponse.CreffosArchivoResumen(
                         true,
@@ -98,8 +107,8 @@ class ConsolidacionResumenServiceTest {
 
         when(consolidacionRepository.findAllByEstadoConsolidacionOrderByPeriodoValoracionDescCreadoEnDesc("COMPLETADO"))
                 .thenReturn(List.of(cabecera));
-        when(consolidadoRegistroRepository.findByIdConsolidacionOrderByIdConsolidadoRegistroAsc(10L))
-                .thenReturn(List.of(registro));
+        when(consolidadoRegistroRepository.findProductosAgregadosByIdConsolidacion(10L))
+                .thenReturn(List.of(productoAgregado));
         when(creffosComparisonService.comparar(periodo, 1L, new BigDecimal("1040060.00")))
                 .thenReturn(new CreffosComparisonService.ComparisonSnapshot(archivo, List.of(), false));
 
@@ -132,6 +141,14 @@ class ConsolidacionResumenServiceTest {
         registroSegmentoUno.setTipoId("CC");
         registroSegmentoUno.setClasificacion((short) 1);
 
+        ProductoAgregadoDto productoAgregadoSegmentoUno = new ProductoAgregadoDto(
+                7L,
+                "Leasing",
+                1L,
+                new BigDecimal("1000.00"),
+                0L
+        );
+
         SiproDetalleCargaPlanillas planillaFullIfrs = new SiproDetalleCargaPlanillas();
         planillaFullIfrs.setId(101L);
         planillaFullIfrs.setIdProducto(99L);
@@ -159,8 +176,8 @@ class ConsolidacionResumenServiceTest {
 
         when(consolidacionRepository.findAllByEstadoConsolidacionOrderByPeriodoValoracionDescCreadoEnDesc("COMPLETADO"))
                 .thenReturn(List.of(cabecera));
-        when(consolidadoRegistroRepository.findByIdConsolidacionOrderByIdConsolidadoRegistroAsc(11L))
-                .thenReturn(List.of(registroSegmentoUno));
+        when(consolidadoRegistroRepository.findProductosAgregadosByIdConsolidacion(11L))
+                .thenReturn(List.of(productoAgregadoSegmentoUno));
         when(cargaPlanillasRepository.findPlanillasAprobadasByFechaCorteAndSegmentoId(periodo, 2L))
                 .thenReturn(List.of(planillaFullIfrs));
         when(archivoValidacionRepository.findByIdCargaPlanillaIn(List.of(101L)))

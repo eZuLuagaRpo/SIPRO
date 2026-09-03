@@ -16,7 +16,7 @@ import java.time.OffsetDateTime;
  * Relaciona cada archivo aprobado que participa en una consolidación por periodo.
  */
 @Entity
-@Table(name = "sipro_detalle_consolidacion_archivos", schema = "public")
+@Table(name = "sipro_detalle_consolidacion_archivos", schema = "schsipro")
 public class SiproDetalleConsolidacionArchivo implements Serializable {
 
     @Id
