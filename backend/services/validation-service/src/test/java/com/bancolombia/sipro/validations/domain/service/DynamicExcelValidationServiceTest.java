@@ -65,6 +65,10 @@ class DynamicExcelValidationServiceTest {
         // lenient: los tests de ctrl file y countDataRows no invocan parametroUnicoService
         lenient().when(parametroUnicoService.getInt(anyString(), anyInt()))
                 .thenAnswer(invocation -> invocation.getArgument(1));
+        // Idem para getString: por defecto responde el valor por defecto pedido (ej: VALIDAR_NIT_EXISTENCIA_LZ
+        // debe seguir siendo "true" como en producción, salvo que un test lo sobreescriba explícitamente).
+        lenient().when(parametroUnicoService.getString(anyString(), anyString()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
     }
 
     @Test

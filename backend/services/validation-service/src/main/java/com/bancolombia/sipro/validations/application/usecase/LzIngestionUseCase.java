@@ -119,7 +119,8 @@ public class LzIngestionUseCase {
 
         // 1b. Validar que las tablas destino/staging existen en PostgreSQL.
         //     Si no existen (ej: nombre derivado incorrecto en catalogo), se aborta
-        //     con mensaje claro. El scheduler reintenta en 24h; el admin corrige
+        //     con mensaje claro. El scheduler reintenta en la proxima ventana (dia 1,
+        //     ultimo dia del mes, o el chequeo diario de respaldo); el admin corrige
         //     sipro_lz_catalogo_tablas.tabla_destino_pg / tabla_staging_pg.
         String stgTable   = qualifyTable(param.getTablaStagingPg());
         String finalTable = qualifyTable(param.getTablaDestinoPg());
@@ -661,13 +662,58 @@ public class LzIngestionUseCase {
         pg.execute("TRUNCATE TABLE " + finalTable);
         log.info("Final: tabla {} truncada (reemplazo total)", finalTable);
 
+        // Optimización para cargas masivas (millones de filas): se elimina temporalmente la PK
+        // de la tabla PADRE (nunca de una particion — Postgres no permite tocar por separado
+        // el indice heredado de una particion, solo el del padre, que se propaga a todas).
+        // Insertar sin mantener el indice fila a fila es mucho mas rapido; se reconstruye
+        // una sola vez al final, en bloque.
+        PkInfo pk = getPkInfo(finalTable);
+        if (pk != null) {
+            pg.execute("ALTER TABLE " + finalTable + " DROP CONSTRAINT IF EXISTS " + pk.name());
+            log.info("Final: PK '{}' eliminada temporalmente en {} para INSERT masivo", pk.name(), finalTable);
+        }
+
         // INSERT desde staging SOLO para ESTE run_id, con columnas explicitas
         String sql = "INSERT INTO " + finalTable + " (" + columns + ") "
             + "SELECT " + columns + " FROM " + stgTable
             + " WHERE ingestion_run_id = ?";
         int inserted = pg.update(sql, runId);
         log.info("Final: insertadas {} filas en {} run_id={}", inserted, finalTable, runId);
+
+        if (pk != null) {
+            try {
+                pg.execute("ALTER TABLE " + finalTable + " ADD CONSTRAINT " + pk.name()
+                    + " PRIMARY KEY (" + pk.columns() + ")");
+                log.info("Final: PK '{}' recreada en {} ({} filas indexadas)", pk.name(), finalTable, inserted);
+            } catch (RuntimeException e) {
+                // Si la PK no se puede recrear (ej: datos duplicados de origen), se vacia la
+                // tabla para no dejarla sin proteccion de unicidad ni indice.
+                log.error("Final: no se pudo recrear la PK '{}' en {} — se vacia la tabla por seguridad.",
+                    pk.name(), finalTable, e);
+                pg.execute("TRUNCATE TABLE " + finalTable);
+                throw e;
+            }
+        }
+
         return (long) inserted;
+    }
+
+    private record PkInfo(String name, String columns) {}
+
+    private PkInfo getPkInfo(String qualifiedTable) {
+        if (!tableExistsInPg(qualifiedTable)) return null;
+        PgTableRef ref = PgTableRef.parse(qualifiedTable);
+        return pg.query(
+            "SELECT c.conname, string_agg(a.attname, ', ' ORDER BY array_position(c.conkey, a.attnum::smallint)) "
+            + "FROM pg_constraint c "
+            + "JOIN pg_class r ON c.conrelid = r.oid "
+            + "JOIN pg_namespace n ON r.relnamespace = n.oid "
+            + "JOIN pg_attribute a ON a.attrelid = r.oid AND a.attnum = ANY(c.conkey) "
+            + "WHERE n.nspname = ? AND r.relname = ? AND c.contype = 'p' "
+            + "GROUP BY c.conname",
+            (rs) -> rs.next() ? new PkInfo(rs.getString(1), rs.getString(2)) : null,
+            ref.schema(), ref.table()
+        );
     }
 
     private record PgTableRef(String schema, String table) {

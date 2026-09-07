@@ -73,6 +73,8 @@ public class DynamicExcelValidationService {
     private static final int DEFAULT_MAX_NIT_ERRORS = 30;
     private static final int DEFAULT_NIT_ERROR_SUMMARY_LIMIT = 5;
     private static final int DEFAULT_MAX_FIELD_ERRORS_PER_COLUMN = 50;
+    // NIT de Bancolombia — no cambia, por eso queda fijo en código y no en sipro_parametros_unico.
+    private static final String NIT_BANCOLOMBIA = "890903938";
         private static final String CTAPUC_FORMAT_ERROR_MESSAGE =
             "Debe ser campo numérico, no puede contener puntos, comas o caracteres especiales, " +
             "no puede tener letras.";
@@ -402,8 +404,16 @@ public class DynamicExcelValidationService {
 
             // Estas validaciones externas solo corren si la estructura básica ya quedó sana.
             // Así evitamos consultas costosas cuando el archivo todavía viene roto de base.
-            if (clienteLzRepository != null && colNameToIndex.containsKey("NIT")) {
+            // VALIDAR_NIT_EXISTENCIA_LZ permite desactivarla desde BD sin redeploy (default true
+            // = mismo comportamiento de siempre si el parametro no existe o no se ha tocado).
+            boolean validarNitExistenciaLz = Boolean.parseBoolean(
+                parametroUnicoService.getString("VALIDAR_NIT_EXISTENCIA_LZ", "true"));
+            if (validarNitExistenciaLz && clienteLzRepository != null && colNameToIndex.containsKey("NIT")) {
                 validateNitExistenceInLz(rowToNit, fechaCorte, errors);
+            }
+
+            if (colNameToIndex.containsKey("NIT")) {
+                validateNitBancolombia(rowToNit, errors);
             }
 
             if (homologacionRepository != null && colNameToIndex.containsKey("CTAPUC") && Long.valueOf(1L).equals(idSegmento)) {
@@ -900,6 +910,20 @@ public class DynamicExcelValidationService {
         }
 
         logger.info("Validación NIT completada: {} errores de {} NITs verificados", nitErrorCount, uniqueNits.size());
+    }
+
+    /**
+     * Valida que la columna NIT no contenga el NIT del propio Bancolombia (890903938).
+     * Fila, columna y valor los agrega automaticamente ValidationError — este metodo
+     * solo aporta el motivo.
+     */
+    private void validateNitBancolombia(Map<Integer, String> rowToNit, List<ValidationError> errors) {
+        for (Map.Entry<Integer, String> entry : rowToNit.entrySet()) {
+            if (NIT_BANCOLOMBIA.equals(entry.getValue())) {
+                errors.add(new ValidationError(entry.getKey(), "NIT", entry.getValue(),
+                    "El campo NIT no puede contener el número del NIT " + NIT_BANCOLOMBIA + " de Bancolombia."));
+            }
+        }
     }
 
     private List<YearMonth> buildCandidateLzPeriods(LocalDate fechaCorte) {
