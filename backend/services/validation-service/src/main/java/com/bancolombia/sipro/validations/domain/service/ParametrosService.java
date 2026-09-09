@@ -636,9 +636,18 @@ public class ParametrosService {
                         "Debe seleccionar al menos un producto para el usuario cargador.");
             }
         } else {
-            // Aprobador, admin u otro: productos y segmentos no aplican
-            idsSegmentos = new LinkedHashSet<>();
-            idsProductos = new LinkedHashSet<>();
+            // Aprobador, admin u otro: no seleccionan productos/segmentos en el formulario,
+            // pero igual necesitan una fila representativa en sipro_usuario_producto_rol
+            // (mismo patron del seed original) para que el panel — listados, selector de
+            // "Nuevo Lider Aprobador" — pueda resolver su rol actual. Sin esto, el usuario
+            // queda invisible en esas pantallas aunque su sesion y permisos reales funcionen
+            // bien (esos se calculan por grupo de Entra ID, no por esta tabla).
+            Producto productoReferencia = productoRepo.findAllByOrderByTituloAsc().stream()
+                    .findFirst()
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT,
+                            "No hay productos registrados en el catálogo; no se puede completar el registro de este rol."));
+            idsProductos = new LinkedHashSet<>(List.of(productoReferencia.getIdProducto()));
+            idsSegmentos = new LinkedHashSet<>(List.of(productoReferencia.getIdSegmento()));
         }
 
         // Validación de unicidad
