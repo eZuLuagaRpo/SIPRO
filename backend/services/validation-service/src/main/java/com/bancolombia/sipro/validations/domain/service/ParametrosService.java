@@ -3,9 +3,7 @@ package com.bancolombia.sipro.validations.domain.service;
 import com.bancolombia.sipro.validations.domain.model.*;
 import com.bancolombia.sipro.validations.infrastructure.notification.MailTemplateNotificationService;
 import com.bancolombia.sipro.validations.infrastructure.repository.*;
-import com.bancolombia.sipro.validations.infrastructure.security.MicrosoftGraphDirectoryService;
 import com.bancolombia.sipro.validations.infrastructure.security.SiproAuthenticatedUser;
-import com.bancolombia.sipro.validations.shared.utils.GroupNameNormalizer;
 import com.bancolombia.sipro.validations.shared.utils.XlsxStreamingReader;
 import org.springframework.web.multipart.MultipartFile;
 import jakarta.persistence.EntityManager;
@@ -59,7 +57,6 @@ public class ParametrosService {
     private final SiproRolesPermisosRepository rolesRepo;
     private final AdminAccessService adminAccessService;
     private final EntityManager entityManager;
-    private final MicrosoftGraphDirectoryService graphDirectoryService;
     private final MailTemplateNotificationService mailTemplateService;
     private final HomologacionColgaapRepository homologacionRepo;
 
@@ -76,7 +73,6 @@ public class ParametrosService {
             SiproRolesPermisosRepository rolesRepo,
             AdminAccessService adminAccessService,
             EntityManager entityManager,
-            MicrosoftGraphDirectoryService graphDirectoryService,
             MailTemplateNotificationService mailTemplateService,
             HomologacionColgaapRepository homologacionRepo) {
         this.reglaRepo = reglaRepo;
@@ -91,7 +87,6 @@ public class ParametrosService {
         this.rolesRepo = rolesRepo;
         this.adminAccessService = adminAccessService;
         this.entityManager = entityManager;
-        this.graphDirectoryService = graphDirectoryService;
         this.mailTemplateService = mailTemplateService;
         this.homologacionRepo = homologacionRepo;
     }
@@ -100,94 +95,6 @@ public class ParametrosService {
 
     public void requireParametros(SiproAuthenticatedUser principal) {
         adminAccessService.requireAdminPermisos(principal);
-    }
-
-    // ── Rol Azure: resolución en tiempo real ──────────────────────────────
-
-    /**
-     * Consulta los grupos de un usuario en Azure Entra ID en tiempo real y los mapea
-     * al rol SIPRO correspondiente según {@code sipro_roles_permisos.grupo_ad}.
-     * <p>
-     * Si el usuario no tiene correo registrado o las credenciales de Graph no están
-     * configuradas, retorna {@code encontrado=false} sin lanzar excepción.
-     *
-     * @param idUsuario ID del usuario SIPRO a consultar
-     * @return mapa con {@code encontrado}, {@code idRol}, {@code nombreRol}, {@code grupoAd}
-     */
-    public Map<String, Object> resolverRolAzure(Long idUsuario) {
-        UsuarioPersona persona = personaRepo.findById(idUsuario)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Usuario " + idUsuario + " no encontrado."));
-
-        String correo = persona.getCorreo();
-        if (correo == null || correo.isBlank()) {
-            logger.warn("El usuario {} no tiene correo registrado; no se puede consultar Azure.", idUsuario);
-            return buildRolAzureNoEncontrado("El usuario no tiene correo registrado en SIPRO.");
-        }
-
-        Set<String> grupos = graphDirectoryService.resolveUserGroupsByUpn(correo);
-        if (grupos.isEmpty()) {
-            return buildRolAzureNoEncontrado(
-                    "No se encontraron grupos en Azure Entra ID para " + correo + ". " +
-                    "Verifique que las credenciales de Graph estén configuradas y que el usuario exista en el directorio.");
-        }
-
-        Set<String> gruposNormalizados = grupos.stream()
-                .filter(g -> g != null && !g.isBlank())
-            .map(GroupNameNormalizer::normalizeFunctionalGroupName)
-            .filter(g -> g != null && !g.isBlank())
-                .collect(Collectors.toSet());
-
-        return rolesRepo.findAll().stream()
-                .filter(r -> r.getGrupoAd() != null && !r.getGrupoAd().isBlank())
-            .filter(r -> gruposNormalizados.contains(
-                GroupNameNormalizer.normalizeFunctionalGroupName(r.getGrupoAd())))
-                .findFirst()
-                .map(r -> {
-                    Map<String, Object> resultado = new LinkedHashMap<>();
-                    resultado.put("encontrado", true);
-                    resultado.put("idRol", r.getIdRol());
-                    resultado.put("nombreRol", r.getRol());
-                    resultado.put("grupoAd", r.getGrupoAd());
-                    resultado.put("correoConsultado", correo);
-                    return resultado;
-                })
-                .orElseGet(() -> buildRolAzureNoEncontrado(
-                        "El usuario " + correo + " tiene " + grupos.size() + " grupo(s) en Azure, " +
-                        "pero ninguno corresponde a un rol SIPRO configurado en sipro_roles_permisos.grupo_ad."));
-    }
-
-    private Map<String, Object> buildRolAzureNoEncontrado(String mensaje) {
-        Map<String, Object> resultado = new LinkedHashMap<>();
-        resultado.put("encontrado", false);
-        resultado.put("idRol", null);
-        resultado.put("nombreRol", null);
-        resultado.put("grupoAd", null);
-        resultado.put("mensaje", mensaje);
-        return resultado;
-    }
-
-    /**
-     * Consulta en paralelo el rol Azure de una lista de IDs de usuarios.
-     * Cada entrada del mapa retornado usa el idUsuario como clave (en String para JSON).
-     * Si un ID no existe, retorna {@code encontrado=false} para ese usuario.
-     */
-    public Map<String, Object> resolverRolAzureMasivo(List<Long> ids) {
-        Map<String, Object> resultado = new LinkedHashMap<>();
-        for (Long id : ids) {
-            try {
-                resultado.put(String.valueOf(id), resolverRolAzure(id));
-            } catch (Exception ex) {
-                Map<String, Object> err = new LinkedHashMap<>();
-                err.put("encontrado", false);
-                err.put("idRol", null);
-                err.put("nombreRol", null);
-                err.put("grupoAd", null);
-                err.put("mensaje", "Error al consultar: " + ex.getMessage());
-                resultado.put(String.valueOf(id), err);
-            }
-        }
-        return resultado;
     }
 
     // ── Ventana de Carga: Regla Base ──────────────────────────────────────

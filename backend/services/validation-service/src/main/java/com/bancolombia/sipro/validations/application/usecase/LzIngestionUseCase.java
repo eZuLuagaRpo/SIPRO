@@ -73,7 +73,6 @@ public class LzIngestionUseCase {
     private static final int DEFAULT_LZ_INGESTION_MAX_ROWS = 0;
     private static final int DEFAULT_LZ_INGESTION_STALE_RUN_TIMEOUT_MINUTES = 60;
     private static final long DEFAULT_MINIMUM_EXPECTED_ROWS = 100;
-    private static final int DEFAULT_LZ_INGESTION_GUARD_DAYS = 7;
     private static final int LZ_STREAMING_BATCH_SIZE = 15_000;
     private static final Set<String> REQUIRED_LZ_COLUMNS = Set.of(
         "llave_mdm", "year", "month", "day"
@@ -158,19 +157,21 @@ public class LzIngestionUseCase {
         //    Cubre: usuario limpio manualmente sipro_lz_ingestion_run.
         cleanOrphanedData(param);
 
-        // 3. Guard por dias: evita re-ingestas innecesarias si ya hubo SUCCESS reciente.
-        //    LZ_INGESTION_GUARD_DAYS controla el intervalo minimo (default 7 dias).
+        // 3. Guard por periodo: evita re-ingestas innecesarias si el periodo (year/month)
+        //    actual ya tuvo una ejecucion exitosa. A diferencia del guard anterior (por dias
+        //    corridos), esto no depende de cuanto tiempo paso desde la ultima vez — solo de
+        //    si ESTE mes calendario ya se completo con exito. Las corridas forzadas (dia 1,
+        //    ultimo dia del mes) se saltan este guard por completo via forceOverwrite=true.
         if (!req.isForceOverwrite()) {
-            int guardDays = parametroUnicoService.getInt("LZ_INGESTION_GUARD_DAYS", DEFAULT_LZ_INGESTION_GUARD_DAYS);
-            Integer recentSuccess = pg.queryForObject(
+            Integer successEstePeriodo = pg.queryForObject(
                 "SELECT COUNT(*) FROM schsipro.sipro_lz_ingestion_run "
                 + "WHERE id_tabla = ? AND status = 'SUCCESS' "
-                + "AND ended_at >= now() - make_interval(days => ?)",
-                Integer.class, idTabla, guardDays);
-            if (recentSuccess != null && recentSuccess > 0) {
-                log.info("Guard: ya existe SUCCESS en los ultimos {} dias para {}. SKIP.", guardDays, tablaCatalogo);
+                + "AND period_year = ? AND period_month = ?",
+                Integer.class, idTabla, year, month);
+            if (successEstePeriodo != null && successEstePeriodo > 0) {
+                log.info("Guard: ya existe SUCCESS para el periodo {}/{} de {}. SKIP.", year, month, tablaCatalogo);
                 return LzIngestionResponse.skipped(
-                    "Ya existe ejecucion exitosa en los ultimos " + guardDays + " dias para " + tablaCatalogo
+                    "Ya existe ejecucion exitosa para el periodo " + year + "/" + month + " de " + tablaCatalogo
                     + ". Usa forceOverwrite=true para repetir.");
             }
         }

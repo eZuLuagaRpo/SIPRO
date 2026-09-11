@@ -1,6 +1,5 @@
 package com.bancolombia.sipro.validations.infrastructure.security;
 
-import com.bancolombia.sipro.validations.domain.service.ParametroUnicoService;
 import com.bancolombia.sipro.validations.infrastructure.security.EntraIdTokenService.EntraAuthenticatedUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,20 +34,7 @@ public class MicrosoftGraphDirectoryService {
     private final RestTemplate restTemplate = new RestTemplate();
     private static final String SIPRO_GROUP_PREFIX = "a_euc_sipro_";
 
-    // Claves para token de aplicación (client_credentials)
-    private static final String TENANT_ID_KEY = "AZURE_TENANT_ID";
-    private static final String CLIENT_ID_KEY = "AZURE_CLIENT_ID";
-    private static final String CLIENT_SECRET_KEY = "AZURE_CLIENT_SECRET";
-    private static final String TOKEN_URL_TEMPLATE = "https://login.microsoftonline.com/%s/oauth2/v2.0/token";
-
-    private final ParametroUnicoService parametroUnicoService;
-
-    // Cache simple del token de aplicación
-    private volatile String cachedAppToken;
-    private volatile long appTokenExpiry = 0;
-
-    public MicrosoftGraphDirectoryService(ParametroUnicoService parametroUnicoService) {
-        this.parametroUnicoService = parametroUnicoService;
+    public MicrosoftGraphDirectoryService() {
     }
 
     public DirectoryUserContext resolveCurrentUserContext(EntraAuthenticatedUser entraUser, String graphAccessToken) {
@@ -218,112 +204,6 @@ public class MicrosoftGraphDirectoryService {
 
     private boolean isFunctionalGroupName(String groupName) {
         return groupName != null && groupName.startsWith(SIPRO_GROUP_PREFIX);
-    }
-
-    // ── Consulta de grupos de usuario arbitrario via token de aplicación ────
-
-    /**
-     * Resuelve los nombres de grupos de un usuario específico (no el autenticado) usando
-     * un token de aplicación obtenido via client_credentials.
-     * <p>
-     * Requiere que {@code AZURE_TENANT_ID}, {@code AZURE_CLIENT_ID} y
-     * {@code AZURE_CLIENT_SECRET} estén configurados en {@code sipro_parametros_unico}.
-     * El permiso de Graph necesario es {@code GroupMember.Read.All} o {@code Directory.Read.All}.
-     * <p>
-     * Si las credenciales no están configuradas o Graph falla, retorna conjunto vacío
-     * (degradación elegante — el rol quedará como «Sin rol»).
-     *
-     * @param userUpn UPN o correo del usuario (ej: juan.ortiz@bancolombia.com.co)
-     * @return conjunto de nombres de grupos en minúsculas
-     */
-    public Set<String> resolveUserGroupsByUpn(String userUpn) {
-        if (userUpn == null || userUpn.isBlank()) {
-            return Set.of();
-        }
-        String appToken = getAppAccessToken();
-        if (appToken == null) {
-            logger.warn("No hay token de aplicación disponible para consultar grupos de '{}'", userUpn);
-            return Set.of();
-        }
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(appToken);
-        headers.setContentType(MediaType.APPLICATION_JSON);
-
-        Set<String> groups = new HashSet<>();
-        String nextUrl = GRAPH_BASE_URL + "/users/" + userUpn
-                + "/memberOf/microsoft.graph.group?$select=displayName,id,securityEnabled&$top=999";
-
-        try {
-            while (nextUrl != null && !nextUrl.isBlank()) {
-                Map<String, Object> response = getMap(headers, nextUrl);
-                List<Map<String, Object>> values = safeList(response.get("value"));
-                for (Map<String, Object> group : values) {
-                    Object securityEnabled = group.get("securityEnabled");
-                    if (securityEnabled instanceof Boolean enabled && !enabled) {
-                        continue;
-                    }
-                    String displayName = asString(group.get("displayName"));
-                    if (displayName != null && !displayName.isBlank()) {
-                        groups.add(displayName.trim().toLowerCase(Locale.ROOT));
-                    }
-                }
-                nextUrl = asString(response.get("@odata.nextLink"));
-            }
-            logger.info("Grupos resueltos para '{}' via app token: {}", userUpn, groups.size());
-        } catch (Exception ex) {
-            logger.warn("No fue posible resolver grupos para '{}' desde Graph: {}", userUpn, ex.getMessage());
-        }
-        return Set.copyOf(groups);
-    }
-
-    /**
-     * Obtiene un token de acceso de aplicación vía client_credentials, con caché simple en memoria.
-     * Retorna {@code null} si las credenciales no están configuradas.
-     */
-    private synchronized String getAppAccessToken() {
-        if (cachedAppToken != null && System.currentTimeMillis() < appTokenExpiry) {
-            return cachedAppToken;
-        }
-
-        String tenantId = parametroUnicoService.getString(TENANT_ID_KEY, "").trim();
-        String clientId = parametroUnicoService.getString(CLIENT_ID_KEY, "").trim();
-        String clientSecret = parametroUnicoService.getString(CLIENT_SECRET_KEY, "").trim();
-
-        if (tenantId.isEmpty() || clientId.isEmpty() || clientSecret.isEmpty()) {
-            logger.debug("Credenciales de app Graph no configuradas (AZURE_TENANT_ID / CLIENT_ID / CLIENT_SECRET). " +
-                    "La consulta de roles Azure en tiempo real no estará disponible.");
-            return null;
-        }
-
-        try {
-            String tokenUrl = String.format(TOKEN_URL_TEMPLATE, tenantId);
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-
-            String body = "client_id=" + clientId
-                    + "&scope=https://graph.microsoft.com/.default"
-                    + "&client_secret=" + clientSecret
-                    + "&grant_type=client_credentials";
-
-                ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
-                    tokenUrl,
-                    HttpMethod.POST,
-                    new HttpEntity<>(body, headers),
-                    new ParameterizedTypeReference<Map<String, Object>>() {
-                    });
-
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                cachedAppToken = (String) response.getBody().get("access_token");
-                Integer expiresIn = (Integer) response.getBody().get("expires_in");
-                appTokenExpiry = System.currentTimeMillis() + ((expiresIn - 60) * 1000L);
-                logger.debug("Token de app Graph obtenido (expira en {} seg)", expiresIn);
-                return cachedAppToken;
-            }
-        } catch (Exception ex) {
-            logger.error("Error obteniendo token de app Graph: {}", ex.getMessage());
-        }
-        return null;
     }
 
     public record DirectoryUserContext(

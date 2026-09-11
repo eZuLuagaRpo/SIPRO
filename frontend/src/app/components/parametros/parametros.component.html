@@ -307,16 +307,11 @@
                     <strong class="user-info-readout__value user-info-readout__value--email">{{ textoUsuario(usuarioSeleccionado.correo) }}</strong>
                   </div>
                   <div class="user-info-readout__row">
-                    <span class="user-info-readout__label">Rol (Azure)</span>
+                    <span class="user-info-readout__label">Rol</span>
                     <strong class="user-info-readout__value">
-                      <em *ngIf="rolAzureCargando" class="param-empty-small">Consultando Azure Entra ID…</em>
-                      <span *ngIf="!rolAzureCargando && rolSeleccionadoActual">{{ nombreRolVisual(rolSeleccionadoActual) }}</span>
-                      <em *ngIf="!rolAzureCargando && !rolSeleccionadoActual" class="param-empty-small">Sin rol en Azure Entra ID.</em>
+                      <span *ngIf="rolSeleccionadoActual">{{ nombreRolVisual(rolSeleccionadoActual) }}</span>
+                      <em *ngIf="!rolSeleccionadoActual" class="param-empty-small">Sin rol asignado.</em>
                     </strong>
-                  </div>
-                  <div *ngIf="!rolAzureCargando && rolAzureMensaje" class="user-info-readout__row">
-                    <span class="user-info-readout__label"></span>
-                    <span class="param-empty-small param-warning-inline">{{ rolAzureMensaje }}</span>
                   </div>
                 </div>
 
@@ -411,22 +406,6 @@
                 <input type="text" class="form-input form-input--pill" [(ngModel)]="busquedaUsuario" placeholder="Buscar por nombre o usuario...">
               </div>
 
-              <!-- Botón de verificación Azure -->
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-                <button
-                  class="btn-pill btn-secondary btn-pill--small"
-                  type="button"
-                  (click)="verificarRolesAzureCargadores()"
-                  [disabled]="validandoAzureCargadores"
-                  title="Consulta Azure Entra ID para confirmar que cada cargador tiene su grupo SIPRO activo">
-                  <span *ngIf="!validandoAzureCargadores">☁ Verificar con Azure</span>
-                  <span *ngIf="validandoAzureCargadores">Verificando…</span>
-                </button>
-                <span *ngIf="validacionAzureCompletada && !validandoAzureCargadores" class="param-badge param-badge--success" style="font-size:11px">
-                  Verificado
-                </span>
-              </div>
-
               <div class="table-container table-container--fixed">
                 <table class="param-table">
                   <thead>
@@ -434,7 +413,6 @@
                       <th class="param-col-check"><input type="checkbox" [checked]="seleccionarTodosLider" (change)="toggleSeleccionarTodos()" title="Seleccionar todos"></th>
                       <th>Usuario</th>
                       <th>Líder Actual</th>
-                      <th title="Estado del grupo en Azure Entra ID">Azure</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -452,23 +430,9 @@
                           <span *ngIf="u.idLider">{{ usuarioLiderLogin(u.idLider) }}</span>
                         </div>
                       </td>
-                      <td (click)="$event.stopPropagation()">
-                        <!-- Badge de estado Azure: solo visible después de verificar -->
-                        <span *ngIf="validacionAzureCompletada"
-                          class="param-badge"
-                          [class.param-badge--success]="estadoBadgeAzure(u.idUsuario) === 'ok'"
-                          [class.param-badge--error]="estadoBadgeAzure(u.idUsuario) === 'sin-grupo'"
-                          [class.param-badge--warning]="estadoBadgeAzure(u.idUsuario) === 'discrepancia'"
-                          [title]="tooltipBadgeAzure(u.idUsuario)">
-                          <span *ngIf="estadoBadgeAzure(u.idUsuario) === 'ok'">✓</span>
-                          <span *ngIf="estadoBadgeAzure(u.idUsuario) === 'discrepancia'">⚠</span>
-                          <span *ngIf="estadoBadgeAzure(u.idUsuario) === 'sin-grupo'">✗</span>
-                        </span>
-                        <span *ngIf="!validacionAzureCompletada" class="param-badge param-badge--neutral" title="Sin verificar">—</span>
-                      </td>
                     </tr>
                     <tr *ngIf="usuariosFiltrados.length === 0">
-                      <td colspan="4" class="param-empty">No se encontraron usuarios.</td>
+                      <td colspan="3" class="param-empty">No se encontraron usuarios.</td>
                     </tr>
                   </tbody>
                 </table>

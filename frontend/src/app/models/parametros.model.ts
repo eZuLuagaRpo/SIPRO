@@ -130,17 +130,6 @@ export interface SegmentoSistema {
   nombre: string;
 }
 
-// ─── Rol Azure en tiempo real ─────────────────────────────────────────────────
-
-export interface RolAzureResult {
-  encontrado: boolean;
-  idRol: number | null;
-  nombreRol: string | null;
-  grupoAd: string | null;
-  correoConsultado?: string | null;
-  mensaje?: string | null;
-}
-
 // ─── Homologación Colgaap ────────────────────────────────────────────────────
 
 export interface CuentaHomologacion {

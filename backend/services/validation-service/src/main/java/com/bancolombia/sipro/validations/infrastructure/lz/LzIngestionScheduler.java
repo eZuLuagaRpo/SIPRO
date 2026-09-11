@@ -19,32 +19,32 @@ import java.util.List;
  * ── Flujo ─────────────────────────────────────────────────────────────────
  *  1. El backend arranca.
  *  2. Pasados ${lz.ingestion.startup-delay-ms} (default 5 min), se ejecuta
- *     una verificacion UNICA que respeta el guard (LZ_INGESTION_GUARD_DAYS):
- *     solo corre si no hubo SUCCESS reciente. No se repite periodicamente
- *     por si sola — el calendario mensual es quien la retoma despues.
+ *     una verificacion UNICA que respeta el guard: solo corre si el periodo
+ *     (year/month) actual todavia NO tiene un run con status=SUCCESS. No se
+ *     repite periodicamente por si sola — el calendario mensual (paso 3) es
+ *     quien la retoma despues.
  *  3. Todas las noches a la hora configurada (${lz.ingestion.mensual-cron},
  *     default 8pm) se ejecuta una verificacion que:
  *       → Si HOY es el dia 1 del mes o el ultimo dia del mes: fuerza la
  *         ingesta (forceOverwrite=true), sin importar el guard. Estas dos
- *         fechas son obligatorias y siempre deben correr, aunque la
- *         ejecucion anterior haya sido apenas ayer (ej: 31 de un mes y
- *         1 del siguiente, con solo 1 dia de diferencia).
+ *         fechas son obligatorias y siempre deben correr, aunque el periodo
+ *         actual ya tenga un SUCCESS previo ese mismo mes (dia 1 y ultimo
+ *         dia capturan dos fotos distintas de los clientes).
  *       → Cualquier otro dia: respeta el guard como red de respaldo — si
  *         por alguna razon las fechas obligatorias fallaron (servidor
- *         caido, error), esta verificacion diaria eventualmente la
- *         recupera una vez pasan LZ_INGESTION_GUARD_DAYS dias sin exito.
+ *         caido, error), esta verificacion diaria REINTENTA cada noche
+ *         hasta que el periodo actual quede con SUCCESS.
  *  4. Para cada tabla activa en sipro_lz_catalogo_tablas, el guard interno
  *     de LzIngestionUseCase decide si procede o se salta (idempotente:
  *     ejecutarlo de mas nunca genera duplicados).
  *
- * ── Guard LZ_INGESTION_GUARD_DAYS ──────────────────────────────────────────
- *  Deja de ser "la cadencia real" (eso ahora lo deciden las fechas de
- *  calendario, dia 1 / ultimo dia, que se fuerzan sin preguntarle al guard).
- *  Pasa a ser solo la red de respaldo del paso 3. Debe quedar en un valor
- *  MAYOR al hueco mas largo posible entre el dia 1 y el ultimo dia del MISMO
- *  mes (hasta 30 dias, ej: enero 1 → enero 31), para que el respaldo se
- *  quede dormido en un mes sano y solo despierte si de verdad algo fallo
- *  por mas de un mes. Valor recomendado: 32.
+ * ── Guard por periodo (LzIngestionUseCase) ─────────────────────────────────
+ *  El guard ya NO se basa en "dias corridos desde el ultimo exito" (ese
+ *  esquema quedo obsoleto — el parametro LZ_INGESTION_GUARD_DAYS ya no se
+ *  lee en ningun lado). Ahora pregunta directamente: "¿el periodo year/month
+ *  actual ya tiene un run SUCCESS?". Esto evita el caso donde el backend se
+ *  reinicia a mitad de mes y el guard antiguo bloqueaba la verificacion de
+ *  arranque solo porque hubo un exito reciente de OTRO mes.
  *
  * ── Conflicto sipro_lz_ingestion_run vacio + datos en Final ───────────────
  *  Si sipro_lz_ingestion_run esta vacio pero sipro_lz_mdm_datos_generales_cliente

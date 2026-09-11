@@ -20,7 +20,6 @@ import {
   ProductoCatalogo,
   ProductoRequest,
   ReglaVentanaBase,
-  RolAzureResult,
   RolSistema,
   SegmentoSistema,
   UsuarioResumen
@@ -73,22 +72,6 @@ export class ParametrosService {
 
   guardarAsignacionUsuario(idUsuario: number, req: AsignacionUsuario): Observable<OperacionResultado> {
     return this.http.put<OperacionResultado>(`${this.base}/usuarios/${idUsuario}/asignacion`, req);
-  }
-
-  /** Consulta el rol del usuario en Azure Entra ID en tiempo real usando credenciales de aplicación. */
-  getRolAzureUsuario(idUsuario: number): Observable<RolAzureResult> {
-    return this.http.get<RolAzureResult>(`${this.base}/usuarios/${idUsuario}/rol-azure`);
-  }
-
-  /**
-   * Consulta masiva de roles Azure para una lista de IDs de usuarios.
-   * Retorna un mapa { [idUsuario: string]: RolAzureResult } dentro de { validaciones: ... }.
-   * Usado en Sección 3 para validar si los cargadores tienen el grupo SIPRO activo en Entra ID.
-   */
-  validarRolesAzureMasivo(ids: number[]): Observable<{ validaciones: Record<string, RolAzureResult> }> {
-    return this.http.get<{ validaciones: Record<string, RolAzureResult> }>(
-      `${this.base}/usuarios/validacion-azure?ids=${ids.join(',')}`
-    );
   }
 
   verificarPendientesLider(idLider: number): Observable<{ tienePendientes: boolean; cantidad: number }> {

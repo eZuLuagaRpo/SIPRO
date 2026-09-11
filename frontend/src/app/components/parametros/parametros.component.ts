@@ -23,7 +23,6 @@ import {
   ReglaVentanaBase,
   ProductoCatalogo,
   ProductoRequest,
-  RolAzureResult,
   RolSistema,
   SegmentoSistema,
   UsuarioResumen,
@@ -130,8 +129,6 @@ export class ParametrosComponent implements OnInit {
   busquedaUsuarioAsignacion = '';
   mostrarOpcionesUsuarioAsignacion = false;
   rolSeleccionado: number | null = null;
-  rolAzureCargando = false;
-  rolAzureMensaje: string | null = null;
   checkboxesPorSegmento: Map<number, CheckboxProducto[]> = new Map();
   guardandoAsignacion = false;
   asignacionError = '';
@@ -153,11 +150,6 @@ export class ParametrosComponent implements OnInit {
   busquedaLider = '';
   mostrarOpcionesLider = false;
   confirmacionLiderVisible = false;
-
-  // Validación Azure para la Sección 3
-  validacionAzureCargadores: Record<string, RolAzureResult> = {};
-  validandoAzureCargadores = false;
-  validacionAzureCompletada = false;
 
   // ─── Sección 4: Nuevo Usuario ─────────────────────────────────────────────
   nuevoUsuario: NuevoUsuarioRequest = {
@@ -659,8 +651,6 @@ export class ParametrosComponent implements OnInit {
       this.usuarioSeleccionado = null;
       this.busquedaUsuarioAsignacion = '';
       this.rolSeleccionado = null;
-      this.rolAzureCargando = false;
-      this.rolAzureMensaje = null;
       this.construirCheckboxes([]);
       this.asignacionError = '';
       this.asignacionExito = '';
@@ -670,35 +660,14 @@ export class ParametrosComponent implements OnInit {
 
     this.usuarioSeleccionado = this.usuarios.find(u => u.idUsuario === Number(this.usuarioSeleccionadoId)) ?? null;
     this.sincronizarBusquedaUsuarioSeleccionado();
-    // El rol se obtiene en tiempo real desde Azure Entra ID (ver llamada abajo)
-    this.rolSeleccionado = null;
-    this.rolAzureCargando = true;
-    this.rolAzureMensaje = null;
+    // El rol se toma del que ya tiene asignado en SIPRO (sipro_usuario_producto_rol).
+    // La determinación real de permisos ocurre por el grupo de Entra ID en el login,
+    // no aquí — este campo es solo para mostrar/editar la asignación en el panel.
+    this.rolSeleccionado = this.usuarioSeleccionado?.idRolActual ?? null;
     this.asignacionError = '';
     this.asignacionExito = '';
     this.construirCheckboxes([]);
-
-    // Consultar rol en Azure Entra ID en tiempo real
-    this.parametrosService.getRolAzureUsuario(Number(this.usuarioSeleccionadoId)).subscribe({
-      next: resultado => {
-        this.rolAzureCargando = false;
-        if (resultado.encontrado && resultado.idRol != null) {
-          this.rolSeleccionado = resultado.idRol;
-          this.rolAzureMensaje = null;
-        } else {
-          this.rolSeleccionado = this.usuarioSeleccionado?.idRolActual ?? null;
-          this.rolAzureMensaje = resultado.mensaje ?? 'No se encontró rol en Azure Entra ID.';
-        }
-        this.cargarProductosAsignados();
-      },
-      error: () => {
-        this.rolAzureCargando = false;
-        // Fallback: usar el rol almacenado localmente en SIPRO
-        this.rolSeleccionado = this.usuarioSeleccionado?.idRolActual ?? null;
-        this.rolAzureMensaje = 'No fue posible consultar Azure Entra ID. Se muestra el último rol conocido.';
-        this.cargarProductosAsignados();
-      }
-    });
+    this.cargarProductosAsignados();
   }
 
   /** Carga los productos asignados al usuario seleccionado desde SIPRO. */
@@ -1087,62 +1056,6 @@ export class ParametrosComponent implements OnInit {
     this.nuevoLiderId = u.idUsuario;
     this.busquedaLider = u.nombreCompleto;
     this.mostrarOpcionesLider = false;
-  }
-
-  /**
-   * Consulta en Azure Entra ID el grupo real de todos los cargadores visibles
-   * y determina si coincide con el rol asignado en PostgreSQL.
-   */
-  verificarRolesAzureCargadores(): void {
-    const cargadores = this.usuarios.filter(u => u.idRolActual === 1);
-    if (cargadores.length === 0) return;
-
-    this.validandoAzureCargadores = true;
-    this.validacionAzureCompletada = false;
-    const ids = cargadores.map(u => u.idUsuario);
-
-    this.parametrosService.validarRolesAzureMasivo(ids)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: resp => {
-          this.validacionAzureCargadores = resp.validaciones ?? {};
-          this.validandoAzureCargadores = false;
-          this.validacionAzureCompletada = true;
-        },
-        error: () => {
-          this.validandoAzureCargadores = false;
-          this.mostrarToast('No fue posible consultar Azure Entra ID. Verifique la configuración.', 'error');
-        }
-      });
-  }
-
-  /**
-   * Retorna el estado del badge Azure para un cargador dado su ID:
-   * - 'ok': rol en Azure coincide con el rol en PostgreSQL
-   * - 'discrepancia': rol en Azure existe pero es diferente al de PostgreSQL
-   * - 'sin-grupo': usuario no tiene ningún grupo SIPRO en Azure
-   * - 'sin-verificar': aún no se ha consultado Azure
-   */
-  estadoBadgeAzure(idUsuario: number): 'ok' | 'discrepancia' | 'sin-grupo' | 'sin-verificar' {
-    const resultado = this.validacionAzureCargadores[String(idUsuario)];
-    if (!resultado) return 'sin-verificar';
-    if (!resultado.encontrado) return 'sin-grupo';
-    const u = this.usuarios.find(x => x.idUsuario === idUsuario);
-    if (!u) return 'sin-verificar';
-    // Comparar idRol de Azure con idRolActual de PostgreSQL
-    return resultado.idRol === u.idRolActual ? 'ok' : 'discrepancia';
-  }
-
-  tooltipBadgeAzure(idUsuario: number): string {
-    const resultado = this.validacionAzureCargadores[String(idUsuario)];
-    if (!resultado) return 'Pendiente de verificar con Azure';
-    if (!resultado.encontrado) return resultado.mensaje ?? 'Sin grupo SIPRO en Azure Entra ID';
-    const u = this.usuarios.find(x => x.idUsuario === idUsuario);
-    const rolAzure = resultado.nombreRol ?? resultado.grupoAd ?? '?';
-    if (!u || resultado.idRol === u.idRolActual) {
-      return `Azure confirma: ${rolAzure}`;
-    }
-    return `Discrepancia: Azure tiene "${rolAzure}" pero PostgreSQL tiene "${u.nombreRolActual ?? '?'}"`;
   }
 
   get seleccionadosCount(): number {

@@ -170,37 +170,6 @@ public class ParametrosController {
         return ResponseEntity.ok(Map.of("success", true, "mensaje", "Usuario registrado exitosamente."));
     }
 
-    /**
-     * Consulta en tiempo real el rol del usuario en Azure Entra ID usando las credenciales
-     * de aplicación configuradas ({@code AZURE_CLIENT_SECRET}).
-     * Retorna {@code encontrado=false} si las credenciales no están configuradas o el usuario
-     * no pertenece a ningún grupo SIPRO en el directorio.
-     */
-    @GetMapping("/usuarios/{idUsuario}/rol-azure")
-    public ResponseEntity<Map<String, Object>> getRolAzure(
-            @AuthenticationPrincipal SiproAuthenticatedUser principal,
-            @PathVariable Long idUsuario) {
-        parametrosService.requireParametros(principal);
-        return ResponseEntity.ok(parametrosService.resolverRolAzure(idUsuario));
-    }
-
-    /**
-     * Consulta masiva del rol Azure para una lista de IDs de usuarios.
-     * Útil para la sección 3 de Parámetros: valida que cada cargador realmente
-     * pertenezca al grupo SIPRO que tiene asignado en PostgreSQL.
-     * Ejemplo: GET /api/parametros/usuarios/validacion-azure?ids=1,2,3
-     */
-    @GetMapping("/usuarios/validacion-azure")
-    public ResponseEntity<Map<String, Object>> getValidacionAzureMasiva(
-            @AuthenticationPrincipal SiproAuthenticatedUser principal,
-            @RequestParam List<Long> ids) {
-        parametrosService.requireParametros(principal);
-        if (ids == null || ids.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Debe indicar al menos un ID de usuario."));
-        }
-        Map<String, Object> validaciones = parametrosService.resolverRolAzureMasivo(ids);
-        return ResponseEntity.ok(Map.of("validaciones", validaciones));
-    }
 
     // ── Productos ─────────────────────────────────────────────────────────
 

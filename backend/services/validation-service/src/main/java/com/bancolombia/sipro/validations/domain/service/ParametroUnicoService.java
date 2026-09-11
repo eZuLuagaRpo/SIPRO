@@ -38,7 +38,10 @@ public class ParametroUnicoService {
 
     private static final Logger logger = LoggerFactory.getLogger(ParametroUnicoService.class);
     private static final String ENV_PREFIX = "sipro.param.";
-    
+
+    /** Tiempo maximo que se confia en un valor cacheado antes de revalidarlo contra la BD. */
+    private static final long CACHE_TTL_MS = 5 * 60 * 1000L;
+
     /** Parámetros que NUNCA deben venir de la BD — solo de config/env vars */
     private static final java.util.Set<String> CRITICAL_CONFIG_ONLY_PARAMS = java.util.Set.of(
             "AZURE_TENANT_ID",
@@ -47,9 +50,12 @@ public class ParametroUnicoService {
             "URL_PDN"
     );
 
+    /** Valor cacheado junto con el instante (epoch millis) en que se guardo. */
+    private record CachedValue(String valor, long guardadoEn) {}
+
     private final SiproParametroUnicoRepository repository;
     private final Environment environment;
-    private final Map<String, String> cache = new ConcurrentHashMap<>();
+    private final Map<String, CachedValue> cache = new ConcurrentHashMap<>();
     private final Map<String, Object> sequenceLocks = new ConcurrentHashMap<>();
 
     public ParametroUnicoService(SiproParametroUnicoRepository repository, Environment environment) {
@@ -60,7 +66,8 @@ public class ParametroUnicoService {
     @PostConstruct
     public void cargarParametros() {
         try {
-            repository.findAll().forEach(p -> cache.put(p.getClave(), p.getValor()));
+            long ahora = System.currentTimeMillis();
+            repository.findAll().forEach(p -> cache.put(p.getClave(), new CachedValue(p.getValor(), ahora)));
             logger.info("Parámetros únicos cargados: {} entradas", cache.size());
         } catch (Exception e) {
             logger.warn("No fue posible cargar sipro_parametros_unico al arranque: {}. Se usarán defaults hasta recargar.",
@@ -83,9 +90,9 @@ public class ParametroUnicoService {
         if (CRITICAL_CONFIG_ONLY_PARAMS.contains(clave)) {
             return getConfigOnly(clave);
         }
-        
-        String val = cache.get(clave);
-        if (val != null && !val.isBlank()) return Optional.of(val);
+
+        Optional<String> val = resolveValue(clave);
+        if (val.isPresent() && !val.get().isBlank()) return val;
         String fromEnv = resolveFromEnvironment(clave);
         return fromEnv != null ? Optional.of(fromEnv) : Optional.empty();
     }
@@ -95,11 +102,42 @@ public class ParametroUnicoService {
         if (CRITICAL_CONFIG_ONLY_PARAMS.contains(clave)) {
             return getConfigOnly(clave).orElse(defaultValue);
         }
-        
-        String val = cache.get(clave);
-        if (val != null && !val.isBlank()) return val;
+
+        Optional<String> val = resolveValue(clave);
+        if (val.isPresent() && !val.get().isBlank()) return val.get();
         String fromEnv = resolveFromEnvironment(clave);
         return fromEnv != null ? fromEnv : defaultValue;
+    }
+
+    /**
+     * Resuelve el valor mas reciente de una clave:
+     *  - Si la copia en cache tiene menos de CACHE_TTL_MS, se usa tal cual (rapido, sin ir a BD).
+     *  - Si no esta en cache o ya vencio, se consulta la BD SOLO por esa clave puntual y se
+     *    refresca la cache con el valor y la hora actuales.
+     *  - Si la consulta a la BD falla (ej: BD no disponible) o la clave no existe ahi, se usa
+     *    lo que hubiera en cache aunque este vencido — mejor un valor desactualizado que nada.
+     */
+    private Optional<String> resolveValue(String clave) {
+        CachedValue cached = cache.get(clave);
+        boolean fresco = cached != null
+                && (System.currentTimeMillis() - cached.guardadoEn()) < CACHE_TTL_MS;
+        if (fresco) {
+            return Optional.of(cached.valor());
+        }
+
+        try {
+            Optional<SiproParametroUnico> desdeDb = repository.findByClave(clave);
+            if (desdeDb.isPresent()) {
+                String valor = desdeDb.get().getValor();
+                cache.put(clave, new CachedValue(valor, System.currentTimeMillis()));
+                return Optional.of(valor);
+            }
+        } catch (Exception e) {
+            logger.warn("No se pudo refrescar el parámetro '{}' desde BD: {}. Se usa el valor en cache (si existe).",
+                    clave, e.getMessage());
+        }
+
+        return cached != null ? Optional.of(cached.valor()) : Optional.empty();
     }
 
     /**
@@ -130,23 +168,23 @@ public class ParametroUnicoService {
     }
 
     public int getInt(String clave, int defaultValue) {
-        String val = cache.get(clave);
-        if (val == null) return defaultValue;
+        Optional<String> val = resolveValue(clave);
+        if (val.isEmpty()) return defaultValue;
         try {
-            return Integer.parseInt(val.trim());
+            return Integer.parseInt(val.get().trim());
         } catch (NumberFormatException e) {
-            logger.warn("Parámetro '{}' tiene valor no numérico '{}'. Usando default: {}", clave, val, defaultValue);
+            logger.warn("Parámetro '{}' tiene valor no numérico '{}'. Usando default: {}", clave, val.get(), defaultValue);
             return defaultValue;
         }
     }
 
     public long getLong(String clave, long defaultValue) {
-        String val = cache.get(clave);
-        if (val == null) return defaultValue;
+        Optional<String> val = resolveValue(clave);
+        if (val.isEmpty()) return defaultValue;
         try {
-            return Long.parseLong(val.trim());
+            return Long.parseLong(val.get().trim());
         } catch (NumberFormatException e) {
-            logger.warn("Parámetro '{}' tiene valor no numérico '{}'. Usando default: {}", clave, val, defaultValue);
+            logger.warn("Parámetro '{}' tiene valor no numérico '{}'. Usando default: {}", clave, val.get(), defaultValue);
             return defaultValue;
         }
     }
@@ -164,14 +202,14 @@ public class ParametroUnicoService {
         repository.findByClave(clave).ifPresentOrElse(parametro -> {
             parametro.setValor(valor);
             repository.save(parametro);
-            cache.put(clave, valor);
+            cache.put(clave, new CachedValue(valor, System.currentTimeMillis()));
         }, () -> {
             SiproParametroUnico nuevoParametro = new SiproParametroUnico();
             nuevoParametro.setClave(clave);
             nuevoParametro.setValor(valor);
             nuevoParametro.setTipo("STRING");
             repository.save(nuevoParametro);
-            cache.put(clave, valor);
+            cache.put(clave, new CachedValue(valor, System.currentTimeMillis()));
         });
     }
 
@@ -210,7 +248,7 @@ public class ParametroUnicoService {
 
             parametro.setValor(String.valueOf(lastReservedValue));
             repository.save(parametro);
-            cache.put(currentKey, String.valueOf(lastReservedValue));
+            cache.put(currentKey, new CachedValue(String.valueOf(lastReservedValue), System.currentTimeMillis()));
 
             return new SequenceReservation(true, nextValue, lastReservedValue, safeIncrement);
         }
