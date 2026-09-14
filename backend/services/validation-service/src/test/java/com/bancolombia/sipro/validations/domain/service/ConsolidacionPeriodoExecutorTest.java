@@ -14,6 +14,7 @@ import com.bancolombia.sipro.validations.infrastructure.repository.SiproDetalleC
 import com.bancolombia.sipro.validations.infrastructure.repository.SiproDetalleConsolidacionesPlanillasRepository;
 import com.bancolombia.sipro.validations.infrastructure.repository.SiproDetalleConsolidadoRegistroRepository;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,6 +24,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.env.Environment;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.ByteArrayInputStream;
@@ -87,9 +90,6 @@ class ConsolidacionPeriodoExecutorTest {
     private CreffosConsolidationService creffosConsolidationService;
 
     @Mock
-    private ConsolidacionConciliacionReportService consolidacionConciliacionReportService;
-
-    @Mock
     private NotificacionConsolidacionService notificacionConsolidacionService;
 
     @Mock
@@ -107,6 +107,12 @@ class ConsolidacionPeriodoExecutorTest {
     @Mock
     private ConsolidacionFullIfrsService consolidacionFullIfrsService;
 
+    @Mock
+    private PlatformTransactionManager transactionManager;
+
+    @Mock
+    private Query advisoryLockQuery;
+
     private ConsolidacionPeriodoExecutor service;
 
     @BeforeEach
@@ -122,20 +128,29 @@ class ConsolidacionPeriodoExecutorTest {
                 ventanaCargaService,
                 fileStorageService,
                 creffosConsolidationService,
-                consolidacionConciliacionReportService,
                 notificacionConsolidacionService,
                 parametroUnicoService,
                 entityManager,
                 environment,
                 archivosBloqueadosFase2Service,
-                consolidacionFullIfrsService
+                consolidacionFullIfrsService,
+                transactionManager
         );
 
             lenient().when(parametroUnicoService.getLong("APP_CONSOLIDACION_POST_CLOSE_DELAY_HOURS", 1L))
                 .thenReturn(1L);
             lenient().when(parametroUnicoService.getLong("APP_CONSOLIDACION_MAX_POST_CLOSE_DAYS", 5L))
                 .thenReturn(5L);
+            lenient().when(parametroUnicoService.getInt(eq("APP_CONSOLIDACION_TIMEOUT_MINUTOS"), anyInt()))
+                .thenReturn(180);
             when(environment.matchesProfiles("dev")).thenReturn(false);
+
+            // Candado de PostgreSQL (advisory lock): por defecto simula que SIEMPRE se toma
+            // libre, para que los tests existentes sigan el flujo normal sin bloquearse.
+            lenient().when(entityManager.createNativeQuery(anyString())).thenReturn(advisoryLockQuery);
+            lenient().when(advisoryLockQuery.setParameter(anyString(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(advisoryLockQuery);
+            lenient().when(advisoryLockQuery.getSingleResult()).thenReturn(Boolean.TRUE);
     }
 
             @Test
@@ -212,11 +227,6 @@ class ConsolidacionPeriodoExecutorTest {
                 null,
                 null
             ));
-        when(consolidacionConciliacionReportService.generar(anyLong()))
-            .thenReturn(new ConsolidacionConciliacionReportService.GeneratedConciliacionReport(
-                "conciliacion_planillas_manuales_20260531.xlsx",
-                new byte[]{1, 2, 3}
-            ));
         AtomicLong consolidacionId = new AtomicLong(1000L);
         doAnswer(invocation -> {
             SiproDetalleConsolidacionesPlanillas value = invocation.getArgument(0);
@@ -247,7 +257,7 @@ class ConsolidacionPeriodoExecutorTest {
         try {
             consolidado = service.consolidarPeriodoForzado(periodo, 1L, "Prueba consolidación");
         } finally {
-            limpiarSincronizacionTransaccional();
+            completarComoCommitYLimpiar();
         }
 
         assertTrue(consolidado, "consolidarPeriodoForzado debio retornar true");
@@ -300,11 +310,6 @@ class ConsolidacionPeriodoExecutorTest {
                 null,
                 null
             ));
-        when(consolidacionConciliacionReportService.generar(anyLong()))
-            .thenReturn(new ConsolidacionConciliacionReportService.GeneratedConciliacionReport(
-                "conciliacion_planillas_manuales_20260531.xlsx",
-                new byte[]{1}
-            ));
         AtomicLong consolidacionId = new AtomicLong(3000L);
         List<SiproDetalleConsolidacionesPlanillas> snapshots = new ArrayList<>();
         doAnswer(invocation -> {
@@ -330,7 +335,7 @@ class ConsolidacionPeriodoExecutorTest {
         try {
             consolidado = service.consolidarPeriodoForzado(periodo, 1L, "Prueba excepción");
         } finally {
-            limpiarSincronizacionTransaccional();
+            completarComoCommitYLimpiar();
         }
 
         assertTrue(consolidado);
@@ -366,11 +371,6 @@ class ConsolidacionPeriodoExecutorTest {
             ));
         when(notificacionConsolidacionService.enviarConfirmacion(anyLong()))
             .thenReturn(MailTemplateNotificationService.DeliveryResult.failed("smtp timeout"));
-        when(consolidacionConciliacionReportService.generar(anyLong()))
-            .thenReturn(new ConsolidacionConciliacionReportService.GeneratedConciliacionReport(
-                "conciliacion_planillas_manuales_20260531.xlsx",
-                new byte[]{4, 5, 6}
-            ));
         AtomicLong consolidacionId = new AtomicLong(5000L);
         List<SiproDetalleConsolidacionesPlanillas> snapshots = new ArrayList<>();
         doAnswer(invocation -> {
@@ -396,7 +396,7 @@ class ConsolidacionPeriodoExecutorTest {
         try {
             consolidado = service.consolidarPeriodoForzado(periodo, 1L, "Prueba advertencias");
         } finally {
-            limpiarSincronizacionTransaccional();
+            completarComoCommitYLimpiar();
         }
 
         assertTrue(consolidado);
@@ -572,6 +572,21 @@ class ConsolidacionPeriodoExecutorTest {
 
     private void limpiarSincronizacionTransaccional() {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    /**
+     * Simula el commit real de Spring: dispara afterCommit() de cada sincronización
+     * registrada (correo, Fase 2) antes de limpiar. Sin esto, el correo movido a
+     * afterCommit nunca se ejecutaría en estos tests (que no pasan por un
+     * PlatformTransactionManager real).
+     */
+    private void completarComoCommitYLimpiar() {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            for (TransactionSynchronization sync : TransactionSynchronizationManager.getSynchronizations()) {
+                sync.afterCommit();
+            }
             TransactionSynchronizationManager.clearSynchronization();
         }
     }

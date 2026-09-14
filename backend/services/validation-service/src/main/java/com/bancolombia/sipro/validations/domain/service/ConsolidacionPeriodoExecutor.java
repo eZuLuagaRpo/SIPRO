@@ -29,9 +29,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -57,6 +58,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -82,6 +84,8 @@ public class ConsolidacionPeriodoExecutor {
     private static final DateTimeFormatter FECHA_HORA_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final int DEFAULT_BATCH_INSERT_SIZE = 500;
     private static final int DEFAULT_LZ_LOOKUP_CHUNK_SIZE = 1000;
+    /** Cada cuántas filas se deja un log de avance al leer un archivo grande (solo diagnóstico). */
+    private static final int PROGRESS_LOG_INTERVAL_ROWS = 50_000;
     private static final List<String> HEADERS_ENTRADA_PLANILLA = List.of(
             "NIT",
             "OFICINA",
@@ -152,16 +156,24 @@ public class ConsolidacionPeriodoExecutor {
     private final VentanaCargaService ventanaCargaService;
     private final FileStorageService fileStorageService;
     private final CreffosConsolidationService creffosConsolidationService;
-    private final ConsolidacionConciliacionReportService consolidacionConciliacionReportService;
     private final NotificacionConsolidacionService notificacionConsolidacionService;
     private final ParametroUnicoService parametroUnicoService;
     private final EntityManager entityManager;
     private final ArchivosBloqueadosFase2Service archivosBloqueadosFase2Service;
     private final ConsolidacionFullIfrsService consolidacionFullIfrsService;
+    private final PlatformTransactionManager transactionManager;
 
     private static final long DEFAULT_POST_CLOSE_DELAY_HOURS = 1;
     private static final long DEFAULT_MAX_POST_CLOSE_DAYS = 5;
     private static final String ADMIN_CONSOLIDACION_BYPASS_WINDOW_KEY = "APP_ADMIN_CONSOLIDACION_BYPASS_WINDOW";
+
+    /** Parámetro para ajustar el timeout de la transacción de consolidación sin redeploy. */
+    private static final String CONSOLIDACION_TIMEOUT_MINUTOS_KEY = "APP_CONSOLIDACION_TIMEOUT_MINUTOS";
+    /** Margen amplio por defecto: la consolidación más lenta observada tomó ~30 min. */
+    private static final int DEFAULT_CONSOLIDACION_TIMEOUT_MINUTOS = 180;
+
+    /** Namespace fijo del advisory lock de PostgreSQL usado para serializar consolidaciones por periodo. */
+    private static final int CONSOLIDACION_LOCK_NAMESPACE = 1957034;
 
     public ConsolidacionPeriodoExecutor(SiproDetalleCargaPlanillasRepository planillaRepository,
                                         SiproDetalleArchivoValidacionRepository validacionRepository,
@@ -173,13 +185,13 @@ public class ConsolidacionPeriodoExecutor {
                                         VentanaCargaService ventanaCargaService,
                                         FileStorageService fileStorageService,
                                         CreffosConsolidationService creffosConsolidationService,
-                                        ConsolidacionConciliacionReportService consolidacionConciliacionReportService,
                                         NotificacionConsolidacionService notificacionConsolidacionService,
                                         ParametroUnicoService parametroUnicoService,
                                         EntityManager entityManager,
                                         Environment environment,
                                         ArchivosBloqueadosFase2Service archivosBloqueadosFase2Service,
-                                        ConsolidacionFullIfrsService consolidacionFullIfrsService) {
+                                        ConsolidacionFullIfrsService consolidacionFullIfrsService,
+                                        PlatformTransactionManager transactionManager) {
         this.planillaRepository = planillaRepository;
         this.validacionRepository = validacionRepository;
         this.clienteLzRepository = clienteLzRepository;
@@ -190,13 +202,13 @@ public class ConsolidacionPeriodoExecutor {
         this.ventanaCargaService = ventanaCargaService;
         this.fileStorageService = fileStorageService;
         this.creffosConsolidationService = creffosConsolidationService;
-        this.consolidacionConciliacionReportService = consolidacionConciliacionReportService;
         this.notificacionConsolidacionService = notificacionConsolidacionService;
         this.parametroUnicoService = parametroUnicoService;
         this.entityManager = entityManager;
         this.environment = environment;
         this.archivosBloqueadosFase2Service = archivosBloqueadosFase2Service;
         this.consolidacionFullIfrsService = consolidacionFullIfrsService;
+        this.transactionManager = transactionManager;
     }
 
     private final Environment environment;
@@ -204,24 +216,42 @@ public class ConsolidacionPeriodoExecutor {
     /**
      * Consolida un periodo solo cuando la ventana y el estado operativo permiten hacerlo.
      */
-    @Transactional
     public boolean consolidarPeriodoSiCorresponde(LocalDate periodoValoracion, Long usuarioEjecutorId, String observacion) {
-        return consolidarPeriodo(periodoValoracion, usuarioEjecutorId, observacion, false);
+        return ejecutarConTransaccionAcotada(
+                () -> consolidarPeriodo(periodoValoracion, usuarioEjecutorId, observacion, false));
     }
 
     /**
      * Consolida un periodo de forma manual. Valida el mismo rango post-cierre que la automática,
      * salvo cuando el bypass temporal de DEV está activo.
      */
-    @Transactional
     public boolean consolidarPeriodoForzado(LocalDate periodoValoracion, Long usuarioEjecutorId, String observacion) {
-        return consolidarPeriodo(periodoValoracion, usuarioEjecutorId, observacion, true);
+        return ejecutarConTransaccionAcotada(
+                () -> consolidarPeriodo(periodoValoracion, usuarioEjecutorId, observacion, true));
+    }
+
+    /**
+     * Envuelve la consolidación en su propia transacción raíz con timeout, leyendo el límite en
+     * minutos desde {@link #CONSOLIDACION_TIMEOUT_MINUTOS_KEY} en cada llamada (ajustable sin
+     * redeploy). Se usa TransactionTemplate en vez de {@code @Transactional} porque el atributo
+     * timeout de la anotación exige un valor constante en tiempo de compilación.
+     */
+    private boolean ejecutarConTransaccionAcotada(Supplier<Boolean> trabajo) {
+        int minutos = parametroUnicoService.getInt(CONSOLIDACION_TIMEOUT_MINUTOS_KEY, DEFAULT_CONSOLIDACION_TIMEOUT_MINUTOS);
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        transactionTemplate.setTimeout(Math.max(1, minutos) * 60);
+        return Boolean.TRUE.equals(transactionTemplate.execute(status -> trabajo.get()));
     }
 
     private boolean consolidarPeriodo(LocalDate periodoValoracion,
                                       Long usuarioEjecutorId,
                                       String observacion,
                                       boolean ejecucionManual) {
+        if (!intentarTomarCandadoDelPeriodo(periodoValoracion)) {
+            return registrarNoConsolidacion(periodoValoracion,
+                    "ya hay una consolidación en curso para este periodo (candado activo)");
+        }
+
         Optional<VentanaCargaService.VentanaCalculada> ventanaOpt = ventanaCargaService.obtenerVentana(periodoValoracion);
         if (ventanaOpt.isEmpty()) {
             return registrarNoConsolidacion(periodoValoracion,
@@ -284,6 +314,25 @@ public class ConsolidacionPeriodoExecutor {
     private boolean registrarNoConsolidacion(LocalDate periodoValoracion, String razon) {
         logger.info("Periodo {}: no consolida porque {}.", periodoValoracion, razon);
         return false;
+    }
+
+    /**
+     * Toma un advisory lock de PostgreSQL exclusivo para este periodo, atado a la transacción
+     * actual: se libera solo al hacer commit o rollback (incluso si el proceso muere a mitad de
+     * camino, sin depender de ningún cronómetro). Evita que dos intentos de consolidación del
+     * MISMO periodo corran a la vez (el scheduler automático, el botón manual y el barrido
+     * post-aprobación de planillas pueden coincidir sin que nadie haga doble clic).
+     * No bloquea: si otro intento ya tiene el candado, retorna false de inmediato en vez de
+     * esperar — así nunca se convierte en una causa adicional de cuelgue.
+     */
+    private boolean intentarTomarCandadoDelPeriodo(LocalDate periodoValoracion) {
+        int clavePeriodo = periodoValoracion.getYear() * 100 + periodoValoracion.getMonthValue();
+        Object resultado = entityManager
+                .createNativeQuery("SELECT pg_try_advisory_xact_lock(:namespace, :clave)")
+                .setParameter("namespace", CONSOLIDACION_LOCK_NAMESPACE)
+                .setParameter("clave", clavePeriodo)
+                .getSingleResult();
+        return Boolean.TRUE.equals(resultado);
     }
 
     private boolean esPlanillaConsolidable(SiproDetalleCargaPlanillas planilla) {
@@ -376,8 +425,7 @@ public class ConsolidacionPeriodoExecutor {
             }
 
             String advertenciaExcelConsolidado = guardarExcelConsolidado(periodoValoracion, excelWriter);
-            PostProcesamientoResult postResult =
-                    ejecutarPostProcesamiento(periodoValoracion, cabecera.getIdConsolidacion());
+            PostProcesamientoResult postResult = ejecutarPostProcesamiento(periodoValoracion);
             List<String> advertenciasPostProceso = new ArrayList<>(postResult.advertencias());
             final CreffosParametricGenerator.GeneratedCreffosFile creffosGenerado = postResult.creffosFile();
             if (advertenciaExcelConsolidado != null && !advertenciaExcelConsolidado.isBlank()) {
@@ -405,9 +453,18 @@ public class ConsolidacionPeriodoExecutor {
             }
             consolidacionRepository.save(cabecera);
 
-                MailTemplateNotificationService.DeliveryResult resultadoCorreo =
-                    notificacionConsolidacionService.enviarConfirmacion(cabecera.getIdConsolidacion());
-                persistirAdvertenciaCorreoSiAplica(cabecera, usuarioAuditoria, fechaFin, resultadoCorreo);
+            // El correo de confirmación se envía DESPUES del commit (igual que la Fase 2 abajo),
+            // para no sostener la conexion/transaccion abierta mientras dura el envio. Por eso
+            // enviarConfirmacion() vuelve a leer la cabecera desde BD por id en vez de confiar en
+            // este objeto en memoria: para cuando corra, la transaccion ya cerró.
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    MailTemplateNotificationService.DeliveryResult resultadoCorreo =
+                            notificacionConsolidacionService.enviarConfirmacion(cabecera.getIdConsolidacion());
+                    persistirAdvertenciaCorreoSiAplica(cabecera, usuarioAuditoria, fechaFin, resultadoCorreo);
+                }
+            });
 
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
@@ -616,6 +673,11 @@ public class ConsolidacionPeriodoExecutor {
                 excelWriter.appendRow(construirFilaConsolidado(fila, planilla, tipoId));
                 cantidadRegistros[0]++;
 
+                if (cantidadRegistros[0] % PROGRESS_LOG_INTERVAL_ROWS == 0) {
+                    logger.info("Periodo {} archivo '{}': {} filas procesadas hasta ahora...",
+                            periodoValoracion, planilla.getNombreArchivoFuente(), cantidadRegistros[0]);
+                }
+
                 if (batch.size() >= batchInsertSize) {
                     persistirBatch(batch);
                 }
@@ -679,6 +741,7 @@ public class ConsolidacionPeriodoExecutor {
         List<String> headersOriginales = new ArrayList<>();
         Map<String, Integer> columnIndexByHeader = new LinkedHashMap<>();
         Set<String> nits = new LinkedHashSet<>();
+        int[] filasEscaneadas = {0};
 
         XlsxStreamingReader.readFirstSheet(inputStream, (rowNumber, rowValues) -> {
             if (rowNumber == 1) {
@@ -701,6 +764,12 @@ public class ConsolidacionPeriodoExecutor {
             String nit = obtenerValorFila(rowValues, columnIndexByHeader, "NIT");
             if (!nit.isBlank()) {
                 nits.add(normalizeLookupDocument(nit));
+            }
+
+            filasEscaneadas[0]++;
+            if (filasEscaneadas[0] % PROGRESS_LOG_INTERVAL_ROWS == 0) {
+                logger.info("Escaneo de '{}': {} filas leídas hasta ahora (buscando NITs)...",
+                        nombreArchivo, filasEscaneadas[0]);
             }
         });
 
@@ -832,12 +901,16 @@ public class ConsolidacionPeriodoExecutor {
             Files.createDirectories(periodoDir);
             String nombreArchivo = "CONSOLIDADO_COLGAAP_" + periodoValoracion.format(FECHA_COMPACT_FMT) + ".xlsx";
             Path targetFile = periodoDir.resolve(nombreArchivo);
+            logger.info("Escribiendo Excel consolidado en ruta compartida: {} ({} bytes)...",
+                    targetFile, contenidoExcel.length);
+            long t0 = System.currentTimeMillis();
             Files.write(targetFile,
                     contenidoExcel,
                     StandardOpenOption.CREATE,
                     StandardOpenOption.TRUNCATE_EXISTING,
                     StandardOpenOption.WRITE);
-            logger.info("Excel consolidado publicado en ruta compartida: {}", targetFile);
+            logger.info("Excel consolidado publicado en ruta compartida: {} ({} ms)",
+                    targetFile, System.currentTimeMillis() - t0);
             return null;
         } catch (Exception ex) {
             logger.warn("No se pudo copiar el Excel consolidado a ruta compartida: {}. Motivo: {}",
@@ -849,12 +922,16 @@ public class ConsolidacionPeriodoExecutor {
     private record PostProcesamientoResult(List<String> advertencias,
             CreffosParametricGenerator.GeneratedCreffosFile creffosFile) {}
 
-    private PostProcesamientoResult ejecutarPostProcesamiento(LocalDate periodoValoracion, Long idConsolidacion) {
+    private PostProcesamientoResult ejecutarPostProcesamiento(LocalDate periodoValoracion) {
         List<String> advertencias = new ArrayList<>();
         CreffosParametricGenerator.GeneratedCreffosFile creffosFile = null;
 
         try {
+            logger.info("Post-procesamiento periodo {}: iniciando generación Full IFRS...", periodoValoracion);
+            long t0FullIfrs = System.currentTimeMillis();
             String advertenciaFullIfrs = consolidacionFullIfrsService.generarConsolidado(periodoValoracion);
+            logger.info("Post-procesamiento periodo {}: generación Full IFRS finalizada ({} ms).",
+                    periodoValoracion, System.currentTimeMillis() - t0FullIfrs);
             if (advertenciaFullIfrs != null && !advertenciaFullIfrs.isBlank()) {
                 advertencias.add(advertenciaFullIfrs);
             }
@@ -865,8 +942,12 @@ public class ConsolidacionPeriodoExecutor {
         }
 
         try {
+            logger.info("Post-procesamiento periodo {}: iniciando generación y publicación de CREFFSOS...", periodoValoracion);
+            long t0Creffsos = System.currentTimeMillis();
             CreffosConsolidationService.PublicationResult publicationResult =
                     creffosConsolidationService.generarYPublicarCreffsos(periodoValoracion);
+            logger.info("Post-procesamiento periodo {}: CREFFSOS finalizado ({} ms).",
+                    periodoValoracion, System.currentTimeMillis() - t0Creffsos);
             creffosFile = publicationResult.generatedFile();
             if (publicationResult.sharedCopyWarning() != null && !publicationResult.sharedCopyWarning().isBlank()) {
                 advertencias.add("CREFFSOS generado pero no copiado a red");
@@ -876,13 +957,11 @@ public class ConsolidacionPeriodoExecutor {
             advertencias.add("CREFFSOS generado pero no copiado a red");
         }
 
-        try {
-            consolidacionConciliacionReportService.generar(idConsolidacion);
-        } catch (Exception ex) {
-            logger.error("No se pudo generar el reporte de conciliación para el periodo {}: {}",
-                    periodoValoracion, ex.getMessage(), ex);
-            advertencias.add("Reporte de conciliación no generado: " + resumirMensaje(ex));
-        }
+        // El reporte de conciliación YA NO se genera aquí: en el flujo automático su
+        // resultado nunca se guardaba (se descartaba sin persistirse ni publicarse) —
+        // se regenera desde cero, bajo demanda, cuando el usuario lo descarga desde el
+        // endpoint correspondiente. Generarlo aquí solo repetía ese trabajo (lectura
+        // completa de registros + CREFFSOS + 2 hojas de Excel) para tirarlo a la basura.
 
         return new PostProcesamientoResult(advertencias, creffosFile);
     }

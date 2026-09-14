@@ -26,6 +26,7 @@ import java.nio.file.StandardOpenOption;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -52,6 +53,8 @@ public class ConsolidacionFullIfrsService {
     private static final DateTimeFormatter FECHA_COMPACT_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final DateTimeFormatter FECHA_HORA_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final int DEFAULT_LZ_LOOKUP_CHUNK_SIZE = 1000;
+    /** Cada cuántas filas se deja un log de avance al leer un archivo grande (solo diagnóstico). */
+    private static final int PROGRESS_LOG_INTERVAL_ROWS = 50_000;
 
     private static final List<String> HEADERS_ENTRADA = List.of(
             "NIT",
@@ -142,13 +145,38 @@ public class ConsolidacionFullIfrsService {
         logger.info("Full IFRS - periodo {}: iniciando consolidación de {} planillas.", periodoValoracion, planillas.size());
 
         try (FullIfrsExcelWriter writer = new FullIfrsExcelWriter()) {
+            List<PlanillaEscaneada> escaneadas = new ArrayList<>();
+            Set<String> nitsDelPeriodo = new LinkedHashSet<>();
+
             for (SiproDetalleCargaPlanillas planilla : planillas) {
                 if (Boolean.TRUE.equals(planilla.getNoReportaDatos())) {
                     logger.info("Full IFRS - planilla {}: aprobación sin datos, se omite.", planilla.getId());
                     continue;
                 }
 
-                procesarPlanilla(periodoValoracion, planilla, writer);
+                String rutaArchivo = planilla.getRutaArchivoAlmacenamiento();
+                if (rutaArchivo == null || rutaArchivo.isBlank()) {
+                    logger.warn("Full IFRS - planilla {}: sin ruta de almacenamiento, se omite.", planilla.getId());
+                    continue;
+                }
+
+                ExcelScanResult scanResult;
+                try (InputStream is = fileStorageService.openStream(rutaArchivo)) {
+                    scanResult = escanearExcel(is, planilla.getNombreArchivoFuente());
+                }
+                nitsDelPeriodo.addAll(scanResult.nits());
+                escaneadas.add(new PlanillaEscaneada(planilla, rutaArchivo, scanResult));
+            }
+
+            // Un solo cruce de TIPO_ID compartido para todo el periodo, en vez de uno por
+            // planilla: evita repetir la consulta a la LZ cuando el mismo cliente (NIT)
+            // aparece en varias planillas del mismo periodo. No cambia cuántas veces se
+            // lee cada archivo (eso sigue igual, a propósito, para no acumular en memoria
+            // planillas de hasta 500.000 filas) — solo reduce viajes a la base de datos.
+            Map<String, String> tipoIdPorNit = cargarTipoIdPorNit(nitsDelPeriodo);
+
+            for (PlanillaEscaneada escaneada : escaneadas) {
+                procesarPlanilla(periodoValoracion, escaneada, tipoIdPorNit, writer);
             }
 
             byte[] contenido = writer.toByteArray();
@@ -159,6 +187,10 @@ public class ConsolidacionFullIfrsService {
             return "Consolidado Full IFRS no generado: " + resumirMensaje(ex);
         }
     }
+
+    private record PlanillaEscaneada(SiproDetalleCargaPlanillas planilla,
+                                     String rutaArchivo,
+                                     ExcelScanResult scanResult) {}
 
     private List<SiproDetalleCargaPlanillas> obtenerPlanillas(LocalDate periodoValoracion) {
         return planillaRepository
@@ -188,22 +220,14 @@ public class ConsolidacionFullIfrsService {
     }
 
     private void procesarPlanilla(LocalDate periodoValoracion,
-                                  SiproDetalleCargaPlanillas planilla,
+                                  PlanillaEscaneada escaneada,
+                                  Map<String, String> tipoIdPorNit,
                                   FullIfrsExcelWriter writer) throws IOException {
-        String rutaArchivo = planilla.getRutaArchivoAlmacenamiento();
-        if (rutaArchivo == null || rutaArchivo.isBlank()) {
-            logger.warn("Full IFRS - planilla {}: sin ruta de almacenamiento, se omite.", planilla.getId());
-            return;
-        }
+        SiproDetalleCargaPlanillas planilla = escaneada.planilla();
+        ExcelScanResult scanResult = escaneada.scanResult();
+        int[] filasProcesadas = {0};
 
-        ExcelScanResult scanResult;
-        try (InputStream is = fileStorageService.openStream(rutaArchivo)) {
-            scanResult = escanearExcel(is, planilla.getNombreArchivoFuente());
-        }
-
-        Map<String, String> tipoIdPorNit = cargarTipoIdPorNit(scanResult.nits());
-
-        try (InputStream is = fileStorageService.openStream(rutaArchivo)) {
+        try (InputStream is = fileStorageService.openStream(escaneada.rutaArchivo())) {
             XlsxStreamingReader.readFirstSheet(is, (rowNumber, rowValues) -> {
                 if (rowNumber == 1 || esFilaVacia(rowValues)) {
                     return;
@@ -212,6 +236,12 @@ public class ConsolidacionFullIfrsService {
                 String nit = normalizeLookupDocument(getValue(fila, "NIT"));
                 String tipoId = firstNonBlank(tipoIdPorNit.get(nit), getValue(fila, "TIPO_ID"));
                 writer.appendRow(construirFila(fila, planilla, tipoId));
+
+                filasProcesadas[0]++;
+                if (filasProcesadas[0] % PROGRESS_LOG_INTERVAL_ROWS == 0) {
+                    logger.info("Full IFRS - periodo {} planilla {}: {} filas procesadas hasta ahora...",
+                            periodoValoracion, planilla.getId(), filasProcesadas[0]);
+                }
             });
         }
 
@@ -221,6 +251,7 @@ public class ConsolidacionFullIfrsService {
     private ExcelScanResult escanearExcel(InputStream inputStream, String nombreArchivo) throws IOException {
         Map<String, Integer> columnIndexByHeader = new LinkedHashMap<>();
         Set<String> nits = new LinkedHashSet<>();
+        int[] filasEscaneadas = {0};
 
         XlsxStreamingReader.readFirstSheet(inputStream, (rowNumber, rowValues) -> {
             if (rowNumber == 1) {
@@ -239,6 +270,12 @@ public class ConsolidacionFullIfrsService {
             String nit = obtenerValorFila(rowValues, columnIndexByHeader, "NIT");
             if (!nit.isBlank()) {
                 nits.add(normalizeLookupDocument(nit));
+            }
+
+            filasEscaneadas[0]++;
+            if (filasEscaneadas[0] % PROGRESS_LOG_INTERVAL_ROWS == 0) {
+                logger.info("Full IFRS - escaneo de '{}': {} filas leídas hasta ahora (buscando NITs)...",
+                        nombreArchivo, filasEscaneadas[0]);
             }
         });
 
@@ -351,11 +388,15 @@ public class ConsolidacionFullIfrsService {
             Files.createDirectories(periodoDir);
             String nombreArchivo = "CONSOLIDADO_FULL_IFRS_" + periodoValoracion.format(FECHA_COMPACT_FMT) + ".xlsx";
             Path targetFile = periodoDir.resolve(nombreArchivo);
+            logger.info("Full IFRS - escribiendo Excel consolidado en red: {} ({} bytes)...",
+                    targetFile, contenido.length);
+            long t0 = System.currentTimeMillis();
             Files.write(targetFile, contenido,
                     StandardOpenOption.CREATE,
                     StandardOpenOption.TRUNCATE_EXISTING,
                     StandardOpenOption.WRITE);
-            logger.info("Full IFRS - Excel consolidado publicado en red: {}", targetFile);
+            logger.info("Full IFRS - Excel consolidado publicado en red: {} ({} ms)",
+                    targetFile, System.currentTimeMillis() - t0);
             return null;
         } catch (Exception ex) {
             logger.warn("Full IFRS - no se pudo copiar a ruta compartida: {}. Motivo: {}",

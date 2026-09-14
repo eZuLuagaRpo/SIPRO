@@ -216,12 +216,16 @@ public class CreffosConsolidationService {
             Path targetDir = Path.of(outputDir.trim());
             Files.createDirectories(targetDir);
             Path targetFile = targetDir.resolve(generatedFile.fileName());
+            logger.info("[CREFFSOS] Escribiendo archivo en ruta compartida: {} ({} bytes)...",
+                    targetFile, generatedFile.content().length);
+            long t0 = System.currentTimeMillis();
             Files.write(targetFile,
                     generatedFile.content(),
                     StandardOpenOption.CREATE,
                     StandardOpenOption.TRUNCATE_EXISTING,
                     StandardOpenOption.WRITE);
-            logger.info("[CREFFSOS] Archivo publicado en ruta compartida: {}", targetFile);
+            logger.info("[CREFFSOS] Archivo publicado en ruta compartida: {} ({} ms)",
+                    targetFile, System.currentTimeMillis() - t0);
             return null;
         } catch (Exception ex) {
             logger.warn("No se pudo copiar CREFFSOS a ruta compartida: {}. Motivo: {}",
