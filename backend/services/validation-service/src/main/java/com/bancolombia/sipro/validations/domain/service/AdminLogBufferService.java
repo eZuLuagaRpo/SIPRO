@@ -32,7 +32,11 @@ public class AdminLogBufferService {
                         "CreffosColumnCalculator",
                         "CreffosComparisonService",
                         "VentanaCargaService",
-                        "NotificacionConsolidacionService"
+                        "NotificacionConsolidacionService",
+                        // Logger dedicado SOLO a los puntos de control y avance de lectura de
+                        // ConsolidacionFullIfrsService (no el logger principal de esa clase, a
+                        // propósito, para no traer también sus demás logs operativos al panel).
+                        "ConsolidacionFullIfrsProgreso"
         );
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter

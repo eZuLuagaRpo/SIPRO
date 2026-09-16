@@ -45,6 +45,13 @@ import java.util.stream.Collectors;
 public class ConsolidacionFullIfrsService {
 
     private static final Logger logger = LoggerFactory.getLogger(ConsolidacionFullIfrsService.class);
+    /**
+     * Logger dedicado SOLO para los puntos de control y el avance de lectura (diagnóstico de
+     * rendimiento). Se separa del logger principal a propósito: así se puede exponer en el
+     * panel admin (ver AdminLogBufferService.CONSOLIDACION_LOGGERS) sin traer también el resto
+     * de logs operativos de esta clase, que no aportan a "cómo va avanzando" la consolidación.
+     */
+    private static final Logger progresoLogger = LoggerFactory.getLogger("ConsolidacionFullIfrsProgreso");
 
     private static final Long SEGMENTO_FULL_IFRS_ID = 2L;
     private static final String CONSOLIDADOS_PREFIX = "consolidados/";
@@ -239,7 +246,7 @@ public class ConsolidacionFullIfrsService {
 
                 filasProcesadas[0]++;
                 if (filasProcesadas[0] % PROGRESS_LOG_INTERVAL_ROWS == 0) {
-                    logger.info("Full IFRS - periodo {} planilla {}: {} filas procesadas hasta ahora...",
+                    progresoLogger.info("Full IFRS - periodo {} planilla {}: {} filas procesadas hasta ahora...",
                             periodoValoracion, planilla.getId(), filasProcesadas[0]);
                 }
             });
@@ -274,7 +281,7 @@ public class ConsolidacionFullIfrsService {
 
             filasEscaneadas[0]++;
             if (filasEscaneadas[0] % PROGRESS_LOG_INTERVAL_ROWS == 0) {
-                logger.info("Full IFRS - escaneo de '{}': {} filas leídas hasta ahora (buscando NITs)...",
+                progresoLogger.info("Full IFRS - escaneo de '{}': {} filas leídas hasta ahora (buscando NITs)...",
                         nombreArchivo, filasEscaneadas[0]);
             }
         });
@@ -388,14 +395,14 @@ public class ConsolidacionFullIfrsService {
             Files.createDirectories(periodoDir);
             String nombreArchivo = "CONSOLIDADO_FULL_IFRS_" + periodoValoracion.format(FECHA_COMPACT_FMT) + ".xlsx";
             Path targetFile = periodoDir.resolve(nombreArchivo);
-            logger.info("Full IFRS - escribiendo Excel consolidado en red: {} ({} bytes)...",
+            progresoLogger.info("Full IFRS - escribiendo Excel consolidado en red: {} ({} bytes)...",
                     targetFile, contenido.length);
             long t0 = System.currentTimeMillis();
             Files.write(targetFile, contenido,
                     StandardOpenOption.CREATE,
                     StandardOpenOption.TRUNCATE_EXISTING,
                     StandardOpenOption.WRITE);
-            logger.info("Full IFRS - Excel consolidado publicado en red: {} ({} ms)",
+            progresoLogger.info("Full IFRS - Excel consolidado publicado en red: {} ({} ms)",
                     targetFile, System.currentTimeMillis() - t0);
             return null;
         } catch (Exception ex) {
