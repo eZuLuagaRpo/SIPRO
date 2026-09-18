@@ -1,7 +1,5 @@
 # SIPRO — Sistema Integral de Provisiones
 
-> Documentación técnica generada a partir del análisis directo del código fuente actual del repositorio (backend, frontend, configuración y modelo de datos real vía entidades JPA). **No se usó Liquibase como fuente de verdad del esquema** porque las migraciones están desactualizadas respecto al esquema real — el esquema de base de datos se administra manualmente. Cualquier punto que no se pudo verificar con certeza queda marcado explícitamente como *pendiente de confirmar* en vez de asumirse.
-
 ## 1. Introducción / Resumen ejecutivo
 
 SIPRO centraliza el ciclo completo de **carga, validación, aprobación, consolidación y conciliación de planillas manuales de provisiones** para dos segmentos contables:
@@ -32,11 +30,10 @@ Para enriquecer y validar esa información, SIPRO se conecta como cliente de sol
 - [12. Despliegue e infraestructura](#12-despliegue-e-infraestructura)
 - [13. Flujos operativos principales](#13-flujos-operativos-principales)
 - [14. Glosario](#14-glosario)
-- [15. Consideraciones y estado actual](#15-consideraciones-y-estado-actual)
 
 ## 3. Arquitectura general
 
-SIPRO es un backend único (`validation-service`, Spring Boot) consumido por un frontend Angular, con PostgreSQL como base de datos transaccional y tres integraciones externas: el proveedor de identidad corporativo (Entra ID), la Landing Zone analítica (Impala) y almacenamiento de archivos (local/NAS o S3, según ambiente).
+SIPRO es un backend único (`validation-service`, Spring Boot) consumido por un frontend Angular, con PostgreSQL como base de datos transaccional y tres integraciones externas: el proveedor de identidad corporativo (Entra ID), la Landing Zone analítica (Impala) y el almacenamiento de archivos (NAS).
 
 ```mermaid
 flowchart TB
@@ -54,7 +51,7 @@ flowchart TB
     DB[("PostgreSQL\nschema schsipro")]
     ENTRA["Microsoft Entra ID\n(JWT + grupos de seguridad)"]
     LZ[("Landing Zone\nImpala / Cloudera")]
-    STORAGE["Almacenamiento de archivos\nlocal (NAS) o AWS S3"]
+    STORAGE["Almacenamiento de archivos\n(NAS)"]
     SECRETS["AWS Secrets Manager\n(BD, LZ)"]
     MAIL["Correo\nSMTP / Outlook COM / AWS SES"]
 
@@ -70,7 +67,7 @@ flowchart TB
     DOM -- "notificaciones" --> MAIL
 ```
 
-La arquitectura del backend es **hexagonal reconocible pero no estrictamente pura**: existe una capa de entrada, una capa de casos de uso, una capa de dominio y una capa de infraestructura, pero conviven restos de una reestructuración incompleta (ver [Estructura del repositorio](#5-estructura-del-repositorio) y [Consideraciones](#15-consideraciones-y-estado-actual)). La mayor parte de la lógica de negocio vive en **servicios de dominio** (36 clases) más que en casos de uso propiamente dichos (solo 6 clases), lo que en la práctica significa que los servicios de dominio orquestan directamente en vez de delegar siempre a un caso de uso intermedio.
+La arquitectura del backend está organizada en capas: una capa de entrada (controladores REST), una capa de casos de uso, una capa de dominio y una capa de infraestructura. La mayor parte de la lógica de negocio vive en los **servicios de dominio** (36 clases), que orquestan directamente las reglas de negocio de carga, validación, aprobación, consolidación y generación de CREFFSOS.
 
 ## 4. Stack tecnológico
 
@@ -79,7 +76,7 @@ La arquitectura del backend es **hexagonal reconocible pero no estrictamente pur
 | Backend | Java 17 (toolchain Gradle) | |
 | Backend | Spring Boot 3.4.0 | |
 | Backend | Spring Data JPA, Spring Security, Spring Mail, Spring Cache (Caffeine) | |
-| Backend | PostgreSQL (driver `org.postgresql:postgresql:42.7.1`) | Esquema `schsipro`. Administrado manualmente (ver [Consideraciones](#15-consideraciones-y-estado-actual)) |
+| Backend | PostgreSQL (driver `org.postgresql:postgresql:42.7.1`) | Esquema `schsipro` |
 | Backend | Apache POI `5.2.5` | Lectura/escritura de Excel (planillas, CREFFSOS, reportes) |
 | Backend | Apache Commons JEXL `3.3` | Motor de fórmulas del motor de reglas de validación |
 | Backend | Driver JDBC Impala (`ImpalaJDBC42.jar`, dependencia local en `libs/`) | Conexión a la Landing Zone |
@@ -90,7 +87,7 @@ La arquitectura del backend es **hexagonal reconocible pero no estrictamente pur
 | Frontend | RxJS `~7.8.0` | |
 | Frontend | `@azure/msal-browser` `^4.26.1` | Autenticación contra Entra ID desde el navegador |
 | Frontend | `xlsx` `^0.18.5` | Manejo de Excel en cliente |
-| Contenedor | `eclipse-temurin:21-jdk` (build) → `eclipse-temurin:21-jre` (runtime) | El contenedor corre en JRE 21 aunque el código compila con toolchain Java 17 |
+| Despliegue | AWS (máquinas y servidor PostgreSQL ya aprovisionados), JAR directo sobre la JVM | Ver [sección 12](#12-despliegue-e-infraestructura) |
 
 ## 5. Estructura del repositorio
 
@@ -98,7 +95,7 @@ La arquitectura del backend es **hexagonal reconocible pero no estrictamente pur
 SIPRO/
 ├── backend/
 │   ├── settings.gradle                  # único módulo: services:validation-service
-│   ├── deployment/                      # Dockerfile + chart Helm base (ver sección 12)
+│   ├── deployment/                      # Dockerfile + chart Helm
 │   └── services/validation-service/
 │       ├── build.gradle
 │       └── src/main/
@@ -114,17 +111,16 @@ SIPRO/
 │           │   │   ├── entrypoint/           # controladores REST (grupo 2, ver nota abajo)
 │           │   │   ├── config/                # seguridad, JPA, storage, LZ, panel admin
 │           │   │   ├── repository/            # repositorios Spring Data JPA (grueso)
-│           │   │   ├── persistence/           # segunda jerarquía de repos/entidades (legado, ver sección 15)
+│           │   │   ├── persistence/           # repositorios y entidades adicionales
 │           │   │   ├── security/              # validación de JWT Entra ID, filtros, RBAC
 │           │   │   ├── storage/                # implementaciones local/S3 de FileStorageService
 │           │   │   ├── lz/                     # cliente JDBC a Impala, manejo de secretos LZ
 │           │   │   ├── notification/           # envío de correo (4 transportes)
 │           │   │   └── adapters/{in,out}/      # adaptadores puerto-entrante/saliente
-│           │   ├── model/ y service/           # paquetes sueltos fuera de domain/ (legado, ver sección 15)
 │           │   └── shared/                     # utilidades y excepciones comunes
 │           └── resources/
 │               ├── application*.yml            # config por ambiente (ver sección 10)
-│               └── db/changelog/                # Liquibase — INACTIVO, no es fuente de verdad del esquema
+│               └── db/changelog/                # historial de cambios de base de datos
 ├── frontend/
 │   └── src/
 │       ├── main.ts                      # bootstrap standalone real
@@ -139,35 +135,68 @@ SIPRO/
 └── ABA/                                 # proyecto independiente, no forma parte de SIPRO (ver sección 1)
 ```
 
-**Nota sobre controladores duplicados:** los controladores REST están repartidos en dos paquetes distintos sin un criterio único documentado — `api/` (`ActaController`, `ConfigController`, `HealthController`, `LzTestController`, `ValidationController`) e `infrastructure/entrypoint/` (`AdminController`, `AuthController`, `LzIngestionController`, `MainController`, `ParametrosController`, `PlanillaController`). No hay un único punto de entrada centralizado; ver [Consideraciones](#15-consideraciones-y-estado-actual).
-
 ## 6. Módulos funcionales
 
 ### Carga y validación de planillas
 
-Un usuario sube un archivo Excel (Colgaap) o Excel + archivo de control `.txt` (Full IFRS, con la cantidad de registros esperada) y el sistema lo valida en caliente contra un **motor de reglas 100% parametrizado en la tabla `data_validation_rule`** — no hay reglas de negocio de estructura, tipo de dato o fecha hardcodeadas en Java para esta parte. El motor soporta 5 tipos de regla: `FIELD` (obligatoriedad, tipo de dato, longitud, regex, lista de valores, o una fórmula JEXL libre), `COMPOSITE_DATE` (arma y valida una fecha desde 3 columnas año/mes/día), `DATE_RELATION` (compara fechas entre sí o contra la fecha de corte elegida), y `CTRL_CONTENT`/`CTRL_RECORD_COUNT` (exclusivas del archivo de control de Full IFRS).
+**Flujo real, de punta a punta:** el usuario sube un archivo Excel (Colgaap) o Excel + archivo de control `.txt` (Full IFRS, con la cantidad de registros esperada) a `POST /api/validar` (o su variante asíncrona `/api/validar/async` para archivos grandes). El resultado de esa validación queda cacheado en memoria (`LoteMemoryStore`, identificado por un `validacionLoteId`) — cuando el usuario decide "solicitar aprobación" (`POST /api/planillas/solicitar`), el sistema **reutiliza el archivo ya validado en caché** en vez de pedirlo de nuevo, lo sube a almacenamiento bajo `pendientes/{fecha}/`, **versiona la planilla** (la versión anterior del mismo producto+fecha se inactiva mediante un bloqueo pesimista `SELECT ... FOR UPDATE`, para evitar condiciones de carrera si dos cargas llegan casi al mismo tiempo) y la deja en estado `PENDIENTE`.
 
-Además del motor parametrizado, existen validaciones de negocio fijas en código: unicidad de DOCUMENTO+MONEDA por archivo, exclusión del NIT propio de Bancolombia, existencia del NIT contra la Landing Zone (activable/desactivable por parámetro), y existencia de la cuenta contable (CTAPUC) contra la tabla de homologación SAP (solo Colgaap). *No se encontró una regla de "cuadre contable" (partida doble) implementada de forma fija — si existe, viviría como una fórmula JEXL configurada en la tabla de reglas, lo cual no se puede confirmar sin consultar la base de datos real (pendiente de confirmar).*
+**Motor de reglas — 100% parametrizado en la tabla `data_validation_rule`**, no hay reglas de estructura/tipo/fecha hardcodeadas en Java. Soporta 5 tipos de regla (`rule_kind`):
+
+| `rule_kind` | Qué valida |
+|---|---|
+| `FIELD` | Obligatoriedad, tipo de dato (entero/decimal, con mínimo/máximo y si permite negativos), longitud máxima, expresión regular, lista de valores permitidos, o una **fórmula libre en Apache Commons JEXL** (`validation_formula`) — el motor JEXL corre en modo `UNRESTRICTED` porque las fórmulas provienen de reglas administradas por la propia aplicación, no de texto libre ingresado por el usuario final |
+| `COMPOSITE_DATE` | Arma una fecha real a partir de 3 columnas separadas (año/mes/día) y valida que esa combinación exista en el calendario |
+| `DATE_RELATION` | Compara dos fechas compuestas entre sí, o contra la fecha de corte elegida por el usuario (variable `VAR_FECHA_CORTE`), con operadores `<=`, `<`, `>=`, `>`, `==`, `!=` |
+| `CTRL_CONTENT` / `CTRL_RECORD_COUNT` | Exclusivas del archivo de control `.txt` de Full IFRS |
+
+Además del motor parametrizado, existen validaciones de negocio fijas en código (no configurables desde la tabla de reglas): unicidad de DOCUMENTO+MONEDA por archivo, exclusión del NIT propio de Bancolombia, existencia del NIT contra la Landing Zone (activable/desactivable por parámetro `VALIDAR_NIT_EXISTENCIA_LZ`), y existencia de la cuenta contable (CTAPUC) contra la tabla de homologación SAP (solo aplica al segmento Colgaap).
+
+**Diferencia Colgaap vs. Full IFRS:** Full IFRS exige el segundo archivo de control y, cuando el usuario certifica un producto como "Sin Datos" para el periodo, el sistema genera automáticamente un Excel vacío con sus 23 encabezados fijos más un `.txt` con "0" — en Colgaap, "Sin Datos" solo deja un registro de certificación sin archivo real asociado.
 
 ### Aprobación y rechazo
 
-Una vez validada, el usuario "solicita aprobación": el archivo se versiona (la versión anterior del mismo producto+fecha se inactiva) y nace en estado `PENDIENTE`. Solo el **líder asignado a esa planilla específica** (`id_lider`) puede aprobar o rechazar — la autorización efectiva de esta acción se valida contra ese campo, no contra el flag genérico de rol "aprobar". El rechazo exige un motivo obligatorio, validado tanto en el controlador como en la persistencia del registro de auditoría. Cada acción (solicitud, aprobación, rechazo) dispara una notificación por correo.
+Solo el **líder asignado a esa planilla específica** (columna `id_lider`) puede aprobar o rechazar — la autorización efectiva se valida comparando ese campo contra el usuario autenticado, **no** contra el flag genérico de permiso "aprobar" del rol. El rechazo exige un motivo obligatorio, verificado en dos capas: el controlador rechaza la petición (HTTP 400) si viene vacío, y el motivo se persiste en `sipro_detalle_rechazos_planilla` junto con la etapa del rechazo, antes de cambiar el estado de la planilla.
+
+Al aprobar, el archivo se mueve de `pendientes/` a `aprobados/{fecha}`; al rechazar, se mueve a `rechazados/{fecha}` y la planilla queda disponible para que el usuario cargue una nueva versión. Si es Full IFRS, la aprobación además copia los archivos a una carpeta de red compartida y, cuando **todas** las planillas Full IFRS del periodo quedan aprobadas, dispara automáticamente la generación de un archivo de homologación.
+
+Cada acción (solicitud, aprobación, rechazo) dispara una notificación por correo, con **4 transportes intercambiables** según el ambiente: `preview` (solo registra en log, usado en desarrollo), `smtp`, `outlook-win32` (automatiza Outlook vía PowerShell/COM en un host Windows on-prem — es el *default* global del sistema) y `ses-api` (AWS SES, el transporte acordado para producción).
 
 ### Consolidación
 
-Cierre periódico (mensual) que reconstruye por completo el consolidado de un periodo a partir de las planillas aprobadas, en paralelo para los dos segmentos, y termina generando el archivo CREFFSOS. Incluye protección contra ejecuciones concurrentes para el mismo periodo, un límite de tiempo configurable para que una ejecución nunca quede indefinidamente "colgada", y una segunda fase asíncrona ("Fase 2 / archivos bloqueados") que publica copias protegidas contra edición del CREFFSOS, de las planillas Full IFRS aprobadas y de un reporte de conciliación, comprimidas en un `.zip` por periodo.
+Cierre periódico (mensual) que reconstruye por completo el consolidado de un periodo a partir de las planillas aprobadas, procesando Colgaap y Full IFRS de forma independiente dentro del mismo cierre, y termina generando el archivo CREFFSOS. Incluye varias protecciones operativas:
+
+- **Candado de PostgreSQL por periodo** (`pg_try_advisory_xact_lock`): evita que dos intentos de consolidar el mismo periodo corran a la vez, sin importar si el disparo viene del botón manual, del cierre automático mensual o de la cascada que se dispara al aprobar una planilla atrasada. Se libera solo, incluso si el proceso se cae a mitad de camino.
+- **Límite de tiempo configurable por parámetro** (ajustable sin redeploy) para que una ejecución nunca quede indefinidamente "colgada" esperando algo del lado de la base de datos.
+- **Cruce de NIT contra la LZ una sola vez por periodo** (no uno por cada planilla Full IFRS), para no repetir consultas redundantes cuando el mismo cliente aparece en varias planillas.
+- Una segunda fase asíncrona ("Fase 2 / archivos bloqueados", ver más abajo) que corre después de confirmarse la Fase 1.
+- El correo de confirmación se envía **después** de que la consolidación queda confirmada en base de datos (no a mitad de la transacción), para no sostener la conexión abierta mientras dura el envío.
 
 ### Generación paramétrica de CREFFSOS
 
-El layout de columnas del archivo de salida CREFFSOS se define en la tabla `sipro_parametros_columnas_creffsos` (accedida por SQL directo, no es una entidad JPA) y se resuelve en tiempo de ejecución mediante un catálogo cerrado de ~15 funciones Java registradas (copiar directo, asignar constante, resolver consecutivo, resolver clasificación PUC, cruces contra la LZ, etc.), no mediante expresiones SQL libres por columna (ese campo existe en el esquema pero no se usa — ver [Consideraciones](#15-consideraciones-y-estado-actual)). El formato de salida (XLSX/CSV/TSV), el nombre del archivo y si incluye encabezado son configurables por parámetro.
+El layout de columnas del archivo de salida se define fila por fila en la tabla `sipro_parametros_columnas_creffsos` (se administra por SQL directo, no es una entidad JPA) y se resuelve en tiempo de ejecución mediante un **catálogo cerrado de funciones Java registradas** — entre ellas: copiar un valor directo, asignar una constante, resolver el consecutivo de documento, resolver la clasificación PUC, resolver la cuenta BankVision, resolver clase de garantía o calificación cruzando contra la LZ (`resolverClaseGarantiaDesdeCenie` / `resolverCalificacionDesdeCenie`, contra `resultados_vspc_finanzas.sipcen_visionry_cenie`), y variantes condicionales ("copiar solo si viene informado", "constante solo si el campo de origen tiene dato"). Las funciones de tipo *lookup* leen una tabla/llave/valor configurados en un campo JSON de parámetros (`lookupSchema`/`lookupTable`/`lookupKey`/`lookupValue`), consultando indistintamente PostgreSQL o la Landing Zone según cómo esté configurada esa columna.
+
+El formato de salida (XLSX por defecto, o CSV/TSV con separador configurable), el nombre del archivo y si incluye fila de encabezado son todos configurables por parámetro, sin tocar código.
+
+### Fase 2 — archivos bloqueados
+
+Paso asíncrono que corre en segundo plano **después** de que la Fase 1 de la consolidación ya quedó confirmada. Publica copias **protegidas contra edición** (protección de hoja de Excel/Word con una contraseña fija, no es cifrado real) del CREFFSOS, de las planillas Full IFRS aprobadas, y de un Excel de conciliación bloqueados-vs-desbloqueados — todo organizado por periodo y comprimido en un único `.zip` al cierre. Cuando el CREFFSOS ya se generó en la Fase 1, la Fase 2 **reutiliza ese mismo archivo** en vez de volver a generarlo, precisamente para no avanzar dos veces el consecutivo reservado en base de datos.
 
 ### Conciliación
 
-Compara el consolidado interno contra el archivo CREFFSOS ya publicado y genera un reporte Excel con el resumen por producto y el detalle de diferencias, si las hay.
+Compara el consolidado interno contra el archivo CREFFSOS ya publicado (documento vs. documento) y genera un reporte Excel con el resumen por producto y el detalle de las diferencias, si las hay. Este reporte se genera **bajo demanda**, cuando el usuario lo descarga — ya no se genera automáticamente dentro del cierre periódico, porque ese cálculo automático nunca se guardaba en ningún lado (se regeneraba desde cero de todas formas al descargarlo), así que hacerlo también en el cierre solo repetía trabajo sin ningún beneficio.
 
 ### Panel de administrador
 
-Expone un dashboard operativo (periodos, estado de ventana de carga, archivos pendientes/rechazados, histórico de consolidaciones), una consola SQL restringida (bloquea DDL peligroso y exige `WHERE` en escrituras, aunque su lista blanca de tablas es hoy solo informativa para el frontend, no una barrera real — ver [Consideraciones](#15-consideraciones-y-estado-actual)), gestión de parámetros del sistema, y un visor de logs operativos en vivo (por *polling*, no un stream real).
+| Función | Endpoint / mecanismo |
+|---|---|
+| Dashboard operativo | `GET /api/admin/dashboard` — periodos disponibles, estado de la ventana de carga, archivos pendientes/rechazados/consolidados, histórico de las últimas 20 consolidaciones |
+| Consolidación manual | `POST /api/admin/consolidacion/manual` — restringido al rol Admin_Permisos |
+| Eliminar una consolidación | `DELETE /api/admin/consolidacion/{id}` |
+| Consola SQL restringida | `POST /api/admin/sql/execute` |
+| Logs operativos en vivo | `GET /api/admin/logs` — por *polling* con cursor, no un stream real |
+
+La consola SQL bloquea sentencias múltiples y comentarios (`;`, `--`, `/* */`), bloquea una lista negra de palabras peligrosas (`delete, truncate, drop, alter, create, grant, revoke, comment, copy`), exige cláusula `WHERE` en los `UPDATE`, exige que el operador escriba una justificación para cualquier escritura, agrega un `LIMIT` automático a los `SELECT` que no lo traigan, y audita cada ejecución con usuario, tablas tocadas y filas afectadas.
 
 ### Integración con Landing Zone
 
@@ -213,12 +242,12 @@ Todas las tablas viven en el esquema `schsipro`. El modelo se agrupa en cuatro d
 | `sipro_detalle_consolidacion_archivos` | Relación de cada archivo aprobado que entró en una consolidación |
 | `sipro_detalle_consolidado_registros` | Fila consolidada individual (una por registro de negocio) |
 
-**Estados reales confirmados en código** (no hay enum central; se reconstruyeron de literales en uso y de un `CHECK constraint` gestionado en `PartitionInitializer.java`, la fuente de verdad real del esquema dado que Liquibase está inactivo):
+**Valores de estado usados por el sistema:**
 - `estado_planilla`: `PENDIENTE`, `APROBADO`, `RECHAZADO` (más variantes de presentación en el frontend para el caso "sin datos").
 - `estado_consolidacion`: `INICIADO`, `EN_PROCESO`, `COMPLETADO`, `COMPLETADO_CON_ADVERTENCIAS`, `ERROR`.
 - `estado` de un run de ingesta LZ: `STARTED`, `SUCCESS`, `FAILED`, `INCOMPLETE`.
 
-El discriminador de segmento (`id_segmento`/`idSegmento` = 1 Colgaap/Modificado, 2 Full IFRS) aparece repetido como constante en varios servicios (no hay un enum ni una única fuente), y en varias tablas conviven con un campo `segmento` de texto libre (nombre), sin llave foránea tipada entre ambos.
+El discriminador de segmento (`id_segmento`/`idSegmento` = 1 Colgaap/Modificado, 2 Full IFRS) identifica el segmento contable en la mayoría de las tablas del modelo, junto con un campo `segmento` de texto libre (nombre) para presentación.
 
 ### Landing Zone
 
@@ -251,8 +280,6 @@ erDiagram
     SIPRO_LZ_INGESTION_RUN ||--o{ SIPRO_LZ_MDM_DATOS_GENERALES_CLIENTES : "ingestion_run_id"
 ```
 
-> **Nota importante:** salvo la relación `SIPRO_PARAMETROS_TABLAS_LZ → SIPRO_LZ_CATALOGO_TABLAS`, la enorme mayoría de estas relaciones **no están declaradas como `@ManyToOne`/`@JoinColumn` en JPA** — son columnas numéricas sueltas (`Long`/`Integer`) que se relacionan solo a nivel de dato, no de objeto. El diagrama refleja la relación lógica de negocio, no necesariamente una llave foránea física declarada. Ver [Consideraciones](#15-consideraciones-y-estado-actual).
-
 ## 8. Integración con Landing Zone (Impala)
 
 La **Landing Zone** es la capa corporativa de datos analíticos de Bancolombia, expuesta vía un clúster **Impala/Cloudera**. SIPRO se conecta como cliente de **solo lectura**, sin pool de conexiones (cada operación abre y cierra su propia conexión JDBC, decisión deliberada para no mantener conexiones permanentes contra un sistema externo).
@@ -260,6 +287,15 @@ La **Landing Zone** es la capa corporativa de datos analíticos de Bancolombia, 
 **Para qué se usa dentro de SIPRO:**
 1. **Validación de existencia de NIT** durante la carga de planillas: se cruza el documento del cliente contra el catálogo maestro replicado, activable/desactivable por parámetro.
 2. **Resolución del tipo de identificación (`TIPO_ID`)** durante la consolidación (Colgaap y Full IFRS), cuando el archivo de origen no lo trae.
+
+**Tablas de origen en Impala (zona.tabla):**
+
+| Uso | Zona | Tabla |
+|---|---|---|
+| Catálogo maestro de clientes (validación de NIT, resolución de `TIPO_ID`, ingesta periódica hacia PostgreSQL) | `resultados_fcr` | `fcr_mdm_datos_generales_clientes` |
+| Cruce con CENIE (clase de garantía y calificación, generación paramétrica de CREFFSOS) | `resultados_vspc_finanzas` | `sipcen_visionry_cenie` |
+
+La tabla del catálogo de clientes es configurable por parámetro (`APP_LZ_SCHEMA` / `APP_LZ_TABLE_MDM`, ver `application.yml`); en DEV/QA se sustituye por una tabla dummy sembrada localmente (`LzDevSeedService`). El cruce con CENIE se resuelve por fuera de ese mecanismo, como una función de tipo *lookup* del generador paramétrico de CREFFSOS (ver [Generación paramétrica de CREFFSOS](#generación-paramétrica-de-creffsos)).
 
 **Mecanismo de conexión:** driver JDBC nativo de Impala, autenticación LDAP (usuario/clave) sobre TLS, con un truststore propio aislado del truststore SSL global de la JVM (para no interferir con la validación de tokens de Entra ID, que también usa HTTPS).
 
@@ -276,13 +312,11 @@ La **Landing Zone** es la capa corporativa de datos analíticos de Bancolombia, 
 | Desarrollo | Bypass directo por variables de entorno (usuario/clave de prueba), o AWS Secrets Manager simulado (LocalStack) |
 | QA / Producción | AWS Secrets Manager real — las variables de bypass deben quedar vacías |
 
-El código emite una advertencia explícita en el log de arranque si el bypass de desarrollo queda activo, **pero no existe ningún bloqueo técnico** que impida activarlo por error en QA/producción — es una convención de configuración, no una salvaguarda forzada por código. Ver [Consideraciones](#15-consideraciones-y-estado-actual).
-
 ## 9. Seguridad y control de acceso
 
 ### Autenticación
 
-El frontend autentica al usuario contra **Microsoft Entra ID** (vía MSAL) y envía el ID token al backend (`POST /api/auth/login`). El backend valida ese JWT de forma real contra el JWKS de Entra ID (issuer, audiencia, firma) — **esto contradice documentación previa dentro del propio repositorio** que afirmaba que la seguridad estaba "relajada" sin validación real de JWT; el código actual sí exige y valida un token real en cada petición protegida. Ver [Consideraciones](#15-consideraciones-y-estado-actual).
+El frontend autentica al usuario contra **Microsoft Entra ID** (vía MSAL) y envía el ID token al backend (`POST /api/auth/login`). El backend valida ese JWT de forma real contra el JWKS de Entra ID (issuer, audiencia, firma) mediante `EntraIdTokenService`, aplicado en cada petición protegida por `EntraAuthenticationFilter` + `SecurityConfig` — no hay modo `permitAll` ni bypass en ningún perfil, dev incluido. Ver [backend/SECURITY.md](backend/SECURITY.md).
 
 Cada petición subsiguiente pasa por un filtro que revalida el token y exige que el usuario **ya exista previamente** en SIPRO — no hay auto-registro (auto-provisioning): si el usuario no existe, la petición se rechaza.
 
@@ -301,70 +335,71 @@ flowchart LR
     G --> H["Permisos finales\npor producto/segmento"]
 ```
 
-**Roles funcionales reales** (reconstruidos de constantes/comentarios en el código — no existe un único archivo que los liste todos juntos, y los nombres/`grupo_ad` exactos se administran en base de datos, no versionados):
+**Roles funcionales:** los nombres y `grupo_ad` exactos se administran en base de datos (`sipro_roles_permisos`), no en código:
 
 | id_rol | Rol | Controla, entre otros |
 |---|---|---|
-| 1 | Cargador *(inferido con menor certeza — ver Consideraciones)* | Carga de archivos |
+| 1 | Cargador | Carga de archivos |
 | 2 | Aprobador | Aprobación/rechazo de planillas |
 | 3 | Soporte Técnico | Acceso al panel admin (dashboard técnico, consola SQL, logs) |
 | 4 | Usuario_Analista | — |
 | 5 | Auditoría | — |
 | 6 | Admin_Permisos | Gestión de parámetros, ejecución de consolidación manual |
 
-> Documentación técnica previa del proyecto mencionaba en un momento 6 roles y en otro 5 roles con nombres distintos. El código actual apunta consistentemente a **estos 6 roles** — ni la lista vieja de 6 ni la de 5 coincide exactamente con lo que hay hoy; trátese como la referencia vigente hasta que se confirme contra la base de datos real.
-
-**Endpoints públicos** (sin autenticación): health checks, `/error`, login, y la configuración pública de Entra ID. **Todo lo demás exige un token válido.** No hay autorización declarativa por rol a nivel de Spring Security (`hasRole`/`@PreAuthorize`) — la restricción fina por rol (por ejemplo, quién entra a `/admin` o a `/parametros`) se hace de forma imperativa dentro de los propios servicios, lo que significa que depende de que cada endpoint invoque explícitamente el chequeo correcto.
+**Endpoints públicos** (sin autenticación): health checks, `/error`, login, y la configuración pública de Entra ID. **Todo lo demás exige un token válido.** La restricción fina por rol (por ejemplo, quién entra a `/admin` o a `/parametros`) se valida dentro de los propios servicios de dominio.
 
 ### Manejo de secretos
 
 - El secreto de Entra ID (`AZURE_CLIENT_SECRET`) y otros 3 parámetros críticos se leen **exclusivamente** de configuración/variables de entorno — nunca de la tabla de parámetros de base de datos, aunque exista un valor ahí, precisamente para que ese secreto nunca quede en BD.
 - Credenciales de la base de datos principal y de la Landing Zone: AWS Secrets Manager en QA/producción (LocalStack en desarrollo).
-- No se encontraron credenciales reales de producción quemadas en el código. Sí existen un puñado de valores de conveniencia exclusivos de desarrollo local (contraseña de BD local, credenciales de prueba de LocalStack, contraseña por defecto estándar de un truststore Java) que no aplican fuera de ese ambiente.
-- Existe una contraseña de protección de hojas de Excel (`"sipro-readonly"`) repetida en 5 archivos distintos — es solo una protección de edición casual de Excel, no un control de acceso real; ver [Consideraciones](#15-consideraciones-y-estado-actual).
+- No hay credenciales reales de producción en el código.
+- Los archivos Excel de salida protegidos (CREFFSOS, planillas Full IFRS bloqueadas en la Fase 2) usan una contraseña de protección de hoja fija, pensada para evitar ediciones accidentales — no es un control de acceso.
 
 ## 10. Configuración y variables de entorno
 
-El backend usa perfiles de Spring (`application-<perfil>.yml`) más un archivo especial **autosuficiente** para despliegues (`application-cloud.yml`), pensado para arrancar el JAR apuntando directamente a él, con tokens `#{VARIABLE}#` que el pipeline corporativo reemplaza según el ambiente (patrón "Replace Tokens" de Azure DevOps).
+El backend usa archivos de configuración por ambiente (`application-<perfil>.yml`) más un archivo especial **autosuficiente** para los despliegues reales (`application-cloud.yml`), pensado para arrancar el JAR apuntando directamente a él, con tokens `#{VARIABLE}#` que el pipeline de Azure DevOps reemplaza según el ambiente (patrón "Replace Tokens").
 
 | Archivo | Cuándo se usa |
 |---|---|
-| `application.yml` | Base común; defaults genéricos (storage S3/LocalStack, transporte de correo `outlook-win32` deshabilitado) |
+| `application.yml` | Base común; defaults genéricos |
 | `application-dev.yml` | Ejecución local desde IDE en la máquina del desarrollador |
-| `application-qa.yml` | Perfil `qa` (hereda buena parte de los defaults de `application.yml` si no se pasa por `application-cloud.yml`) |
-| `application-prd.yml` | Perfil `prd` |
-| `application-prd-replacetokens.yml` | Plantilla inactiva salvo que se active explícitamente ese perfil |
-| `application-cloud.yml` | El que realmente se usa en los despliegues dev/qa/prd en la nube, vía reemplazo de tokens |
+| `application-cloud.yml` | El que se usa en los despliegues reales en AWS (DEV, QA y PDN), vía reemplazo de tokens |
 
 **Diferencias clave por ambiente:**
 
-- **Almacenamiento:** local apuntando a un recurso compartido de red (NAS Windows) en desarrollo y en los despliegues cloud reales; S3/LocalStack solo aplica al perfil "puro" sin pasar por `application-cloud.yml`. Ver [Almacenamiento de archivos](#11-almacenamiento-de-archivos).
+- **Almacenamiento:** apunta a la carpeta de red compartida (NAS) dedicada a SIPRO, tanto en desarrollo como en los despliegues reales. Ver [Almacenamiento de archivos](#11-almacenamiento-de-archivos).
 - **Landing Zone:** desarrollo y QA comparten el mismo host intermedio con datos de prueba sembrados automáticamente; producción apunta al host corporativo real, sin datos sembrados.
 - **Correo:** desarrollo fuerza modo "preview" (solo registra en log, no envía nada real); producción usa AWS SES vía API; el resto de ambientes puede usar SMTP u Outlook (vía automatización COM en un host Windows on-prem), transporte que es el *default* global del sistema.
 - **Base de datos:** el tamaño del pool de conexiones crece de un valor pequeño en desarrollo genérico a 30 conexiones en producción/cloud.
-- **Gestor de secretos:** LocalStack (simulado) en desarrollo local, AWS Secrets Manager real en el resto.
+- **Gestor de secretos:** AWS Secrets Manager para las credenciales de base de datos y de la Landing Zone.
 - **Entra ID / URLs de cada ambiente:** se leen siempre de configuración o variables de entorno, nunca de la base de datos.
-- **CORS y credenciales de S3 en producción** quedan sin valor por defecto a propósito — si el pipeline no las inyecta, el sistema falla de forma segura (bloqueando) en vez de abrir algo sin querer.
+- **CORS en producción** no tiene valor por defecto a propósito — si el pipeline no lo inyecta, el sistema bloquea el acceso en vez de abrir orígenes sin querer.
 
-**Variables más relevantes para un primer despliegue** (nombres, no valores): perfil de Spring activo, credenciales/URL de base de datos (o el nombre del secreto en Secrets Manager), tipo de almacenamiento y su ruta/bucket, orígenes permitidos de CORS, credenciales de la aplicación de Entra ID, URLs propias de cada ambiente, host/puerto/credenciales de la Landing Zone y su truststore, y la configuración de correo (habilitado/transporte/remitente).
+**Variables más relevantes para un primer despliegue** (nombres, no valores): perfil de Spring activo, credenciales/URL de base de datos (o el nombre del secreto en Secrets Manager), ruta de almacenamiento, orígenes permitidos de CORS, credenciales de la aplicación de Entra ID, URLs propias de cada ambiente, host/puerto/credenciales de la Landing Zone y su truststore, y la configuración de correo (habilitado/transporte/remitente).
 
 ## 11. Almacenamiento de archivos
 
-`FileStorageService` es la interfaz única para guardar/leer archivos (planillas, Excel consolidados, CREFFSOS). Tiene dos implementaciones intercambiables por configuración (`app.storage.type`):
+`FileStorageService` es la interfaz única para guardar/leer archivos (planillas, Excel consolidados, CREFFSOS), configurada mediante una ruta base (`app.storage.local.base-dir`) que apunta a una **carpeta de red compartida (NAS) dedicada a SIPRO**. En desarrollo, esa ruta es `\\SBMDEBNS03\BFT\SIPRO\planillas`. Ahí es donde el sistema va guardando todo lo que pasa por `FileStorageService`: las planillas cargadas por los usuarios (organizadas en subcarpetas `pendientes/{fecha}`, `aprobados/{fecha}`, `rechazados/{fecha}`, `inactivos/{fecha}`), los Excel consolidados y los archivos CREFFSOS generados. En los ambientes desplegados en AWS, esa misma ruta base la inyecta el pipeline de release vía el token `APP_STORAGE_LOCAL_BASE_DIR` sobre `application-cloud.yml` (ver [sección 12](#12-despliegue-e-infraestructura)).
 
-- **Local** (`local`): guarda en una ruta de disco configurable. Es la que realmente se usa hoy en desarrollo y en los ambientes desplegados en la nube — apuntando, en ambos casos, a una **carpeta de red compartida de Windows (NAS)**.
-- **S3** (`s3`, con reintentos y "calentamiento" de conexión pensado originalmente para LocalStack en desarrollo local vía WSL2): es el valor por defecto si nadie especifica lo contrario, pero en la práctica no es el mecanismo activo en los ambientes reales desplegados hoy.
-
-**Consideración importante (inferida del código y la configuración, no documentada explícitamente por el equipo):** el contenedor donde corre el backend en los ambientes cloud es Linux, pero la ruta de almacenamiento local configurada tiene, en al menos un caso confirmado, sintaxis de ruta de red de Windows. Linux no interpreta ese formato como una ruta de red — lo trataría como un nombre de archivo/carpeta local literal. Para que el almacenamiento local funcione de forma confiable en un contenedor Linux, la ruta configurada debe apuntar a un punto de montaje real de Linux (por ejemplo, un recurso CIFS/SMB montado), no a la sintaxis UNC de Windows tal cual.
-
-Además del `FileStorageService`, existen **rutas de red compartidas adicionales e independientes**, administradas por parámetros propios (no por `app.storage.*`), usadas para publicar copias finales de Excel/CREFFSOS para consumo de sistemas externos — y una de ellas está **hardcodeada** directamente en el código en vez de ser un parámetro (ver [Consideraciones](#15-consideraciones-y-estado-actual)).
+Además del `FileStorageService`, SIPRO usa **rutas de red compartidas adicionales**, configuradas por sus propios parámetros, para publicar copias finales de Excel y CREFFSOS que consumen sistemas externos.
 
 ## 12. Despliegue e infraestructura
 
-- **Empaquetado:** un `Dockerfile` multi-stage (`backend/deployment/Dockerfile`) compila con `eclipse-temurin:21-jdk` y arma la imagen final sobre `eclipse-temurin:21-jre`, copiando únicamente el JAR resultante (`sipro.jar`) y exponiendo el puerto 8080.
-- **Orquestación:** existe un chart Helm base (`backend/deployment/helm/`) con placeholders sin resolver (repositorio de imagen, tag, variables de ambiente vacías) — el propio README de esa carpeta lo describe como una "copia de trabajo", no como la versión activa.
-- **CI/CD:** **no se encontró ningún pipeline de CI/CD versionado dentro de este repositorio** (sin Azure Pipelines, GitHub Actions, Jenkinsfile ni Terraform). El README de despliegue del backend menciona una carpeta `infra/` en la raíz del repo como "la versión activa y documentada" del despliegue — **esa carpeta no existe en el checkout actual del repositorio**, ni hay rastro de que haya sido borrada. Puede vivir en un repositorio separado no incluido aquí, o la documentación puede estar desactualizada; queda como pendiente de confirmar con el equipo.
-- **Frontend:** no tiene Dockerfile, carpeta de despliegue ni pipeline dentro de este repositorio — solo scripts de build local de Angular.
+SIPRO corre sobre infraestructura de **AWS** ya aprovisionada (máquinas y servidor de PostgreSQL ya configurados); el backend se ejecuta como JAR directo sobre la JVM en esas máquinas.
+
+**Repositorio y pipelines:** el código fuente que efectivamente se despliega vive en un repositorio de **Azure DevOps**, separado del control de versiones de este checkout, organizado en dos carpetas de alto nivel: `Frontend/` y `Backend/`. En ese repositorio están configurados los pipelines de **build** y de **release** de Azure DevOps (no hay archivos de pipeline versionados dentro de este monorepo).
+
+**Arranque del backend:** el ambiente desplegado se levanta apuntando explícitamente al archivo `application-cloud.yml` (`backend/services/validation-service/src/main/resources/application-cloud.yml`), pasado como argumento de arranque en vez de activarse por un perfil Spring convencional:
+
+```
+java -Duser.timezone=America/Bogota -jar sipro.jar --spring.config.location=file:/ruta/application-cloud.yml
+```
+
+Ese archivo es **autosuficiente** (no depende de `application.yml` empaquetado en el JAR) y es el **mismo archivo para DEV, QA y PDN** — lo que cambia entre ambientes son los valores que se le inyectan, no el archivo.
+
+**Sustitución de variables:** el pipeline de *release* en Azure DevOps ejecuta la tarea **Replace Tokens**, que reemplaza cada marcador con la sintaxis `#{NOMBRE_VARIABLE}#` presente en `application-cloud.yml` (credenciales de BD, credenciales de Entra ID, credenciales/host de la Landing Zone, configuración de correo, CORS, etc.) por el valor real tomado del Variable Group de Azure DevOps correspondiente al ambiente (DEV, QA o PDN). Tras ese reemplazo, el pipeline empaqueta el resultado como artefacto de release y lo despliega a la máquina AWS del ambiente correspondiente.
+
+**Frontend:** se despliega desde la carpeta `Frontend/` de ese mismo repositorio de Azure DevOps, con su propio build y release, a partir del build de producción de Angular (`ng build`).
 
 ## 13. Flujos operativos principales
 
@@ -404,17 +439,6 @@ sequenceDiagram
     Consol->>Consol: Fase 2 (async): archivos bloqueados, conciliación, .zip
 ```
 
-### Máquina de estados de una planilla
-
-```mermaid
-stateDiagram-v2
-    [*] --> PENDIENTE: Solicitud de aprobación
-    PENDIENTE --> APROBADO: Líder aprueba
-    PENDIENTE --> RECHAZADO: Líder rechaza (motivo obligatorio)
-    RECHAZADO --> PENDIENTE: Usuario vuelve a cargar (nueva versión)
-    APROBADO --> [*]: Entra a la consolidación del periodo
-```
-
 ## 14. Glosario
 
 | Término | Significado |
@@ -428,21 +452,3 @@ stateDiagram-v2
 | Motor de reglas | Sistema de validación de archivos configurado en la tabla `data_validation_rule`, no hardcodeado |
 | Ingesta LZ | Proceso periódico que replica el catálogo de clientes de la Landing Zone hacia PostgreSQL |
 | Consecutivo | Número secuencial reservado por el generador de CREFFSOS para ciertas columnas de salida |
-
-## 15. Consideraciones y estado actual
-
-Esta sección reúne, de forma explícita, las inconsistencias y deuda técnica detectadas al verificar el código actual — muchas de ellas contradicen documentación existente en el propio repositorio, que quedó desactualizada.
-
-- **La documentación de seguridad del repositorio está desactualizada y es engañosa.** `backend/SECURITY.md` y `backend/README.md` afirman que la seguridad "está orientada a desarrollo" y que no hay validación real de JWT. El código actual demuestra lo contrario: valida tokens de Entra ID de forma real en cada petición protegida. Se recomienda corregir o retirar esa documentación para evitar que alguien la tome como referencia vigente.
-- **`security/roles.yml` es configuración muerta.** Está declarado en `application.yml` (`security.ad.groupsMapping`) pero ninguna clase Java lo lee — el mapeo real de grupo-a-rol vive en la base de datos (`sipro_roles_permisos.grupo_ad`).
-- **`frontend/README.md` está desactualizado:** no documenta los módulos `admin`, `parametros` ni `tablero`, que sí existen y están en uso.
-- **El bypass de credenciales de desarrollo para la Landing Zone no tiene un bloqueo técnico** que impida activarlo por error en QA/producción — solo una advertencia en el log. Es una convención de configuración, no una salvaguarda forzada.
-- **La carpeta `infra/`** que la documentación de despliegue del backend da por existente y activa **no está en este repositorio**, y no se encontró ningún pipeline de CI/CD versionado en todo el monorepo.
-- **Estructura de paquetes con restos de una migración incompleta:** conviven dos jerarquías paralelas de controladores (`api/` e `infrastructure/entrypoint/`) y de repositorios (`infrastructure/repository/` e `infrastructure/persistence/repository/`), además de paquetes sueltos `model/` y `service/` fuera de `domain/`. No se encontró documentación sobre si es una migración en curso o deuda técnica aceptada.
-- **En el frontend, `app.module.ts`/`app-routing.module.ts` (esquema `NgModule`) parecen código muerto** — el bootstrap real (`main.ts`) usa exclusivamente componentes standalone y `app.routes.ts`.
-- **La ruta de red de la homologación Full IFRS está hardcodeada en código** (`HomologacionFullIfrsService`), a diferencia de las demás rutas de red del sistema, que sí son parámetros configurables.
-- **El campo `expresion_sql` (y `tabla_origen`/`alias_origen`) de la configuración de columnas de CREFFSOS existe en el esquema pero no se usa** en el motor de resolución actual — solo se resuelven columnas vía funciones Java registradas.
-- **`CreffosColumnCalculator.java` parece código sin uso activo** en el pipeline actual de generación de CREFFSOS.
-- **La lista blanca de tablas de la consola SQL del panel admin (`allowedTables`) no se aplica como restricción real** — `AdminSqlService` la ignora al validar, y solo se expone al frontend como ayuda informativa. El bloqueo real de seguridad de esa consola es la lista negra de sentencias DDL peligrosas, que sí se aplica.
-- **La mayoría de las relaciones entre tablas no están declaradas como llaves foráneas JPA** (`@ManyToOne`), sino como columnas numéricas sueltas — JPA se usa aquí principalmente como mapeador de columnas, no de relaciones de objeto. No hay integridad referencial declarativa a nivel de la capa de persistencia.
-- **No se pudo verificar ningún dato de este documento directamente contra la base de datos real** (solo contra el código) porque el esquema se administra manualmente y Liquibase está inactivo — si algo cambió manualmente en la base de datos sin reflejarse en el código (por ejemplo, roles adicionales, columnas nuevas), este documento no podría detectarlo. Se recomienda una revisión periódica de este README contra la base de datos real.

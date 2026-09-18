@@ -112,7 +112,9 @@ public interface SiproUsuarioProductoRolRepository extends JpaRepository<SiproUs
     List<String> findDistinctActiveEmailsByGrupoAdIn(@Param("gruposAd") Collection<String> gruposAd);
 
     /**
-     * Obtiene todas las asignaciones activas de cargadores para el segmento indicado.
+     * Obtiene todas las asignaciones activas de cargadores para el segmento indicado, solo para
+     * productos que sigan activos (un producto desactivado nunca debe generar notificaciones de
+     * incumplimiento, porque ya no se espera que se cargue nada para él).
      * Incluye usuario y producto pre-cargados (EAGER) para evitar N+1 al construir notificaciones.
      */
     @Query("SELECT upr FROM SiproUsuarioProductoRol upr " +
@@ -120,6 +122,7 @@ public interface SiproUsuarioProductoRolRepository extends JpaRepository<SiproUs
            "JOIN FETCH upr.producto " +
            "WHERE upr.activo = true " +
            "AND upr.rol.cargarArchivos = 1 " +
+           "AND upr.producto.activo = 1 " +
            "AND upr.id.idSegmento = :idSegmento")
     List<SiproUsuarioProductoRol> findActivasCargadoresBySegmento(@Param("idSegmento") Long idSegmento);
 

@@ -42,6 +42,8 @@ Documento de referencia del flujo actual de autenticacion para SIPRO. El login y
     "puedeVisualizar": false,
     "puedeExportar": true,
     "puedeModificarParametros": false,
+    "puedeAccederPanelAdmin": false,
+    "puedeVisualizarConsolidados": false,
     "productosAsignados": []
   },
   "sessionTimeoutMinutes": 5
@@ -75,11 +77,17 @@ Documento de referencia del flujo actual de autenticacion para SIPRO. El login y
 
 ## Guards actuales
 
+Todos viven en `frontend/src/app/guards/auth.guard.ts`.
+
 | Guard | Uso |
 |------|-----|
 | authGuard | Requiere usuario autenticado |
 | cargarGuard | Requiere autenticacion y permiso de carga |
 | aprobacionGuard | Requiere autenticacion y permiso de aprobacion |
+| resumenGuard | Requiere autenticacion y permiso de visualizacion de consolidados |
+| adminGuard | Requiere autenticacion y `puedeAccederPanelAdmin` (ruta /admin) |
+| parametrosGuard | Requiere autenticacion y permiso administrativo (ruta /parametros) |
+| tableroGuard | Requiere autenticacion y perfil administrativo funcional (ruta /tablero) |
 
 ## Endpoints relacionados
 
@@ -98,11 +106,11 @@ Documento de referencia del flujo actual de autenticacion para SIPRO. El login y
 4. Verifica redireccion a /inicio.
 5. Verifica que los permisos efectivos correspondan a los grupos AD del usuario (por ejemplo, SIPRO_Usuario_Cargador o SIPRO_Usuario_Aprobador).
 6. Si el usuario no tiene permiso, intenta navegar a /cargar o /aprobacion y valida redireccion a /inicio.
-6. Refresca la pagina y confirma restauracion de sesion desde sessionStorage.
+7. Refresca la pagina y confirma restauracion de sesion desde sessionStorage.
 
 ## Consideraciones de seguridad
 
-- El backend sigue con seguridad relajada para desarrollo y no bloquea la API por Spring Security.
-- Los guards Angular y RBAC mejoran UX y control funcional, pero no reemplazan una proteccion backend endurecida.
+- El backend exige autenticacion en toda la API salvo una lista blanca corta (login, config publica de Entra, health/actuator). `SecurityConfig` + `EntraAuthenticationFilter` validan el idToken de Entra ID (JWKS real) en cada peticion, en todos los perfiles, no solo en produccion. Ver [SECURITY.md](../SECURITY.md).
+- Los guards Angular y RBAC mejoran UX y control funcional, pero no reemplazan la proteccion backend, que ya esta activa.
 - El secreto AZURE_CLIENT_SECRET se consume solo en backend desde sipro_parametros_unico; no debe exponerse al frontend ni a archivos cliente.
 - Para resolver grupos por Graph se requieren permisos de aplicacion adecuados en Microsoft Graph, ademas del acceso al perfil del usuario.

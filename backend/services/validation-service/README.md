@@ -15,7 +15,7 @@ Servicio Spring Boot principal de SIPRO. Expone la API REST para autenticacion, 
 
 ```text
 src/main/java/com/bancolombia/sipro/validations/
-├── api/                       # Controladores legacy de validacion, health y config
+├── api/                       # Controladores de validacion, health y config
 ├── application/               # DTOs y use cases
 ├── domain/model/              # Entidades de dominio y entidades JPA activas
 ├── domain/service/            # Servicios de consolidacion, resumen, reglas, storage
@@ -58,7 +58,10 @@ src/main/java/com/bancolombia/sipro/validations/
 | GET | /api/main/consolidacion/resumen | Resumen consolidado |
 | GET | /api/main/consolidacion/detalle-diferencia | Detalle consolidado por periodo |
 | GET | /api/main/consolidacion/resumen/reporte | Descarga XLSX del resumen consolidado |
+| GET | /api/admin/dashboard | Panel /admin: estado de periodos y ultima consolidacion (Soporte Tecnico o Admin_Permisos) |
 | POST | /api/admin/consolidacion/manual | Iniciar consolidacion manual (panel /admin, exclusivo Admin_Permisos) |
+| POST | /api/admin/sql/execute | Consola SQL restringida del panel /admin |
+| GET | /api/admin/logs | Logs en vivo del backend para el modal de seguimiento del panel /admin |
 | POST | /api/lz/ingest | Iniciar ingesta LZ |
 
 ## Comportamientos importantes
@@ -66,7 +69,7 @@ src/main/java/com/bancolombia/sipro/validations/
 - La aprobacion operativa usa el lider asignado en la planilla para visibilidad y autorizacion.
 - La sesion del frontend se protege durante operaciones largas como validacion y consolidacion manual.
 - Las diferencias de conciliacion se calculan aparte de las observaciones internas de calidad en los datos consolidados.
-- El servicio arranca en dev con seguridad relajada y truststore de Impala opcional.
+- El servicio exige autenticacion contra Entra ID (JWT real via JWKS) en toda la API salvo login/health, en todos los perfiles; el truststore de Impala es opcional solo si no se va a usar LZ real. Ver [../../SECURITY.md](../../SECURITY.md).
 
 ## Documentos complementarios
 

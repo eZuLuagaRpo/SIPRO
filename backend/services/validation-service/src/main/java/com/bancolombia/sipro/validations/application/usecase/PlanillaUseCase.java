@@ -956,6 +956,13 @@ public class PlanillaUseCase {
                 continue;
             }
 
+            // Si el producto fue desactivado, no debe contarse como pendiente: ya no se
+            // espera que se siga cargando información para él.
+            Producto producto = upr.getProducto();
+            if (producto == null || producto.getActivo() == null || producto.getActivo() != 1) {
+                continue;
+            }
+
             // Solo evaluar si el rol permite carga de archivos
             if (upr.getRol() != null && upr.getRol().getCargarArchivos() != null
                     && upr.getRol().getCargarArchivos() == 1) {

@@ -1,10 +1,6 @@
 # Despliegue - SIPRO Backend
 
-Activos de empaquetado y despliegue del validation-service: Dockerfile y chart Helm. Esta carpeta es una copia de trabajo, preparada para el dia en que `backend/` se convierta en la raiz de su propio repositorio.
-
-Mientras el monorepo siga unido, `infra/` en la raiz del repo sigue siendo la version activa y documentada — no se ha eliminado ni modificado nada de ahi. Esta carpeta no la reemplaza todavia, es un adelanto.
-
-LocalStack (simulacion de S3 para desarrollo local) no esta incluido aqui a proposito: es una herramienta de desarrollo, no de despliegue, y sigue viviendo en `infra/localstack/` hasta que se decida su ubicacion definitiva.
+Activos de empaquetado y despliegue del validation-service: Dockerfile y chart Helm, para construir y correr el backend como imagen de contenedor. El despliegue operativo de SIPRO en AWS se hace por otra via — ver la seccion "Despliegue e infraestructura" del [README.md raiz](../../README.md#12-despliegue-e-infraestructura).
 
 ## Estructura
 
@@ -48,7 +44,7 @@ docker run -p 8080:8080 sipro-validation-service
 
 ## Helm
 
-Chart base para desplegar el servicio. Varios valores siguen siendo placeholders corporativos (imagen, dominio) y deben revisarse antes de un despliegue real — el detalle de cada variable esta comentado en `helm/values.yaml`.
+Chart base para desplegar el servicio en Kubernetes. El detalle de cada variable esta comentado en `helm/values.yaml`.
 
 ### Comandos
 
@@ -70,13 +66,6 @@ helm uninstall sipro-validation-service
 - `env.APP_STORAGE_S3_*`
 - `env.APP_MAIL_*` / `MAIL_*`
 
-## LocalStack
+## LocalStack (desarrollo local con almacenamiento S3)
 
-`localstack/start-localstack.ps1` automatiza levantar LocalStack en Docker dentro de WSL2 para simular S3 en desarrollo local: mantiene el forwarding a `localhost:4566`, asegura que exista el bucket `sipro-bucket` y restaura un seed minimo cuando el volumen queda vacio.
-
-### Modos soportados
-
-- `Start`: levanta o reutiliza el contenedor y deja corriendo un keepalive en segundo plano.
-- `Status`: muestra contenedor, health, hooks de init y conteo de objetos del bucket.
-- `Stop`: detiene el contenedor y el keepalive de Windows.
-- `Recreate`: elimina contenedor y datos runtime, pero conserva `init-scripts` y `seed`.
+Para desarrollar con `app.storage.type=s3` sin depender de AWS real, hace falta LocalStack corriendo por cuenta propia (por ejemplo `docker run -p 4566:4566 localstack/localstack`) con el bucket configurado en `application*.yml` ya creado. `S3Config.java` resuelve automaticamente la IP de WSL2 como fallback si `localhost:4566` no responde.

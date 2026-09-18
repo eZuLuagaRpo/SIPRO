@@ -44,6 +44,9 @@ npm start
 - Login: http://localhost:4200/login
 - Inicio: http://localhost:4200/inicio
 - Resumen: http://localhost:4200/resumen
+- Tablero de control: http://localhost:4200/tablero
+- Panel de administrador (Soporte Tecnico / Admin_Permisos): http://localhost:4200/admin
+- Parametros (Admin_Permisos): http://localhost:4200/parametros
 
 ## Flujo minimo de verificacion
 
