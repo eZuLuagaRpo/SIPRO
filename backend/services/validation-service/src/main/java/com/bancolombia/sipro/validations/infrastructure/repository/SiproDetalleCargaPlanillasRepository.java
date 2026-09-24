@@ -149,15 +149,10 @@ public interface SiproDetalleCargaPlanillasRepository extends JpaRepository<Sipr
             @Param("fechaCorte") LocalDate fechaCorte,
             @Param("idProducto") Long idProducto);
 
-    // ===== Resumen de cargas por correo usuario =====
+    // ===== Resumen de cargas por id de usuario =====
 
-    @Query("SELECT COUNT(p) FROM SiproDetalleCargaPlanillas p WHERE p.correoUsuarioCarga = :correo AND p.estadoPlanilla = :estado AND p.activo = true")
-    long countByCorreoUsuarioCargaAndEstadoPlanillaAndActivoTrue(
-            @Param("correo") String correo,
-            @Param("estado") String estado);
-
-    @Query("SELECT MAX(p.fechaCreacion) FROM SiproDetalleCargaPlanillas p WHERE p.correoUsuarioCarga = :correo AND p.activo = true")
-    Optional<LocalDateTime> findUltimaCargaByCorreoUsuario(@Param("correo") String correo);
+    @Query("SELECT MAX(p.fechaCreacion) FROM SiproDetalleCargaPlanillas p WHERE p.idUsuarioCarga = :idUsuario AND p.activo = true")
+    Optional<LocalDateTime> findUltimaCargaByIdUsuario(@Param("idUsuario") Long idUsuario);
 
     /**
      * Verifica si existe al menos una carga activa (no rechazada) para un usuario + producto

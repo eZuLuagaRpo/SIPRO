@@ -696,17 +696,17 @@ public class PlanillaUseCase {
 
     /**
      * Obtiene el resumen de cargas (conteo por estado + última carga) para un usuario cargador.
-     * @param correoUsuario Correo del usuario cargador
+     * @param idUsuario ID del usuario cargador
      * @return ResumenCargasResponse con los conteos y fecha de última carga
      */
     @Transactional(readOnly = true)
-    public ResumenCargasResponse obtenerResumenCargas(String correoUsuario) {
-        logger.info("Consultando resumen de cargas para: {}", correoUsuario);
+    public ResumenCargasResponse obtenerResumenCargas(Long idUsuario) {
+        logger.info("Consultando resumen de cargas para usuario ID: {}", idUsuario);
 
-        long pendientes = planillaRepository.countByCorreoUsuarioCargaAndEstadoPlanillaAndActivoTrue(correoUsuario, "PENDIENTE");
-        long aprobados = planillaRepository.countByCorreoUsuarioCargaAndEstadoPlanillaAndActivoTrue(correoUsuario, "APROBADO");
-        long rechazados = planillaRepository.countByCorreoUsuarioCargaAndEstadoPlanillaAndActivoTrue(correoUsuario, "RECHAZADO");
-        LocalDateTime ultimaCarga = planillaRepository.findUltimaCargaByCorreoUsuario(correoUsuario).orElse(null);
+        long pendientes = planillaRepository.countByIdUsuarioCargaAndEstadoPlanillaAndActivoTrue(idUsuario, "PENDIENTE");
+        long aprobados = planillaRepository.countByIdUsuarioCargaAndEstadoPlanillaAndActivoTrue(idUsuario, "APROBADO");
+        long rechazados = planillaRepository.countByIdUsuarioCargaAndEstadoPlanillaAndActivoTrue(idUsuario, "RECHAZADO");
+        LocalDateTime ultimaCarga = planillaRepository.findUltimaCargaByIdUsuario(idUsuario).orElse(null);
 
         return new ResumenCargasResponse(pendientes, aprobados, rechazados, ultimaCarga);
     }

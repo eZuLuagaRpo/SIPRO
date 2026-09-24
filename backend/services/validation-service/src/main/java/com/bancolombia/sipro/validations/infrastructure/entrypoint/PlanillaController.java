@@ -97,10 +97,10 @@ public class PlanillaController {
      * Devuelve el resumen de cargas del usuario solicitante.
      */
     @GetMapping("/resumen")
-    public ResponseEntity<ResumenCargasResponse> resumenCargas(@RequestParam(required = false) String correo,
+    public ResponseEntity<ResumenCargasResponse> resumenCargas(@RequestParam(required = false) Long idUsuario,
                                                                Authentication authentication) {
         ResumenCargasResponse resumen = planillaUseCase.obtenerResumenCargas(
-                resolveAuthenticatedCorreo(correo, authentication, "consultar resumen de cargas"));
+                resolveAuthenticatedUserId(idUsuario, authentication, "consultar resumen de cargas"));
         return ResponseEntity.ok(resumen);
     }
 
