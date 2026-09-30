@@ -101,6 +101,9 @@ app:
   storage:
     type: local
     local:
+      # Punto de montaje LOCAL de Linux (no una ruta UNC de Windows) — lo entrega
+      # el equipo de provision despues de montar el recurso de red descrito en
+      # nas.route (ver mas abajo). Ejemplo esperado: /mnt/sipro-nas/planillas.
       base-dir: '#{APP_STORAGE_LOCAL_BASE_DIR}#'
 
   lz:
@@ -215,3 +218,16 @@ lz:
 
   ingestion:
     validate-on-startup: '#{LZ_VALIDATE_ON_STARTUP}#'
+
+# Datos del recurso de red (NAS) que el equipo de provision monta como carpeta
+# local de Linux ANTES de que arranque la aplicacion. La aplicacion NO lee estas
+# tres variables (no hay ningun @Value ni @ConfigurationProperties que las use hoy):
+# solo quedan aqui tokenizadas para que el equipo de provision las tome de este
+# mismo Variable Group al hacer el montaje por su cuenta. Lo unico que la
+# aplicacion realmente usa es el punto de montaje resultante, en
+# app.storage.local.base-dir (ver mas arriba) — ese si debe ser una ruta de Linux
+# (ej. /mnt/sipro-nas/planillas), nunca la ruta UNC de Windows tal cual.
+nas:
+  route:    '#{RUTA_NAS}#'
+  user:     '#{USER_NAS}#'
+  password: '#{PWD_NAS}#'
