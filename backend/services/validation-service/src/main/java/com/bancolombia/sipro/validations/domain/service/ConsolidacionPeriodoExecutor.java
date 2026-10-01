@@ -535,7 +535,10 @@ public class ConsolidacionPeriodoExecutor {
         cabecera.setEstadoConsolidacion(ESTADO_INICIADO);
         cabecera.setCantidadArchivosConsolidados(0);
         cabecera.setCantidadRegistrosConsolidados(0);
-        cabecera.setFuenteVentana(ventana.getTipoVentanaRespuesta());
+        // Se guarda el valor crudo (REGLA_GENERAL/EXCEPCION), no la version acortada
+        // de getTipoVentanaRespuesta() (pensada para la respuesta de la API al frontend) —
+        // la restriccion CHECK de la columna solo acepta 'REGLA_GENERAL' o 'EXCEPCION'.
+        cabecera.setFuenteVentana(ventana.getFuenteVentana());
         cabecera.setIdReglaVentana(ventana.esExcepcion() ? null : ventana.getIdReglaVentana());
         cabecera.setPeriodoExcepcionVentana(ventana.esExcepcion()
             ? firstNonNull(ventana.getPeriodoExcepcionVentana(), periodoValoracion)
