@@ -542,6 +542,16 @@ public class PlanillaUseCase {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
+                    long productosEsperados = productoRepository.countActivosByIdSegmento(2L);
+                    long planillasCargadas = planillaRepository
+                            .countActivasByFechaCorteAndSegmentoId(fechaCorteFullIfrs, 2L);
+                    if (planillasCargadas < productosEsperados) {
+                        // Todavia faltan productos activos sin cargar ninguna planilla para este
+                        // periodo; no se puede saber si "todo esta aprobado" sin que todos hayan
+                        // cargado algo primero.
+                        return;
+                    }
+
                     long pendientes = planillaRepository
                             .countPlanillasNoAprobadasByFechaCorteAndSegmentoId(fechaCorteFullIfrs, 2L);
                     if (pendientes > 0) {
