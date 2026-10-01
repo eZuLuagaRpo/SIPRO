@@ -110,8 +110,6 @@ export class ParametrosComponent implements OnInit {
   excepcionEditandoPeriodo: string | null = null;
   excepcionFormTitulo = 'Agregar una excepción de fechas';
   guardandoExcepcion = false;
-  excepcionPendienteEliminar: ExcepcionVentanaCarga | null = null;
-  eliminandoExcepcion = false;
 
   // ─ Sistema de Notificaciones Toast ─────────────────────────
   toastMensaje: string | null = null;
@@ -566,48 +564,6 @@ export class ParametrosComponent implements OnInit {
       error: () => {
         this.guardandoExcepcion = false;
         this.mostrarToast('Error de conexión al guardar la excepción.', 'error');
-      }
-    });
-  }
-
-  eliminarExcepcion(exc: ExcepcionVentanaCarga): void {
-    this.excepcionPendienteEliminar = exc;
-  }
-
-  cerrarModalEliminarExcepcion(): void {
-    if (this.eliminandoExcepcion) {
-      return;
-    }
-
-    this.excepcionPendienteEliminar = null;
-  }
-
-  confirmarEliminarExcepcion(): void {
-    const excepcion = this.excepcionPendienteEliminar;
-    if (!excepcion) {
-      return;
-    }
-
-    this.eliminandoExcepcion = true;
-    this.parametrosService.eliminarExcepcion(excepcion.periodoValoracion).subscribe({
-      next: res => {
-        this.eliminandoExcepcion = false;
-        if (res.success) {
-          this.excepciones = this.excepciones.filter(e => e.periodoValoracion !== excepcion.periodoValoracion);
-          if (this.excepcionEditandoPeriodo === excepcion.periodoValoracion) {
-            this.cancelarEdicionExcepcion();
-          }
-          this.excepcionPendienteEliminar = null;
-          this.mostrarMensajeGlobal('Excepción eliminada.', 'success');
-        } else {
-          this.excepcionPendienteEliminar = null;
-          this.mostrarMensajeGlobal(res.mensaje || 'No fue posible eliminar.', 'error');
-        }
-      },
-      error: () => {
-        this.eliminandoExcepcion = false;
-        this.excepcionPendienteEliminar = null;
-        this.mostrarMensajeGlobal('Error de conexión al eliminar.', 'error');
       }
     });
   }

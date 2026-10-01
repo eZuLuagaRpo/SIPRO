@@ -229,9 +229,6 @@
                       <button class="btn-icon" (click)="editarExcepcion(exc)" title="Editar">
                         <img [src]="modifyIcon" class="action-icon" alt="Editar" />
                       </button>
-                      <button class="btn-icon" (click)="eliminarExcepcion(exc)" title="Eliminar">
-                        <img [src]="eraseIcon" class="action-icon" alt="Eliminar" />
-                      </button>
                     </td>
                   </tr>
                 </tbody>
@@ -804,31 +801,6 @@
             </button>
             <button class="btn-pill btn-primary" type="button" (click)="confirmarGuardarAsignacion()" [disabled]="guardandoAsignacion">
               {{ guardandoAsignacion ? 'Guardando…' : 'Confirmar y guardar' }}
-            </button>
-          </section>
-        </section>
-      </article>
-
-      <article class="bc-modal-active" role="dialog" aria-modal="true" *ngIf="excepcionPendienteEliminar as excAEliminar">
-        <div class="bc-modal-backdrop" (click)="cerrarModalEliminarExcepcion()"></div>
-
-        <section class="bc-modal-container param-confirm-modal">
-          <section class="bc-modal-header centered-column">
-            <img [src]="alertIcon" alt="Confirmación" class="param-confirm-modal__icon">
-            <h4 class="modal-title-label" id="param-delete-modal-title">Confirmar eliminación</h4>
-          </section>
-
-          <section class="param-confirm-modal__body centered-column">
-            <p>Va a eliminar la excepción configurada para <strong>{{ excAEliminar.periodoLabel ?? excAEliminar.periodoValoracion }}</strong>.</p>
-            <p>Al continuar, se volverá a aplicar el rango base estándar de carga y aprobación.</p>
-          </section>
-
-          <section class="bc-modal-footer param-confirm-modal__footer">
-            <button class="btn-pill btn-secondary" type="button" (click)="cerrarModalEliminarExcepcion()" [disabled]="eliminandoExcepcion">
-              Cancelar
-            </button>
-            <button class="btn-pill btn-primary" type="button" (click)="confirmarEliminarExcepcion()" [disabled]="eliminandoExcepcion">
-              {{ eliminandoExcepcion ? 'Eliminando…' : 'Eliminar excepción' }}
             </button>
           </section>
         </section>

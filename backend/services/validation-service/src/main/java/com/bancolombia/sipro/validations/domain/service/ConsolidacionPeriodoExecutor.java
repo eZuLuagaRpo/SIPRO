@@ -425,9 +425,26 @@ public class ConsolidacionPeriodoExecutor {
             }
 
             String advertenciaExcelConsolidado = guardarExcelConsolidado(periodoValoracion, excelWriter);
-            PostProcesamientoResult postResult = ejecutarPostProcesamiento(periodoValoracion);
-            List<String> advertenciasPostProceso = new ArrayList<>(postResult.advertencias());
-            final CreffosParametricGenerator.GeneratedCreffosFile creffosGenerado = postResult.creffosFile();
+
+            // CREFFSOS se genera aquí, como cierre de la Fase 1: depende directamente de los
+            // registros que se acaban de insertar en sipro_detalle_consolidado_registros
+            // (Colgaap). Full IFRS, en cambio, es un proceso independiente que no comparte
+            // datos con lo anterior, por eso queda como post-procesamiento aparte.
+            logger.info("Fase 1 periodo {}: iniciando generación y publicación de CREFFSOS...", periodoValoracion);
+            long t0Creffsos = System.currentTimeMillis();
+            CreffosGenerationResult creffosResult = generarYPublicarCreffsosSeguro(periodoValoracion);
+            final CreffosParametricGenerator.GeneratedCreffosFile creffosGenerado = creffosResult.creffosFile();
+            logger.info("Fase 1 periodo {}: CREFFSOS finalizado ({} ms).",
+                    periodoValoracion, System.currentTimeMillis() - t0Creffsos);
+
+            logger.info("Post-procesamiento periodo {}: iniciando generación Full IFRS...", periodoValoracion);
+            long t0FullIfrs = System.currentTimeMillis();
+            List<String> advertenciasFullIfrs = ejecutarPostProcesamientoFullIfrs(periodoValoracion);
+            logger.info("Post-procesamiento periodo {}: generación Full IFRS finalizada ({} ms).",
+                    periodoValoracion, System.currentTimeMillis() - t0FullIfrs);
+
+            List<String> advertenciasPostProceso = new ArrayList<>(creffosResult.advertencias());
+            advertenciasPostProceso.addAll(advertenciasFullIfrs);
             if (advertenciaExcelConsolidado != null && !advertenciaExcelConsolidado.isBlank()) {
                 advertenciasPostProceso.add(advertenciaExcelConsolidado);
             }
@@ -919,35 +936,21 @@ public class ConsolidacionPeriodoExecutor {
         }
     }
 
-    private record PostProcesamientoResult(List<String> advertencias,
+    private record CreffosGenerationResult(List<String> advertencias,
             CreffosParametricGenerator.GeneratedCreffosFile creffosFile) {}
 
-    private PostProcesamientoResult ejecutarPostProcesamiento(LocalDate periodoValoracion) {
+    /**
+     * Genera y publica CREFFSOS como cierre de la Fase 1: depende directamente de los
+     * registros que ya quedaron insertados en sipro_detalle_consolidado_registros para este
+     * período (Colgaap). Un fallo aquí se degrada a advertencia — no tumba la consolidación.
+     */
+    private CreffosGenerationResult generarYPublicarCreffsosSeguro(LocalDate periodoValoracion) {
         List<String> advertencias = new ArrayList<>();
         CreffosParametricGenerator.GeneratedCreffosFile creffosFile = null;
 
         try {
-            logger.info("Post-procesamiento periodo {}: iniciando generación Full IFRS...", periodoValoracion);
-            long t0FullIfrs = System.currentTimeMillis();
-            String advertenciaFullIfrs = consolidacionFullIfrsService.generarConsolidado(periodoValoracion);
-            logger.info("Post-procesamiento periodo {}: generación Full IFRS finalizada ({} ms).",
-                    periodoValoracion, System.currentTimeMillis() - t0FullIfrs);
-            if (advertenciaFullIfrs != null && !advertenciaFullIfrs.isBlank()) {
-                advertencias.add(advertenciaFullIfrs);
-            }
-        } catch (Exception ex) {
-            logger.error("No se pudo generar el consolidado Full IFRS para el periodo {}: {}",
-                    periodoValoracion, ex.getMessage(), ex);
-            advertencias.add("Consolidado Full IFRS no generado: " + resumirMensaje(ex));
-        }
-
-        try {
-            logger.info("Post-procesamiento periodo {}: iniciando generación y publicación de CREFFSOS...", periodoValoracion);
-            long t0Creffsos = System.currentTimeMillis();
             CreffosConsolidationService.PublicationResult publicationResult =
                     creffosConsolidationService.generarYPublicarCreffsos(periodoValoracion);
-            logger.info("Post-procesamiento periodo {}: CREFFSOS finalizado ({} ms).",
-                    periodoValoracion, System.currentTimeMillis() - t0Creffsos);
             creffosFile = publicationResult.generatedFile();
             if (publicationResult.sharedCopyWarning() != null && !publicationResult.sharedCopyWarning().isBlank()) {
                 advertencias.add("CREFFSOS generado pero no copiado a red");
@@ -957,13 +960,35 @@ public class ConsolidacionPeriodoExecutor {
             advertencias.add("CREFFSOS generado pero no copiado a red");
         }
 
-        // El reporte de conciliación YA NO se genera aquí: en el flujo automático su
-        // resultado nunca se guardaba (se descartaba sin persistirse ni publicarse) —
-        // se regenera desde cero, bajo demanda, cuando el usuario lo descarga desde el
-        // endpoint correspondiente. Generarlo aquí solo repetía ese trabajo (lectura
-        // completa de registros + CREFFSOS + 2 hojas de Excel) para tirarlo a la basura.
+        return new CreffosGenerationResult(advertencias, creffosFile);
+    }
 
-        return new PostProcesamientoResult(advertencias, creffosFile);
+    /**
+     * Post-procesamiento: genera el consolidado Full IFRS, un proceso independiente que no
+     * comparte datos ni tabla con el consolidado Colgaap de la Fase 1. Un fallo aquí también
+     * se degrada a advertencia — no tumba la consolidación.
+     *
+     * El reporte de conciliación YA NO se genera aquí: en el flujo automático su resultado
+     * nunca se guardaba (se descartaba sin persistirse ni publicarse) — se regenera desde
+     * cero, bajo demanda, cuando el usuario lo descarga desde el endpoint correspondiente.
+     * Generarlo aquí solo repetía ese trabajo (lectura completa de registros + CREFFSOS + 2
+     * hojas de Excel) para tirarlo a la basura.
+     */
+    private List<String> ejecutarPostProcesamientoFullIfrs(LocalDate periodoValoracion) {
+        List<String> advertencias = new ArrayList<>();
+
+        try {
+            String advertenciaFullIfrs = consolidacionFullIfrsService.generarConsolidado(periodoValoracion);
+            if (advertenciaFullIfrs != null && !advertenciaFullIfrs.isBlank()) {
+                advertencias.add(advertenciaFullIfrs);
+            }
+        } catch (Exception ex) {
+            logger.error("No se pudo generar el consolidado Full IFRS para el periodo {}: {}",
+                    periodoValoracion, ex.getMessage(), ex);
+            advertencias.add("Consolidado Full IFRS no generado: " + resumirMensaje(ex));
+        }
+
+        return advertencias;
     }
 
     private String construirObservacion(String observacionBase, List<String> advertencias) {

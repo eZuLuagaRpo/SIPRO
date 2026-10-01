@@ -263,10 +263,13 @@ public interface SiproDetalleCargaPlanillasRepository extends JpaRepository<Sipr
 
     /**
      * Cuenta planillas activas del segmento indicado para un periodo, sin filtrar por estado.
+     * Excluye planillas de productos ya desactivados: un producto desactivado no debe seguir
+     * contando como "cargado" ni bloqueando comparaciones contra el catálogo de productos activos.
      */
     @Query("SELECT COUNT(cp) FROM SiproDetalleCargaPlanillas cp, Producto prod " +
             "WHERE cp.idProducto = prod.idProducto " +
             "AND prod.idSegmento = :idSegmento " +
+            "AND prod.activo = 1 " +
             "AND cp.fechaCorteInformacion = :fechaCorte " +
             "AND cp.activo = true")
     long countActivasByFechaCorteAndSegmentoId(
@@ -275,10 +278,14 @@ public interface SiproDetalleCargaPlanillasRepository extends JpaRepository<Sipr
 
     /**
      * Cuenta planillas activas del segmento indicado que aún no están en un estado aprobado.
+     * Excluye planillas de productos ya desactivados: un producto desactivado no debe seguir
+     * bloqueando indefinidamente un disparador de "todo quedó aprobado" (homologación, copia a
+     * carpeta compartida, etc.) por una planilla pendiente/rechazada que ya no importa.
      */
     @Query("SELECT COUNT(cp) FROM SiproDetalleCargaPlanillas cp, Producto prod " +
             "WHERE cp.idProducto = prod.idProducto " +
             "AND prod.idSegmento = :idSegmento " +
+            "AND prod.activo = 1 " +
             "AND cp.fechaCorteInformacion = :fechaCorte " +
             "AND cp.activo = true " +
             "AND LOWER(COALESCE(cp.estadoPlanilla, '')) NOT IN ('aprobado', 'archivo aprobado', 'aprobación sin datos', 'aprobacion sin datos')")
@@ -288,6 +295,8 @@ public interface SiproDetalleCargaPlanillasRepository extends JpaRepository<Sipr
 
     /**
      * Obtiene las planillas activas y aprobadas del segmento indicado para un periodo.
+     * A propósito NO filtra por producto activo: una planilla ya aprobada es información real
+     * que debe seguir consolidándose/reportándose aunque el producto se desactive después.
      */
     @Query("SELECT cp FROM SiproDetalleCargaPlanillas cp, Producto prod " +
             "WHERE cp.idProducto = prod.idProducto " +
@@ -302,10 +311,14 @@ public interface SiproDetalleCargaPlanillasRepository extends JpaRepository<Sipr
 
     /**
      * Obtiene las planillas activas del segmento indicado para un periodo, sin filtrar por estado.
+     * Excluye planillas de productos ya desactivados (ver nota de los métodos de conteo de arriba):
+     * se usa para los contadores de pendientes/rechazadas del panel admin y del precheck de
+     * consolidación manual, que no deben seguir señalando algo pendiente de un producto desactivado.
      */
     @Query("SELECT cp FROM SiproDetalleCargaPlanillas cp, Producto prod " +
             "WHERE cp.idProducto = prod.idProducto " +
             "AND prod.idSegmento = :idSegmento " +
+            "AND prod.activo = 1 " +
             "AND cp.fechaCorteInformacion = :fechaCorte " +
             "AND cp.activo = true " +
             "ORDER BY cp.id ASC")

@@ -530,26 +530,37 @@ public class PlanillaUseCase {
 
         runAfterCommit(() -> planillaNotificationService.notificarAprobacion(planilla));
 
-        // Determinar si es Full IFRS para copiar a carpeta compartida
-        final String rutaXlsxAprobado = nuevaRutaXlsx;
-        final String rutaCtrlAprobado = nuevaRutaControl;
-        final String nombreArchivoXlsx = planilla.getNombreArchivoFuente();
+        // Determinar si es Full IFRS: la copia a la carpeta compartida y la homologación
+        // solo se disparan cuando TODAS las planillas Full IFRS del período queden aprobadas
+        // (no una por una en cada aprobación individual).
         boolean isFullIfrsAprobacion = planilla.getSegmento() != null
                 && (planilla.getSegmento().toLowerCase().contains("full")
                     || planilla.getSegmento().toLowerCase().contains("ifrs"));
 
-        if (isFullIfrsAprobacion && rutaXlsxAprobado != null && !rutaXlsxAprobado.isEmpty()) {
+        if (isFullIfrsAprobacion) {
             final LocalDate fechaCorteFullIfrs = planilla.getFechaCorteInformacion();
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    copiarACarpertaCompartidaFullIfrs(rutaXlsxAprobado, rutaCtrlAprobado, nombreArchivoXlsx);
                     long pendientes = planillaRepository
                             .countPlanillasNoAprobadasByFechaCorteAndSegmentoId(fechaCorteFullIfrs, 2L);
-                    if (pendientes == 0) {
-                        logger.info("[HomologacionFullIfrs] Todas las planillas Full IFRS del período {} aprobadas. Generando TXT.", fechaCorteFullIfrs);
-                        homologacionFullIfrsService.generarYPublicarTxt(fechaCorteFullIfrs);
+                    if (pendientes > 0) {
+                        return;
                     }
+
+                    logger.info("[Full IFRS] Todas las planillas del período {} quedaron aprobadas. " +
+                            "Copiando todas a la carpeta compartida y generando homologación.", fechaCorteFullIfrs);
+
+                    List<SiproDetalleCargaPlanillas> planillasAprobadas = planillaRepository
+                            .findPlanillasAprobadasByFechaCorteAndSegmentoId(fechaCorteFullIfrs, 2L);
+                    for (SiproDetalleCargaPlanillas aprobada : planillasAprobadas) {
+                        copiarACarpertaCompartidaFullIfrs(
+                                aprobada.getRutaArchivoAlmacenamiento(),
+                                aprobada.getRutaArchivoControl(),
+                                aprobada.getNombreArchivoFuente());
+                    }
+
+                    homologacionFullIfrsService.generarYPublicarTxt(fechaCorteFullIfrs);
                 }
             });
         }
