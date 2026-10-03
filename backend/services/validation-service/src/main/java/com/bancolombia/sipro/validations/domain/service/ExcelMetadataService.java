@@ -442,16 +442,21 @@ public class ExcelMetadataService {
 
                 try {
                     String monedaCode = idx.containsKey("MONEDA") ? cols[idx.get("MONEDA")].trim() : "";
+                    String vlrTexto = idx.containsKey("VLRINIOBL") ? cols[idx.get("VLRINIOBL")].trim() : "";
+                    if (monedaCode.isBlank() && vlrTexto.isBlank()) {
+                        continue;
+                    }
+
                     String monedaLabel = "0".equals(monedaCode) ? "COP" : ("1".equals(monedaCode) ? "USD" : "OTRA");
 
-                    if (idx.containsKey("VLRINIOBL")) {
-                        String vlrStr = cols[idx.get("VLRINIOBL")].trim().replace(",", ".");
-                        if (!vlrStr.isEmpty()) {
-                            BigDecimal vlr = new BigDecimal(vlrStr);
-                            countByMoneda.put(monedaLabel, countByMoneda.getOrDefault(monedaLabel, 0L) + 1);
-                            sumByMoneda.put(monedaLabel,
-                                    sumByMoneda.getOrDefault(monedaLabel, BigDecimal.ZERO).add(vlr));
-                        }
+                    // La fila cuenta siempre que tenga dato, sin importar si VLRINIOBL se puede
+                    // convertir a número — contar registros no deberia depender de eso.
+                    countByMoneda.put(monedaLabel, countByMoneda.getOrDefault(monedaLabel, 0L) + 1);
+
+                    if (!vlrTexto.isBlank()) {
+                        BigDecimal vlr = new BigDecimal(normalizeNumber(vlrTexto));
+                        sumByMoneda.put(monedaLabel,
+                                sumByMoneda.getOrDefault(monedaLabel, BigDecimal.ZERO).add(vlr));
                     }
                 } catch (Exception ignored) {
                 }
@@ -474,20 +479,40 @@ public class ExcelMetadataService {
 
             try {
                 String monedaCode = idx.containsKey("MONEDA") ? getValue(rowValues, idx.get("MONEDA")) : "";
+                String vlrTexto = idx.containsKey("VLRINIOBL") ? getValue(rowValues, idx.get("VLRINIOBL")) : "";
+                if (monedaCode.isBlank() && vlrTexto.isBlank()) {
+                    return;
+                }
+
                 String monedaLabel = "0".equals(monedaCode) ? "COP" : ("1".equals(monedaCode) ? "USD" : "OTRA");
 
-                if (idx.containsKey("VLRINIOBL")) {
-                    String val = getValue(rowValues, idx.get("VLRINIOBL")).replace(",", ".");
-                    if (!val.isEmpty()) {
-                        BigDecimal vlr = new BigDecimal(val);
-                        countByMoneda.put(monedaLabel, countByMoneda.getOrDefault(monedaLabel, 0L) + 1);
-                        sumByMoneda.put(monedaLabel,
-                                sumByMoneda.getOrDefault(monedaLabel, BigDecimal.ZERO).add(vlr));
-                    }
+                // La fila cuenta siempre que tenga dato, sin importar si VLRINIOBL se puede
+                // convertir a número — contar registros no deberia depender de eso.
+                countByMoneda.put(monedaLabel, countByMoneda.getOrDefault(monedaLabel, 0L) + 1);
+
+                if (!vlrTexto.isBlank()) {
+                    BigDecimal vlr = new BigDecimal(normalizeNumber(vlrTexto));
+                    sumByMoneda.put(monedaLabel,
+                            sumByMoneda.getOrDefault(monedaLabel, BigDecimal.ZERO).add(vlr));
                 }
             } catch (Exception ignored) {
             }
         });
+    }
+
+    /**
+     * Normaliza un número que puede venir con separador de miles y/o decimales en distintos
+     * formatos (coma, punto, o ambos). Misma lógica ya probada en ConsolidacionPeriodoExecutor
+     * y ConsolidacionFullIfrsService.
+     */
+    private String normalizeNumber(String value) {
+        String cleaned = value.trim().replace(" ", "");
+        if (cleaned.contains(",") && cleaned.contains(".")) {
+            cleaned = cleaned.replace(",", "");
+        } else if (cleaned.contains(",")) {
+            cleaned = cleaned.replace(",", ".");
+        }
+        return cleaned;
     }
 
     private String getValue(List<String> rowValues, int index) {

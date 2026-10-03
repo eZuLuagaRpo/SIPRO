@@ -1,5 +1,6 @@
 package com.bancolombia.sipro.validations.domain.service;
 
+import com.bancolombia.sipro.validations.domain.model.Producto;
 import com.bancolombia.sipro.validations.domain.model.SiproDetalleArchivoValidacion;
 import com.bancolombia.sipro.validations.domain.model.SiproDetalleCargaPlanillas;
 import com.bancolombia.sipro.validations.domain.model.SiproDetalleConsolidadoRegistro;
@@ -50,15 +51,6 @@ public class ConciliacionArchivosBloqueadosService {
     // Misma contrasena que el resto de copias bloqueadas (ver PlanillaUseCase/CreffosParametricGenerator).
     private static final String LOCKED_FILE_PASSWORD = "sipro-readonly";
 
-    private static final List<String> SEGMENTOS_FULL_IFRS = List.of(
-            "Acuerdos Conjuntos", "Banco corrientes", "Cajeros", "Canales de distribución",
-            "Canales digitales", "Cartera moneda extranjera", "Cartera moneda legal",
-            "Comisiones diferidas", "Conciliación clientes", "Cuentas por cobrar trade",
-            "Depósitos", "Depóstios genérica", "Estados Financieros", "Factoring",
-            "Hipotecario", "Leasing", "Nequi", "Recaudos", "SAP", "Seguridad",
-            "SUFI", "Tarjetas", "Tesorería"
-    );
-
     private static final int COL_A = 0;
     private static final int COL_B = 1;
     private static final int COL_C = 2;
@@ -77,16 +69,19 @@ public class ConciliacionArchivosBloqueadosService {
     private final SiproDetalleCargaPlanillasRepository cargaPlanillasRepository;
     private final SiproDetalleArchivoValidacionRepository validacionRepository;
     private final SiproResumenPorMonedaRepository resumenPorMonedaRepository;
+    private final com.bancolombia.sipro.validations.infrastructure.repository.ProductoRepository productoRepository;
     private final FileStorageService fileStorageService;
 
     public ConciliacionArchivosBloqueadosService(
             SiproDetalleCargaPlanillasRepository cargaPlanillasRepository,
             SiproDetalleArchivoValidacionRepository validacionRepository,
             SiproResumenPorMonedaRepository resumenPorMonedaRepository,
+            com.bancolombia.sipro.validations.infrastructure.repository.ProductoRepository productoRepository,
             FileStorageService fileStorageService) {
         this.cargaPlanillasRepository = cargaPlanillasRepository;
         this.validacionRepository = validacionRepository;
         this.resumenPorMonedaRepository = resumenPorMonedaRepository;
+        this.productoRepository = productoRepository;
         this.fileStorageService = fileStorageService;
     }
 
@@ -101,7 +96,16 @@ public class ConciliacionArchivosBloqueadosService {
 
         Map<String, PlanillaResumen> resumenPorProducto = cargarResumenFullIfrs(fechaCorte);
 
-        byte[] contenido = construirExcel(creffosCantidad, creffosValor, resumenPorProducto);
+        // Catalogo real de productos activos Full IFRS, en vez de una lista de nombres escrita
+        // a mano: asi nunca queda desincronizado si se crea, renombra o desactiva un producto.
+        List<String> segmentosFullIfrs = productoRepository
+                .findActivosByIdSegmentoOrderByTituloAsc(SEGMENTO_FULL_IFRS_ID)
+                .stream()
+                .map(Producto::getTitulo)
+                .filter(titulo -> titulo != null && !titulo.isBlank())
+                .toList();
+
+        byte[] contenido = construirExcel(creffosCantidad, creffosValor, resumenPorProducto, segmentosFullIfrs);
         String nombreArchivo = "CONCILIACION_ARCHIVOS_BLOQUEADOS_" + fechaCorte.format(NOMBRE_ARCHIVO_FMT) + ".xlsx";
         return new GeneratedConciliacion(nombreArchivo, contenido);
     }
@@ -169,7 +173,12 @@ public class ConciliacionArchivosBloqueadosService {
     // ─────────────────────────── Construccion del Excel ───────────────────────────
 
     private byte[] construirExcel(long creffosCantidad, BigDecimal creffosValor,
-                                   Map<String, PlanillaResumen> resumenPorProducto) {
+                                   Map<String, PlanillaResumen> resumenPorProducto,
+                                   List<String> segmentosFullIfrs) {
+        // 2 filas de titulo/encabezado + 1 fila CREFFSOS + una fila "Planilla manual" y una
+        // "Archivo control" por cada producto activo del catalogo (ya no un numero fijo, para
+        // no quedarse corto si el dia de manana hay mas productos Full IFRS activos).
+        int totalFilas = 3 + (segmentosFullIfrs.size() * 2);
         try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             XSSFSheet sheet = workbook.createSheet("Hoja1");
 
@@ -204,8 +213,8 @@ public class ConciliacionArchivosBloqueadosService {
             XSSFCellStyle estiloTituloVerde = crearEstiloTitulo(workbook, fontBold, "E2EFDA");
             XSSFCellStyle estiloValorDosDecimales = crearEstiloValorDosDecimales(workbook, estiloDato);
 
-            // A1:N49 completo con borde fino, incluidas las celdas que quedan vacias.
-            for (int filaIdx = 0; filaIdx < 49; filaIdx++) {
+            // A1:N{totalFilas} completo con borde fino, incluidas las celdas que quedan vacias.
+            for (int filaIdx = 0; filaIdx < totalFilas; filaIdx++) {
                 Row row = sheet.createRow(filaIdx);
                 for (int col = 0; col <= COL_N; col++) {
                     row.createCell(col).setCellStyle(estiloDato);
@@ -225,7 +234,7 @@ public class ConciliacionArchivosBloqueadosService {
             filaIdx = escribirFilaDatos(sheet, filaIdx, "Colgaap/Modificado", "CREFFSOS",
                     creffosCantidad, creffosValor, estiloDato, estiloValorDosDecimales);
 
-            for (String segmento : SEGMENTOS_FULL_IFRS) {
+            for (String segmento : segmentosFullIfrs) {
                 PlanillaResumen resumen = resumenPorProducto.get(normalizarProducto(segmento));
                 Long cantidad = resumen == null ? null : resumen.cantidad();
                 BigDecimal valor = resumen == null ? null : resumen.valor();
@@ -233,7 +242,7 @@ public class ConciliacionArchivosBloqueadosService {
                     cantidad, valor, estiloDato, estiloValorDosDecimales);
             }
 
-            for (String segmento : SEGMENTOS_FULL_IFRS) {
+            for (String segmento : segmentosFullIfrs) {
                 PlanillaResumen resumen = resumenPorProducto.get(normalizarProducto(segmento));
                 Integer cantidadControl = resumen == null ? null : resumen.cantidadControl();
                 filaIdx = escribirFilaControl(sheet, filaIdx, "Full IFRS", "Archivo control " + segmento,

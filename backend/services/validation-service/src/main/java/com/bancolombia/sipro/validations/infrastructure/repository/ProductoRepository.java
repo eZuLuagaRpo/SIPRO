@@ -51,4 +51,12 @@ public interface ProductoRepository extends JpaRepository<Producto, Long> {
      */
     @Query("SELECT COUNT(p) FROM Producto p WHERE p.idSegmento = :idSegmento AND p.activo = 1")
     long countActivosByIdSegmento(@Param("idSegmento") Long idSegmento);
+
+    /**
+     * Lista los productos activos de un segmento, ordenados por título. Se usa donde antes se
+     * usaba una lista de nombres de producto escrita a mano (ver ConciliacionArchivosBloqueadosService),
+     * para que nunca quede desincronizada si se crean, renombran o desactivan productos.
+     */
+    @Query("SELECT p FROM Producto p WHERE p.idSegmento = :idSegmento AND p.activo = 1 ORDER BY p.titulo ASC")
+    List<Producto> findActivosByIdSegmentoOrderByTituloAsc(@Param("idSegmento") Long idSegmento);
 }

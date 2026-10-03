@@ -33,10 +33,15 @@ public class AdminLogBufferService {
                         "CreffosComparisonService",
                         "VentanaCargaService",
                         "NotificacionConsolidacionService",
-                        // Logger dedicado SOLO a los puntos de control y avance de lectura de
-                        // ConsolidacionFullIfrsService (no el logger principal de esa clase, a
-                        // propósito, para no traer también sus demás logs operativos al panel).
-                        "ConsolidacionFullIfrsProgreso"
+                        // Logger dedicado a los puntos de control y avance de lectura de
+                        // ConsolidacionFullIfrsService.
+                        "ConsolidacionFullIfrsProgreso",
+                        // Logger principal de Full IFRS: mismo nivel de detalle que
+                        // ConsolidacionPeriodoExecutor (inicio, cruce TIPO_ID, planilla procesada).
+                        "ConsolidacionFullIfrsService",
+                        // Fase 2 (archivos bloqueados): corre asíncrona después del COMPLETADO.
+                        "ArchivosBloqueadosFase2Service",
+                        "FullIfrsBloqueadosConsolidacionService"
         );
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter
