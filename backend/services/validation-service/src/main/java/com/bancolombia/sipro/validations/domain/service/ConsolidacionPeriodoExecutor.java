@@ -6,8 +6,10 @@ import com.bancolombia.sipro.validations.domain.model.SiproDetalleConsolidacionA
 import com.bancolombia.sipro.validations.domain.model.SiproDetalleConsolidacionesPlanillas;
 import com.bancolombia.sipro.validations.domain.model.SiproDetalleConsolidadoRegistro;
 import com.bancolombia.sipro.validations.domain.model.Producto;
+import com.bancolombia.sipro.validations.domain.model.CreffosColumnDefinition;
 import com.bancolombia.sipro.validations.infrastructure.notification.MailTemplateNotificationService;
 import com.bancolombia.sipro.validations.infrastructure.repository.ClienteLzRepository;
+import com.bancolombia.sipro.validations.infrastructure.repository.CreffosParametroColumnasRepository;
 import com.bancolombia.sipro.validations.infrastructure.repository.ProductoRepository;
 import com.bancolombia.sipro.validations.infrastructure.repository.SiproDetalleArchivoValidacionRepository;
 import com.bancolombia.sipro.validations.infrastructure.repository.SiproDetalleCargaPlanillasRepository;
@@ -162,6 +164,7 @@ public class ConsolidacionPeriodoExecutor {
     private final ArchivosBloqueadosFase2Service archivosBloqueadosFase2Service;
     private final ConsolidacionFullIfrsService consolidacionFullIfrsService;
     private final PlatformTransactionManager transactionManager;
+    private final CreffosParametroColumnasRepository creffosParametroColumnasRepository;
 
     private static final long DEFAULT_POST_CLOSE_DELAY_HOURS = 1;
     private static final long DEFAULT_MAX_POST_CLOSE_DAYS = 5;
@@ -191,7 +194,8 @@ public class ConsolidacionPeriodoExecutor {
                                         Environment environment,
                                         ArchivosBloqueadosFase2Service archivosBloqueadosFase2Service,
                                         ConsolidacionFullIfrsService consolidacionFullIfrsService,
-                                        PlatformTransactionManager transactionManager) {
+                                        PlatformTransactionManager transactionManager,
+                                        CreffosParametroColumnasRepository creffosParametroColumnasRepository) {
         this.planillaRepository = planillaRepository;
         this.validacionRepository = validacionRepository;
         this.clienteLzRepository = clienteLzRepository;
@@ -209,6 +213,7 @@ public class ConsolidacionPeriodoExecutor {
         this.archivosBloqueadosFase2Service = archivosBloqueadosFase2Service;
         this.consolidacionFullIfrsService = consolidacionFullIfrsService;
         this.transactionManager = transactionManager;
+        this.creffosParametroColumnasRepository = creffosParametroColumnasRepository;
     }
 
     private final Environment environment;
@@ -390,6 +395,7 @@ public class ConsolidacionPeriodoExecutor {
 
         try (ConsolidatedExcelWriter excelWriter = new ConsolidatedExcelWriter()) {
             Map<Long, SiproDetalleArchivoValidacion> validacionesPorCarga = cargarValidaciones(planillasAprobadas);
+            DocumentoSecuenciaConfig documentoSecuenciaConfig = resolverDocumentoSecuenciaConfig();
 
             cabecera.setEstadoConsolidacion(ESTADO_EN_PROCESO);
             cabecera.setModificadoPorId(usuarioAuditoria);
@@ -414,7 +420,8 @@ public class ConsolidacionPeriodoExecutor {
                             cabecera,
                             archivoConsolidado,
                             planilla,
-                            excelWriter);
+                            excelWriter,
+                            documentoSecuenciaConfig);
                 }
 
                 archivoConsolidado.setCantidadRegistrosArchivo(registrosArchivo);
@@ -661,7 +668,8 @@ public class ConsolidacionPeriodoExecutor {
                                         SiproDetalleConsolidacionesPlanillas cabecera,
                                         SiproDetalleConsolidacionArchivo archivo,
                                         SiproDetalleCargaPlanillas planilla,
-                                        ConsolidatedExcelWriter excelWriter) throws IOException {
+                                        ConsolidatedExcelWriter excelWriter,
+                                        DocumentoSecuenciaConfig documentoSecuenciaConfig) throws IOException {
         String rutaArchivo = planilla.getRutaArchivoAlmacenamiento();
         if (rutaArchivo == null || rutaArchivo.isBlank()) {
             throw new IllegalStateException("La planilla " + planilla.getId()
@@ -679,6 +687,26 @@ public class ConsolidacionPeriodoExecutor {
         List<SiproDetalleConsolidadoRegistro> batch = new ArrayList<>(batchInsertSize);
         final int[] cantidadRegistros = {0};
 
+        // Si este archivo tiene filas con DOCUMENTO vacío/cero, se reserva de una vez (misma
+        // tabla/parámetro que usa CreffosParametricGenerator) el bloque exacto de consecutivos
+        // que se necesita, y se asigna aquí mismo, fila por fila, antes de escribir el Excel y
+        // de persistir el registro. Así, cuando CREFFSOS corra más adelante, encontrará el
+        // DOCUMENTO ya diligenciado y simplemente lo copiará — sin pedir ni consumir uno nuevo.
+        final long[] siguienteDocumento = {0L};
+        final long[] ultimoDocumentoReservado = {-1L};
+        final long incrementoDocumento = documentoSecuenciaConfig.increment();
+        if (documentoSecuenciaConfig.enabled() && scanResult.documentosVacios() > 0) {
+            ParametroUnicoService.SequenceReservation reservation = parametroUnicoService.reserveSequenceRange(
+                    documentoSecuenciaConfig.currentKey(),
+                    documentoSecuenciaConfig.initialKey(),
+                    documentoSecuenciaConfig.increment(),
+                    scanResult.documentosVacios());
+            if (reservation.enabled()) {
+                siguienteDocumento[0] = reservation.nextValue();
+                ultimoDocumentoReservado[0] = reservation.lastReservedValue();
+            }
+        }
+
         try (InputStream inputStream = fileStorageService.openStream(rutaArchivo)) {
             XlsxStreamingReader.readFirstSheet(inputStream, (rowNumber, rowValues) -> {
                 if (rowNumber == 1 || esFilaVacia(rowValues)) {
@@ -686,6 +714,17 @@ public class ConsolidacionPeriodoExecutor {
                 }
 
                 Map<String, String> fila = convertirFila(scanResult.columnIndexByHeader(), rowValues);
+                if (ultimoDocumentoReservado[0] >= 0 && esDocumentoVacioOCero(getValue(fila, "DOCUMENTO"))) {
+                    if (siguienteDocumento[0] <= ultimoDocumentoReservado[0]) {
+                        fila.put("DOCUMENTO", String.valueOf(siguienteDocumento[0]));
+                        siguienteDocumento[0] += incrementoDocumento;
+                    } else {
+                        logger.warn("Periodo {} archivo '{}': se agotó el bloque de consecutivos reservado "
+                                        + "para DOCUMENTO; la fila queda sin asignar (como antes del ajuste).",
+                                periodoValoracion, planilla.getNombreArchivoFuente());
+                    }
+                }
+
                 String nit = normalizeLookupDocument(getValue(fila, "NIT"));
                 String tipoId = firstNonBlank(tipoIdPorNit.get(nit), getValue(fila, "TIPO_ID"));
 
@@ -762,6 +801,7 @@ public class ConsolidacionPeriodoExecutor {
         Map<String, Integer> columnIndexByHeader = new LinkedHashMap<>();
         Set<String> nits = new LinkedHashSet<>();
         int[] filasEscaneadas = {0};
+        int[] documentosVacios = {0};
 
         XlsxStreamingReader.readFirstSheet(inputStream, (rowNumber, rowValues) -> {
             if (rowNumber == 1) {
@@ -786,6 +826,10 @@ public class ConsolidacionPeriodoExecutor {
                 nits.add(normalizeLookupDocument(nit));
             }
 
+            if (esDocumentoVacioOCero(obtenerValorFila(rowValues, columnIndexByHeader, "DOCUMENTO"))) {
+                documentosVacios[0]++;
+            }
+
             filasEscaneadas[0]++;
             if (filasEscaneadas[0] % PROGRESS_LOG_INTERVAL_ROWS == 0) {
                 logger.info("Escaneo de '{}': {} filas leídas hasta ahora (buscando NITs)...",
@@ -793,7 +837,7 @@ public class ConsolidacionPeriodoExecutor {
             }
         });
 
-        return new ExcelScanResult(headersOriginales, columnIndexByHeader, nits);
+        return new ExcelScanResult(headersOriginales, columnIndexByHeader, nits, documentosVacios[0]);
     }
 
     private void validarHeadersRequeridos(Collection<String> headers, String nombreArchivo) {
@@ -1041,18 +1085,27 @@ public class ConsolidacionPeriodoExecutor {
         return "CONSOLIDADO_" + periodoValoracion.format(FECHA_FMT) + ".xlsx";
     }
 
-    private void setCellValue(Cell cell, String valor) {
+    private void setCellValue(Cell cell, String valor, boolean esColumnaDecimal) {
         if (valor == null || valor.isBlank()) {
             cell.setBlank();
             return;
         }
         try {
-            cell.setCellValue(Double.parseDouble(normalizeNumber(valor)));
+            // Solo para columnas de valores/saldos: ademas de coma/punto, quita '$' y cualquier
+            // espacio (incluido el espacio de no separacion que deja el formato contable de
+            // Excel) que algunos usuarios dejan en la planilla de origen. Se limita a estas
+            // columnas para no afectar el parseo de ninguna otra (NIT, codigos, etc.).
+            String texto = esColumnaDecimal ? limpiarSimbolosMonetarios(valor) : valor;
+            cell.setCellValue(Double.parseDouble(normalizeNumber(texto)));
             return;
         } catch (NumberFormatException ignored) {
             // Se mantiene como texto si no es numérico.
         }
         cell.setCellValue(valor);
+    }
+
+    private String limpiarSimbolosMonetarios(String value) {
+        return value.replaceAll("[^0-9,.\\-]", "");
     }
 
     private BigDecimal calcularDuracionMinutos(OffsetDateTime inicio, OffsetDateTime fin) {
@@ -1189,7 +1242,50 @@ public class ConsolidacionPeriodoExecutor {
 
     private record ExcelScanResult(List<String> headersOriginales,
                                    Map<String, Integer> columnIndexByHeader,
-                                   Set<String> nits) {
+                                   Set<String> nits,
+                                   int documentosVacios) {
+    }
+
+    /**
+     * Misma parametrización que usa CreffosParametricGenerator para la columna DOCUMENTO
+     * (sipro_parametros_columnas_creffsos, función "resolverDocumentoConsecutivo"). Se lee aquí
+     * para asignar el consecutivo en el consolidado de Colgaap ANTES de que se escriba el Excel
+     * y ANTES de que corra CREFFSOS — así, cuando CREFFSOS lea el registro ya persistido, el
+     * DOCUMENTO ya no estará vacío y simplemente copiará el mismo valor, sin pedir uno nuevo.
+     */
+    private record DocumentoSecuenciaConfig(boolean enabled, String currentKey, String initialKey, int increment) {
+        static DocumentoSecuenciaConfig disabled() {
+            return new DocumentoSecuenciaConfig(false, null, null, 1);
+        }
+    }
+
+    private DocumentoSecuenciaConfig resolverDocumentoSecuenciaConfig() {
+        for (CreffosColumnDefinition definition : creffosParametroColumnasRepository.findActiveDefinitions()) {
+            String funcion = definition.funcionJava() == null ? "" : definition.funcionJava().trim();
+            if (!"resolverDocumentoConsecutivo".equals(funcion) && !"resolveDocumentoConsecutivo".equals(funcion)) {
+                continue;
+            }
+            boolean useSequence = definition.parametroBooleano("useSequenceWhenNullOrZero", true);
+            String currentKey = definition.parametroTexto("currentSequenceParam");
+            if (!useSequence || currentKey == null || currentKey.isBlank()) {
+                return DocumentoSecuenciaConfig.disabled();
+            }
+            String initialKey = definition.parametroTexto("initialSequenceParam");
+            int increment = definition.parametroEntero("increment", 1);
+            return new DocumentoSecuenciaConfig(true, currentKey, initialKey, increment);
+        }
+        return DocumentoSecuenciaConfig.disabled();
+    }
+
+    private boolean esDocumentoVacioOCero(String value) {
+        if (value == null || value.isBlank()) {
+            return true;
+        }
+        try {
+            return new BigDecimal(normalizeNumber(value)).compareTo(BigDecimal.ZERO) == 0;
+        } catch (NumberFormatException ex) {
+            return false;
+        }
     }
 
     private final class ConsolidatedExcelWriter implements AutoCloseable {
@@ -1234,7 +1330,7 @@ public class ConsolidacionPeriodoExecutor {
             for (int columnIndex = 0; columnIndex < HEADERS_CONSOLIDADO_SALIDA.size(); columnIndex++) {
                 String header = HEADERS_CONSOLIDADO_SALIDA.get(columnIndex);
                 Cell cell = row.createCell(columnIndex);
-                setCellValue(cell, fila.getOrDefault(header, ""));
+                setCellValue(cell, fila.getOrDefault(header, ""), DECIMAL_COLUMNS.contains(header));
                 if (DECIMAL_COLUMNS.contains(header)) {
                     cell.setCellStyle(decimalStyle);
                 }

@@ -111,6 +111,10 @@ class ConsolidacionPeriodoExecutorTest {
     private PlatformTransactionManager transactionManager;
 
     @Mock
+    private com.bancolombia.sipro.validations.infrastructure.repository.CreffosParametroColumnasRepository
+            creffosParametroColumnasRepository;
+
+    @Mock
     private Query advisoryLockQuery;
 
     private ConsolidacionPeriodoExecutor service;
@@ -134,7 +138,8 @@ class ConsolidacionPeriodoExecutorTest {
                 environment,
                 archivosBloqueadosFase2Service,
                 consolidacionFullIfrsService,
-                transactionManager
+                transactionManager,
+                creffosParametroColumnasRepository
         );
 
             lenient().when(parametroUnicoService.getLong("APP_CONSOLIDACION_POST_CLOSE_DELAY_HOURS", 1L))

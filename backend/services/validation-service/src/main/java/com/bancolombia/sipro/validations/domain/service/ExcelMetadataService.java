@@ -441,16 +441,26 @@ public class ExcelMetadataService {
                 String[] cols = line.split(String.valueOf(delim), -1);
 
                 try {
-                    String monedaCode = idx.containsKey("MONEDA") ? cols[idx.get("MONEDA")].trim() : "";
-                    String vlrTexto = idx.containsKey("VLRINIOBL") ? cols[idx.get("VLRINIOBL")].trim() : "";
-                    if (monedaCode.isBlank() && vlrTexto.isBlank()) {
+                    // La fila cuenta si tiene dato en CUALQUIER columna (igual que
+                    // analyzeFileContent/numeroFilasDatos) — no solo si MONEDA/VLRINIOBL estan
+                    // diligenciados, ya que hay registros validos donde esas dos celdas puntuales
+                    // quedan vacias sin que la fila deje de ser un registro real.
+                    boolean filaConDatos = false;
+                    for (String col : cols) {
+                        if (col != null && !col.trim().isEmpty()) {
+                            filaConDatos = true;
+                            break;
+                        }
+                    }
+                    if (!filaConDatos) {
                         continue;
                     }
 
+                    String monedaCode = idx.containsKey("MONEDA") ? cols[idx.get("MONEDA")].trim() : "";
+                    String vlrTexto = idx.containsKey("VLRINIOBL") ? cols[idx.get("VLRINIOBL")].trim() : "";
+
                     String monedaLabel = "0".equals(monedaCode) ? "COP" : ("1".equals(monedaCode) ? "USD" : "OTRA");
 
-                    // La fila cuenta siempre que tenga dato, sin importar si VLRINIOBL se puede
-                    // convertir a número — contar registros no deberia depender de eso.
                     countByMoneda.put(monedaLabel, countByMoneda.getOrDefault(monedaLabel, 0L) + 1);
 
                     if (!vlrTexto.isBlank()) {
@@ -478,16 +488,26 @@ public class ExcelMetadataService {
             }
 
             try {
-                String monedaCode = idx.containsKey("MONEDA") ? getValue(rowValues, idx.get("MONEDA")) : "";
-                String vlrTexto = idx.containsKey("VLRINIOBL") ? getValue(rowValues, idx.get("VLRINIOBL")) : "";
-                if (monedaCode.isBlank() && vlrTexto.isBlank()) {
+                // La fila cuenta si tiene dato en CUALQUIER columna (igual que
+                // analyzeFileContent/numeroFilasDatos) — no solo si MONEDA/VLRINIOBL estan
+                // diligenciados, ya que hay registros validos donde esas dos celdas puntuales
+                // quedan vacias sin que la fila deje de ser un registro real.
+                boolean filaConDatos = false;
+                for (String valor : rowValues) {
+                    if (valor != null && !valor.trim().isEmpty()) {
+                        filaConDatos = true;
+                        break;
+                    }
+                }
+                if (!filaConDatos) {
                     return;
                 }
 
+                String monedaCode = idx.containsKey("MONEDA") ? getValue(rowValues, idx.get("MONEDA")) : "";
+                String vlrTexto = idx.containsKey("VLRINIOBL") ? getValue(rowValues, idx.get("VLRINIOBL")) : "";
+
                 String monedaLabel = "0".equals(monedaCode) ? "COP" : ("1".equals(monedaCode) ? "USD" : "OTRA");
 
-                // La fila cuenta siempre que tenga dato, sin importar si VLRINIOBL se puede
-                // convertir a número — contar registros no deberia depender de eso.
                 countByMoneda.put(monedaLabel, countByMoneda.getOrDefault(monedaLabel, 0L) + 1);
 
                 if (!vlrTexto.isBlank()) {
@@ -506,7 +526,9 @@ public class ExcelMetadataService {
      * y ConsolidacionFullIfrsService.
      */
     private String normalizeNumber(String value) {
-        String cleaned = value.trim().replace(" ", "");
+        // Quita simbolo de moneda ($), espacios y cualquier texto (p.ej. "COP") que algunos
+        // usuarios dejan al formatear la celda como moneda; solo deja digitos, separadores y signo.
+        String cleaned = value.trim().replaceAll("[^0-9,.\\-]", "");
         if (cleaned.contains(",") && cleaned.contains(".")) {
             cleaned = cleaned.replace(",", "");
         } else if (cleaned.contains(",")) {

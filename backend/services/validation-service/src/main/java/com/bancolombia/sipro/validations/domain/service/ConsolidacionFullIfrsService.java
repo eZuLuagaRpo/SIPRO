@@ -453,6 +453,14 @@ public class ConsolidacionFullIfrsService {
         return cleaned;
     }
 
+    // Solo para columnas de valores/saldos del consolidado: ademas de coma/punto, quita '$' y
+    // cualquier espacio (incluido el espacio de no separacion que deja el formato contable de
+    // Excel) antes de intentar convertir a numero. Se limita a estas columnas para no afectar
+    // el parseo de ninguna otra (NIT, codigos, etc.).
+    private String limpiarSimbolosMonetarios(String value) {
+        return value.replaceAll("[^0-9,.\\-]", "");
+    }
+
     private String getValue(Map<String, String> fila, String key) {
         return fila.getOrDefault(key, "").trim();
     }
@@ -518,21 +526,21 @@ public class ConsolidacionFullIfrsService {
                 String header = HEADERS_SALIDA.get(i);
                 Cell cell = row.createCell(i);
                 String valor = fila.getOrDefault(header, "");
-                setCellValue(cell, valor);
+                setCellValue(cell, valor, DECIMAL_COLUMNS.contains(header));
                 if (DECIMAL_COLUMNS.contains(header)) {
                     cell.setCellStyle(decimalStyle);
                 }
             }
         }
 
-        private void setCellValue(Cell cell, String valor) {
+        private void setCellValue(Cell cell, String valor, boolean esColumnaDecimal) {
             if (valor == null || valor.isBlank()) {
                 cell.setBlank();
                 return;
             }
             try {
-                String cleaned = valor.trim().replace(",", ".");
-                cell.setCellValue(Double.parseDouble(cleaned));
+                String texto = esColumnaDecimal ? limpiarSimbolosMonetarios(valor) : valor;
+                cell.setCellValue(Double.parseDouble(normalizeNumber(texto)));
                 return;
             } catch (NumberFormatException ignored) {
                 // no es numérico, se escribe como texto

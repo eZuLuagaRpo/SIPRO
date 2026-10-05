@@ -1543,7 +1543,12 @@ public class DynamicExcelValidationService {
         for (ValidationRule rule : ctrlRules) {
             if (rule.isCtrlContentRule()) {
                 String pattern = rule.getRegexPattern();
-                boolean hasSpaces = ctrlContent.contains(" ");
+                // Antes solo detectaba el espacio literal (" "); un Enter al final del .txt
+                // inserta un salto de línea, no un espacio, así que se escapaba de este chequeo
+                // y también del de patrón (que valida sobre el contenido ya recortado con trim()).
+                // Se amplía a cualquier caracter en blanco (espacio, tab, salto de línea, etc.)
+                // sin tocar el resto de la lógica: todo lo que antes se detectaba sigue igual.
+                boolean hasSpaces = ctrlContent.chars().anyMatch(Character::isWhitespace);
                 boolean failsPattern = pattern != null && !pattern.isEmpty() && !trimmed.matches(pattern);
                 if (hasSpaces || failsPattern) {
                     String raw = rule.getComments() != null ? rule.getComments() : "";

@@ -23,6 +23,11 @@ import com.bancolombia.sipro.validations.infrastructure.repository.SiproDetalleR
 import com.bancolombia.sipro.validations.infrastructure.repository.SiproUsuarioProductoRolRepository;
 import com.bancolombia.sipro.validations.infrastructure.repository.UsuarioLoginRepository;
 import com.bancolombia.sipro.validations.domain.model.SiproDetalleRechazosPlanilla;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.web.multipart.MultipartFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -833,10 +839,11 @@ public class PlanillaUseCase {
             // copiar xlsx a la raiz
             if (rutaXlsx != null && !rutaXlsx.isEmpty()) {
                 byte[] xlsxBytes = fileStorageService.getFileAsBytes(rutaXlsx);
+                byte[] xlsxLimpio = limpiarRangoUsadoXlsx(xlsxBytes);
                 String nombreDest = (nombreArchivo != null && !nombreArchivo.isBlank())
                         ? nombreArchivo
                         : extraerNombreLimpio(rutaXlsx);
-                Files.write(raizDir.resolve(nombreDest), xlsxBytes,
+                Files.write(raizDir.resolve(nombreDest), xlsxLimpio,
                         StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
                 logger.info("[Full IFRS] xlsx copiado a: {}/{}", rutaRaiz, nombreDest);
             }
@@ -853,6 +860,88 @@ public class PlanillaUseCase {
             logger.warn("[Full IFRS] No se pudo copiar a la carpeta compartida '{}': {}",
                     rutaRaiz, e.getMessage());
         }
+    }
+
+    /**
+     * Recorta el rango usado de cada hoja del Excel hasta la ultima fila/columna que tiene un
+     * dato real, antes de copiarlo a la carpeta compartida. Equivale a lo que hoy se hace a mano
+     * seleccionando las filas/columnas sobrantes y usando Ctrl + "-": elimina celdas y filas que
+     * no tienen ningun valor, pero nunca toca una celda con contenido real. Si algo falla, se
+     * devuelve el archivo original sin cambios (nunca bloquea la copia por esto).
+     */
+    private byte[] limpiarRangoUsadoXlsx(byte[] xlsxBytes) {
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(xlsxBytes));
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
+                recortarRangoUsado(workbook.getSheetAt(i));
+            }
+            workbook.write(out);
+            return out.toByteArray();
+        } catch (Exception ex) {
+            logger.warn("[Full IFRS] No se pudo recortar el rango usado del Excel antes de copiarlo "
+                    + "a la carpeta compartida: {}. Se copia el archivo original sin cambios.", ex.getMessage());
+            return xlsxBytes;
+        }
+    }
+
+    private void recortarRangoUsado(Sheet sheet) {
+        int ultimaFilaConDatos = -1;
+        int ultimaColumnaConDatos = -1;
+
+        // Primero se revisa TODA la hoja (todas las filas y columnas) para encontrar el limite
+        // real de los datos, antes de borrar nada.
+        for (Row row : sheet) {
+            for (Cell cell : row) {
+                if (celdaTieneDatoReal(cell)) {
+                    ultimaFilaConDatos = Math.max(ultimaFilaConDatos, row.getRowNum());
+                    ultimaColumnaConDatos = Math.max(ultimaColumnaConDatos, cell.getColumnIndex());
+                }
+            }
+        }
+
+        if (ultimaFilaConDatos < 0) {
+            // Hoja sin ningun dato real (no deberia pasar en una planilla aprobada): no se toca.
+            return;
+        }
+
+        // Eje X: dentro de cada fila que se conserva, borrar las celdas despues de la ultima
+        // columna con dato real EN TODA LA HOJA (no columna por fila, para no borrar una celda
+        // vacia de una columna que si usa otra fila).
+        for (int r = 0; r <= ultimaFilaConDatos; r++) {
+            Row row = sheet.getRow(r);
+            if (row == null) {
+                continue;
+            }
+            List<Cell> celdasSobrantes = new ArrayList<>();
+            for (Cell cell : row) {
+                if (cell.getColumnIndex() > ultimaColumnaConDatos) {
+                    celdasSobrantes.add(cell);
+                }
+            }
+            for (Cell cell : celdasSobrantes) {
+                row.removeCell(cell);
+            }
+        }
+
+        // Eje Y: borrar las filas completas despues de la ultima fila con dato real. De atras
+        // para adelante para no invalidar los indices mientras se recorre.
+        for (int r = sheet.getLastRowNum(); r > ultimaFilaConDatos; r--) {
+            Row row = sheet.getRow(r);
+            if (row != null) {
+                sheet.removeRow(row);
+            }
+        }
+    }
+
+    private boolean celdaTieneDatoReal(Cell cell) {
+        if (cell == null || cell.getCellType() == CellType.BLANK) {
+            return false;
+        }
+        if (cell.getCellType() == CellType.STRING) {
+            String valor = cell.getStringCellValue();
+            return valor != null && !valor.trim().isEmpty();
+        }
+        return true;
     }
 
     private static String extraerNombreLimpio(String ruta) {
