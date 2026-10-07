@@ -73,10 +73,10 @@ app:
   # En PDN el transporte acordado es AWS SES API (SDK), no SMTP.
   mail:
     transport: ${APP_MAIL_TRANSPORT:ses-api}
+    # Sin access-key/secret-key: el SDK de AWS toma las credenciales del rol IAM de la
+    # maquina/contenedor (mismo patron que ABA, desplegado por el mismo equipo).
     ses:
       region: ${APP_MAIL_SES_REGION:us-east-1}
-      access-key: ${APP_MAIL_SES_ACCESS_KEY:}
-      secret-key: ${APP_MAIL_SES_SECRET_KEY:}
 
 # ── Parámetros críticos de Entra ID y URLs (PDN producción) ─────────────────
 # ESTOS VALORES VIENEN EXCLUSIVAMENTE DEL PIPELINE (variables de entorno).

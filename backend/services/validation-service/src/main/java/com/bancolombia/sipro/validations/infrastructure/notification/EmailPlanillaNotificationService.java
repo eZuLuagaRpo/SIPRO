@@ -110,13 +110,14 @@ public class EmailPlanillaNotificationService implements PlanillaNotificationSer
         boolean isFullIfrs = segmento != null
                 && (segmento.toLowerCase().contains("full") || segmento.toLowerCase().contains("ifrs"));
         if (isFullIfrs) {
+            // No se informa la ruta/carpeta de destino: es un detalle interno de la plataforma,
+            // no algo que el usuario final necesite saber.
             model.put("mensaje_destino_full_ifrs",
                 "<div style=\"background:#fff3cd; border:1px solid #ffc107; border-radius:4px; padding:10px 14px; "
                 + "font-size:13px; color:#856404; margin-bottom:18px; line-height:18px;\">"
                 + "<strong>Destino de archivos Full IFRS:</strong> "
                 + "Los archivos aprobados (planilla y archivo de control) ser&#225;n enviados autom&#225;ticamente "
-                + "a la carpeta compartida de red: "
-                + "<strong>\\\\Sbcldwpifw01\\IFRS9_Planillas_Manuales</strong>. "
+                + "a la carpeta compartida de red. "
                 + "Esta planilla no genera archivo TOPCREFFSOS."
                 + "</div>");
         } else {

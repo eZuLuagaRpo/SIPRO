@@ -13,6 +13,7 @@ import java.nio.file.StandardOpenOption;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Genera y publica el archivo CREFFSOS a partir de los registros consolidados del periodo.
@@ -118,6 +119,16 @@ public class CreffosConsolidationService {
      * Los archivos bloqueados se procesan después en {@link #procesarArchivosBloqueados}.
      */
     public PublicationResult generarYPublicarCreffsos(LocalDate fechaCorte) {
+        return generarYPublicarCreffsos(fechaCorte, Map.of());
+    }
+
+    /**
+     * Variante que recibe los consecutivos de DOCUMENTO ya asignados por Colgaap
+     * (idConsolidadoRegistro -> número), para que CREFFSOS los reutilice en vez de generar los
+     * suyos — así ambos archivos quedan alineados sin que CREFFSOS tenga que volver a calcular
+     * nada ni consultar de más.
+     */
+    public PublicationResult generarYPublicarCreffsos(LocalDate fechaCorte, Map<Long, Long> documentosAsignados) {
         List<SiproDetalleConsolidadoRegistro> registros = consolidadoRegistroRepository
                 .findByFechaCorteOrderByIdConsolidadoRegistroAsc(fechaCorte);
 
@@ -127,7 +138,7 @@ public class CreffosConsolidationService {
         }
 
         CreffosParametricGenerator.GeneratedCreffosFile generatedFile =
-                creffosParametricGenerator.generate(fechaCorte, registros);
+                creffosParametricGenerator.generate(fechaCorte, registros, documentosAsignados);
 
         String fechaStr = fechaCorte.format(FECHA_FMT);
         String storageKey = CONSOLIDADOS_PREFIX + fechaStr + "/" + generatedFile.fileName();

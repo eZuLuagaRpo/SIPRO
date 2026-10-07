@@ -36,7 +36,10 @@ public class HomologacionFullIfrsService {
 
     // Ruta fija de la carpeta de red donde se publica el TXT de homologación de cuentas Full IFRS.
     // Independiente de IFRS_PLANILLAS_RUTA_SALIDA (esa es solo para las planillas aprobadas).
-    private static final String HOMOLOGACION_RUTA_SALIDA = "\\\\SBMDEBNS03\\BFT\\SIPRO\\HomologacionIFRS";
+    // Punto de montaje Linux del servidor de archivos (antes \\SBMDEBNS03\BFT\SIPRO\HomologacionIFRS
+    // en Windows) — /mnt/windows-share es el mismo recurso de red, ya montado por el equipo de
+    // provision como carpeta local de Linux.
+    private static final String HOMOLOGACION_RUTA_SALIDA = "/mnt/windows-share/HomologacionIFRS";
 
     private final HomologacionFullIfrsRepository repo;
 

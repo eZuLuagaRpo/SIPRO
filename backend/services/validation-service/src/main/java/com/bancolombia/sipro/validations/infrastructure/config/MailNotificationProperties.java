@@ -24,11 +24,13 @@ public class MailNotificationProperties {
         return ses;
     }
 
-    /** Configuracion del transporte "ses-api" (AWS SES via SDK, sin SMTP). */
+    /**
+     * Configuracion del transporte "ses-api" (AWS SES via SDK, sin SMTP). No hay access key ni
+     * secret key: el SDK toma las credenciales del rol IAM de la maquina/contenedor (mismo
+     * patron que usa el proyecto ABA, desplegado por el mismo equipo de infraestructura).
+     */
     public static class Ses {
         private String region = "us-east-1";
-        private String accessKey;
-        private String secretKey;
 
         public String getRegion() {
             return region;
@@ -36,22 +38,6 @@ public class MailNotificationProperties {
 
         public void setRegion(String region) {
             this.region = region;
-        }
-
-        public String getAccessKey() {
-            return accessKey;
-        }
-
-        public void setAccessKey(String accessKey) {
-            this.accessKey = accessKey;
-        }
-
-        public String getSecretKey() {
-            return secretKey;
-        }
-
-        public void setSecretKey(String secretKey) {
-            this.secretKey = secretKey;
         }
     }
 

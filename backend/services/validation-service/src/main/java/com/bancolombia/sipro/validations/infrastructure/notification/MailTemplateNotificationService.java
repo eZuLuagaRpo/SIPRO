@@ -13,8 +13,6 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StreamUtils;
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.sesv2.SesV2Client;
@@ -255,9 +253,9 @@ public class MailTemplateNotificationService {
      */
     private DeliveryResult sendViaSesApi(EmailPayload email, String contexto, String referencia) {
         MailNotificationProperties.Ses sesProperties = properties.getSes();
-        if (isBlank(sesProperties.getRegion()) || isBlank(sesProperties.getAccessKey()) || isBlank(sesProperties.getSecretKey())) {
-            logPreview(email, contexto, referencia, "SES no configurado (region/credenciales faltantes)");
-            return DeliveryResult.failed("SES no configurado (region/credenciales faltantes)");
+        if (isBlank(sesProperties.getRegion())) {
+            logPreview(email, contexto, referencia, "SES no configurado (region faltante)");
+            return DeliveryResult.failed("SES no configurado (region faltante)");
         }
 
         try {
@@ -282,15 +280,14 @@ public class MailTemplateNotificationService {
             ByteArrayOutputStream rawOutput = new ByteArrayOutputStream();
             mimeMessage.writeTo(rawOutput);
 
-            AwsBasicCredentials credentials = AwsBasicCredentials.create(
-                    sesProperties.getAccessKey(), sesProperties.getSecretKey());
-
             List<String> allDestinations = new ArrayList<>(email.recipients());
             allDestinations.addAll(email.cc());
 
+            // Igual que en ABA: no se configura un credentialsProvider explícito — el SDK de AWS
+            // toma automáticamente el rol IAM asignado a la máquina/contenedor. Así se evita
+            // depender de un access key/secret key de larga duración que haya que gestionar.
             try (SesV2Client sesClient = SesV2Client.builder()
                     .region(Region.of(sesProperties.getRegion()))
-                    .credentialsProvider(StaticCredentialsProvider.create(credentials))
                     .build()) {
 
                 SendEmailRequest request = SendEmailRequest.builder()

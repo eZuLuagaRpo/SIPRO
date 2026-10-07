@@ -52,6 +52,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -396,6 +397,12 @@ public class ConsolidacionPeriodoExecutor {
         try (ConsolidatedExcelWriter excelWriter = new ConsolidatedExcelWriter()) {
             Map<Long, SiproDetalleArchivoValidacion> validacionesPorCarga = cargarValidaciones(planillasAprobadas);
             DocumentoSecuenciaConfig documentoSecuenciaConfig = resolverDocumentoSecuenciaConfig();
+            // Consecutivos asignados hoy mismo (idConsolidadoRegistro -> numero), SOLO para que
+            // CREFFSOS muestre el mismo numero sin generarlo de nuevo. A proposito nunca se
+            // persiste en el campo "documento" del registro, para no afectar las columnas de
+            // CREFFSOS que usan ese mismo campo como llave de consulta contra la LZ (garantia y
+            // calificacion desde CENIE) — esas deben seguir viendo el dato original, vacio o no.
+            Map<Long, Long> documentosAsignados = new HashMap<>();
 
             cabecera.setEstadoConsolidacion(ESTADO_EN_PROCESO);
             cabecera.setModificadoPorId(usuarioAuditoria);
@@ -421,7 +428,8 @@ public class ConsolidacionPeriodoExecutor {
                             archivoConsolidado,
                             planilla,
                             excelWriter,
-                            documentoSecuenciaConfig);
+                            documentoSecuenciaConfig,
+                            documentosAsignados);
                 }
 
                 archivoConsolidado.setCantidadRegistrosArchivo(registrosArchivo);
@@ -439,7 +447,7 @@ public class ConsolidacionPeriodoExecutor {
             // datos con lo anterior, por eso queda como post-procesamiento aparte.
             logger.info("Fase 1 periodo {}: iniciando generación y publicación de CREFFSOS...", periodoValoracion);
             long t0Creffsos = System.currentTimeMillis();
-            CreffosGenerationResult creffosResult = generarYPublicarCreffsosSeguro(periodoValoracion);
+            CreffosGenerationResult creffosResult = generarYPublicarCreffsosSeguro(periodoValoracion, documentosAsignados);
             final CreffosParametricGenerator.GeneratedCreffosFile creffosGenerado = creffosResult.creffosFile();
             logger.info("Fase 1 periodo {}: CREFFSOS finalizado ({} ms).",
                     periodoValoracion, System.currentTimeMillis() - t0Creffsos);
@@ -669,7 +677,8 @@ public class ConsolidacionPeriodoExecutor {
                                         SiproDetalleConsolidacionArchivo archivo,
                                         SiproDetalleCargaPlanillas planilla,
                                         ConsolidatedExcelWriter excelWriter,
-                                        DocumentoSecuenciaConfig documentoSecuenciaConfig) throws IOException {
+                                        DocumentoSecuenciaConfig documentoSecuenciaConfig,
+                                        Map<Long, Long> documentosAsignados) throws IOException {
         String rutaArchivo = planilla.getRutaArchivoAlmacenamiento();
         if (rutaArchivo == null || rutaArchivo.isBlank()) {
             throw new IllegalStateException("La planilla " + planilla.getId()
@@ -689,9 +698,9 @@ public class ConsolidacionPeriodoExecutor {
 
         // Si este archivo tiene filas con DOCUMENTO vacío/cero, se reserva de una vez (misma
         // tabla/parámetro que usa CreffosParametricGenerator) el bloque exacto de consecutivos
-        // que se necesita, y se asigna aquí mismo, fila por fila, antes de escribir el Excel y
-        // de persistir el registro. Así, cuando CREFFSOS corra más adelante, encontrará el
-        // DOCUMENTO ya diligenciado y simplemente lo copiará — sin pedir ni consumir uno nuevo.
+        // que se necesita. Ese número se usa SOLO para el Excel de este consolidado — nunca se
+        // persiste en el registro — y se guarda aparte en "documentosAsignados" para que
+        // CREFFSOS, al generarse después, muestre el mismo número sin inventar uno nuevo.
         final long[] siguienteDocumento = {0L};
         final long[] ultimoDocumentoReservado = {-1L};
         final long incrementoDocumento = documentoSecuenciaConfig.increment();
@@ -707,6 +716,11 @@ public class ConsolidacionPeriodoExecutor {
             }
         }
 
+        // Pendientes de esta planilla: el registro todavía no tiene idConsolidadoRegistro hasta
+        // que persistirBatch() lo inserte (la BD lo asigna). Se vuelcan a "documentosAsignados"
+        // justo después de cada persistencia, ya con el id real disponible.
+        List<DocumentoPendiente> pendientesDocumento = new ArrayList<>();
+
         try (InputStream inputStream = fileStorageService.openStream(rutaArchivo)) {
             XlsxStreamingReader.readFirstSheet(inputStream, (rowNumber, rowValues) -> {
                 if (rowNumber == 1 || esFilaVacia(rowValues)) {
@@ -714,22 +728,30 @@ public class ConsolidacionPeriodoExecutor {
                 }
 
                 Map<String, String> fila = convertirFila(scanResult.columnIndexByHeader(), rowValues);
+                String nit = normalizeLookupDocument(getValue(fila, "NIT"));
+                String tipoId = firstNonBlank(tipoIdPorNit.get(nit), getValue(fila, "TIPO_ID"));
+
+                // El registro que se persiste conserva el DOCUMENTO tal cual vino en el archivo
+                // (vacío si vacío) — intacto para que las columnas de CREFFSOS que lo usan como
+                // llave de consulta contra la LZ (garantía/calificación desde CENIE) sigan
+                // viendo exactamente el mismo dato que veían antes de este ajuste.
+                SiproDetalleConsolidadoRegistro registro = construirRegistro(cabecera, archivo, planilla, fila, tipoId);
+                batch.add(registro);
+
+                Map<String, String> filaConsolidado = construirFilaConsolidado(fila, planilla, tipoId);
                 if (ultimoDocumentoReservado[0] >= 0 && esDocumentoVacioOCero(getValue(fila, "DOCUMENTO"))) {
                     if (siguienteDocumento[0] <= ultimoDocumentoReservado[0]) {
-                        fila.put("DOCUMENTO", String.valueOf(siguienteDocumento[0]));
+                        long asignado = siguienteDocumento[0];
+                        filaConsolidado.put("DOCUMENTO", String.valueOf(asignado));
                         siguienteDocumento[0] += incrementoDocumento;
+                        pendientesDocumento.add(new DocumentoPendiente(registro, asignado));
                     } else {
                         logger.warn("Periodo {} archivo '{}': se agotó el bloque de consecutivos reservado "
                                         + "para DOCUMENTO; la fila queda sin asignar (como antes del ajuste).",
                                 periodoValoracion, planilla.getNombreArchivoFuente());
                     }
                 }
-
-                String nit = normalizeLookupDocument(getValue(fila, "NIT"));
-                String tipoId = firstNonBlank(tipoIdPorNit.get(nit), getValue(fila, "TIPO_ID"));
-
-                batch.add(construirRegistro(cabecera, archivo, planilla, fila, tipoId));
-                excelWriter.appendRow(construirFilaConsolidado(fila, planilla, tipoId));
+                excelWriter.appendRow(filaConsolidado);
                 cantidadRegistros[0]++;
 
                 if (cantidadRegistros[0] % PROGRESS_LOG_INTERVAL_ROWS == 0) {
@@ -739,14 +761,34 @@ public class ConsolidacionPeriodoExecutor {
 
                 if (batch.size() >= batchInsertSize) {
                     persistirBatch(batch);
+                    volcarDocumentosAsignados(pendientesDocumento, documentosAsignados);
                 }
             });
         }
 
         persistirBatch(batch);
+        volcarDocumentosAsignados(pendientesDocumento, documentosAsignados);
         logger.info("Periodo {} archivo {}: se consolidaron {} registros de datos.",
                 periodoValoracion, planilla.getNombreArchivoFuente(), cantidadRegistros[0]);
         return cantidadRegistros[0];
+    }
+
+    private record DocumentoPendiente(SiproDetalleConsolidadoRegistro registro, long consecutivo) {
+    }
+
+    /**
+     * Pasa a "documentosAsignados" (idConsolidadoRegistro -> consecutivo) las asignaciones
+     * pendientes de este lote, ahora que persistirBatch() ya les dio su id real. Se llama justo
+     * después de cada persistencia, tanto a mitad del archivo como al final.
+     */
+    private void volcarDocumentosAsignados(List<DocumentoPendiente> pendientes, Map<Long, Long> documentosAsignados) {
+        for (DocumentoPendiente pendiente : pendientes) {
+            Long id = pendiente.registro().getIdConsolidadoRegistro();
+            if (id != null) {
+                documentosAsignados.put(id, pendiente.consecutivo());
+            }
+        }
+        pendientes.clear();
     }
 
     private SiproDetalleConsolidadoRegistro construirRegistro(SiproDetalleConsolidacionesPlanillas cabecera,
@@ -991,13 +1033,14 @@ public class ConsolidacionPeriodoExecutor {
      * registros que ya quedaron insertados en sipro_detalle_consolidado_registros para este
      * período (Colgaap). Un fallo aquí se degrada a advertencia — no tumba la consolidación.
      */
-    private CreffosGenerationResult generarYPublicarCreffsosSeguro(LocalDate periodoValoracion) {
+    private CreffosGenerationResult generarYPublicarCreffsosSeguro(LocalDate periodoValoracion,
+            Map<Long, Long> documentosAsignados) {
         List<String> advertencias = new ArrayList<>();
         CreffosParametricGenerator.GeneratedCreffosFile creffosFile = null;
 
         try {
             CreffosConsolidationService.PublicationResult publicationResult =
-                    creffosConsolidationService.generarYPublicarCreffsos(periodoValoracion);
+                    creffosConsolidationService.generarYPublicarCreffsos(periodoValoracion, documentosAsignados);
             creffosFile = publicationResult.generatedFile();
             if (publicationResult.sharedCopyWarning() != null && !publicationResult.sharedCopyWarning().isBlank()) {
                 advertencias.add("CREFFSOS generado pero no copiado a red");

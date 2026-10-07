@@ -77,10 +77,10 @@ app:
     from: '#{APP_MAIL_FROM}#'
     action-url: '#{APP_MAIL_ACTION_URL}#'
     banner-url: '#{APP_MAIL_BANNER_URL}#'
+    # Sin access-key/secret-key: el SDK de AWS toma las credenciales del rol IAM de la
+    # maquina/contenedor (mismo patron que ABA, desplegado por el mismo equipo).
     ses:
       region: '#{APP_MAIL_SES_REGION}#'
-      access-key: '#{APP_MAIL_SES_ACCESS_KEY}#'
-      secret-key: '#{APP_MAIL_SES_SECRET_KEY}#'
 
 # ── Parámetros críticos de Entra ID y URLs (Replace Tokens) ───────────────────
 # Cuando Replace Tokens está activo, estos tokens se reemplazan por los valores

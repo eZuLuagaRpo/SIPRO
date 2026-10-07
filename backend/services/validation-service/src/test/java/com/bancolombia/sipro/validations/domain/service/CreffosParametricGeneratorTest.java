@@ -138,6 +138,52 @@ class CreffosParametricGeneratorTest {
     }
 
     @Test
+    void deberiaUsarClasificacionDeLeasingYConservarReglaParaOtrosProductos() {
+        List<CreffosColumnDefinition> definiciones = List.of(
+                definition("CLASIFCPUC", 46, "INTEGER", "REGLA", "resolverClasificacionCpuc", null,
+                        Map.of(
+                                "leasingProductName", "LEASING",
+                                "modalidadHip", "HIP",
+                                "modalidadDsc", "DSC",
+                                "tiposClasificacionUno", List.of("FS003", "FS007", "FS008"),
+                                "defaultValue", 2
+                        ))
+        );
+
+        when(parametroColumnasRepository.findActiveDefinitions()).thenReturn(definiciones);
+        when(parametroUnicoService.getString("CREFFSOS_FORMATO_SALIDA", "XLSX")).thenReturn("csv");
+        when(parametroUnicoService.getString("CREFFSOS_INCLUIR_ENCABEZADO", "true")).thenReturn("false");
+
+        SiproDetalleConsolidadoRegistro leasingConClasificacion = new SiproDetalleConsolidadoRegistro();
+        leasingConClasificacion.setProductoOrigen(" leasing ");
+        leasingConClasificacion.setClasificacion((short) 4);
+        leasingConClasificacion.setModalidad("HIP");
+        leasingConClasificacion.setTipoId("FS003");
+
+        SiproDetalleConsolidadoRegistro leasingSinClasificacion = new SiproDetalleConsolidadoRegistro();
+        leasingSinClasificacion.setProductoOrigen("Leasing");
+        leasingSinClasificacion.setModalidad("HIP");
+
+        SiproDetalleConsolidadoRegistro otroProductoConClasificacion = new SiproDetalleConsolidadoRegistro();
+        otroProductoConClasificacion.setProductoOrigen("Credito");
+        otroProductoConClasificacion.setClasificacion((short) 4);
+        otroProductoConClasificacion.setTipoId("FS007");
+
+        SiproDetalleConsolidadoRegistro otroProductoReglaDefault = new SiproDetalleConsolidadoRegistro();
+        otroProductoReglaDefault.setProductoOrigen("Credito");
+        otroProductoReglaDefault.setClasificacion((short) 4);
+
+        CreffosParametricGenerator.GeneratedCreffosFile generated = generator.generate(
+                LocalDate.of(2026, 3, 31),
+                List.of(leasingConClasificacion, leasingSinClasificacion,
+                        otroProductoConClasificacion, otroProductoReglaDefault)
+        );
+        
+        String content = new String(generated.content(), StandardCharsets.UTF_8).stripTrailing();
+        assertEquals(List.of("4", "3", "1", "2"), content.lines().toList());
+    }
+    
+    @Test
     void deberiaConsultarCeniePriorizandoUltimaIngestionCuandoLaReglaLoPide() {
         List<CreffosColumnDefinition> definiciones = List.of(
                 definition("DOCUMENTO", 1, "INTEGER", "DIRECTO", "copiarDirecto", null,

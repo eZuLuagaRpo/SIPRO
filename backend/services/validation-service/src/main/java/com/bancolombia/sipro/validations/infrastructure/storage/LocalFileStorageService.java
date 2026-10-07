@@ -35,6 +35,12 @@ public class LocalFileStorageService implements FileStorageService {
     @Value("${app.storage.local.base-dir:C:/s3mock2/sipro-local-storage}")
     private String baseDir;
 
+    // Subcarpeta fija de SIPRO dentro del punto de montaje. Así "app.storage.local.base-dir"
+    // puede quedar como la raíz "pelada" que entrega el equipo de provisión (ej. /mnt/windows-share)
+    // sin que haya que escribir la subcarpeta a mano en la variable — el código siempre la agrega,
+    // igual que antes se escribía ".../planillas" como parte del valor de la variable.
+    private static final String SIPRO_SUBDIR = "planillas";
+
     private Path basePath;
 
     /**
@@ -42,7 +48,7 @@ public class LocalFileStorageService implements FileStorageService {
      */
     @PostConstruct
     public void init() {
-        this.basePath = Paths.get(baseDir).toAbsolutePath().normalize();
+        this.basePath = Paths.get(baseDir, SIPRO_SUBDIR).toAbsolutePath().normalize();
         try {
             Files.createDirectories(basePath);
             logger.info("[LocalStorage] Almacenamiento local activo en: {}", basePath);

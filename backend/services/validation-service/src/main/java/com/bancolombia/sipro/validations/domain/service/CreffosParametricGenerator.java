@@ -67,6 +67,20 @@ public class CreffosParametricGenerator {
      */
     public GeneratedCreffosFile generate(LocalDate fechaCorte,
                                          List<SiproDetalleConsolidadoRegistro> registros) {
+        return generate(fechaCorte, registros, Map.of());
+    }
+
+    /**
+     * Variante que recibe los consecutivos de DOCUMENTO que Colgaap ya asignó en su propio
+     * consolidado (idConsolidadoRegistro -> número), para la columna "resolverDocumentoConsecutivo".
+     * Si una fila ya tiene su número ahí, se reutiliza en vez de pedir/generar uno nuevo — así
+     * CREFFSOS queda alineado con el consolidado sin tener que calcular nada de más. El campo
+     * "documento" del registro NUNCA se toca por esto (sigue intacto para los demás usos, como
+     * las columnas de garantía/calificación que lo usan como llave de consulta contra la LZ).
+     */
+    public GeneratedCreffosFile generate(LocalDate fechaCorte,
+                                         List<SiproDetalleConsolidadoRegistro> registros,
+                                         Map<Long, Long> documentosAsignados) {
         List<CreffosColumnDefinition> definitions = parametroColumnasRepository.findActiveDefinitions();
         if (definitions.isEmpty()) {
             throw new IllegalStateException("No hay columnas activas configuradas en sipro_parametros_columnas_creffsos");
@@ -74,14 +88,15 @@ public class CreffosParametricGenerator {
 
         OutputConfig outputConfig = resolveOutputConfig();
         Map<String, Map<String, String>> lookupCache = preloadLookups(definitions, registros);
-        SequenceState sequenceState = resolveSequenceState(definitions, registros);
+        SequenceState sequenceState = resolveSequenceState(definitions, registros, documentosAsignados);
 
         List<Map<String, String>> rows = new ArrayList<>(registros.size());
         for (SiproDetalleConsolidadoRegistro registro : registros) {
             Map<String, Object> source = buildSourceMap(registro);
             LinkedHashMap<String, String> output = new LinkedHashMap<>();
             for (CreffosColumnDefinition definition : definitions) {
-                String resolvedValue = resolveValue(definition, source, output, lookupCache, sequenceState);
+                String resolvedValue = resolveValue(definition, source, output, lookupCache, sequenceState,
+                        registro.getIdConsolidadoRegistro());
                 output.put(definition.nombreColumna(), formatValue(definition, resolvedValue));
             }
             rows.add(output);
@@ -358,7 +373,8 @@ public class CreffosParametricGenerator {
     }
 
     private SequenceState resolveSequenceState(List<CreffosColumnDefinition> definitions,
-                                               List<SiproDetalleConsolidadoRegistro> registros) {
+                                               List<SiproDetalleConsolidadoRegistro> registros,
+                                               Map<Long, Long> documentosAsignados) {
         for (CreffosColumnDefinition definition : definitions) {
             if (!"resolverDocumentoConsecutivo".equals(safeText(definition.funcionJava()))) {
                 continue;
@@ -368,12 +384,15 @@ public class CreffosParametricGenerator {
             String initialKey = definition.parametroTexto("initialSequenceParam");
             int increment = definition.parametroEntero("increment", 1);
             if (isBlank(currentKey)) {
-                return SequenceState.disabled();
+                return SequenceState.disabled(documentosAsignados);
             }
 
-            int requestedCount = countMissingSequenceValues(definition, registros);
+            // Solo se reserva para las filas que Colgaap NO haya asignado ya (ver
+            // documentosAsignados) — si ya vienen todas cubiertas, no se pide ni se consume
+            // ningún consecutivo nuevo aquí.
+            int requestedCount = countMissingSequenceValues(definition, registros, documentosAsignados);
             if (requestedCount <= 0) {
-                return SequenceState.disabled();
+                return SequenceState.disabled(documentosAsignados);
             }
 
             ParametroUnicoService.SequenceReservation reservation = parametroUnicoService.reserveSequenceRange(
@@ -382,13 +401,14 @@ public class CreffosParametricGenerator {
                     increment,
                     requestedCount
             );
-            return SequenceState.fromReservation(reservation);
+            return SequenceState.fromReservation(reservation, documentosAsignados);
         }
-        return SequenceState.disabled();
+        return SequenceState.disabled(documentosAsignados);
     }
 
     private int countMissingSequenceValues(CreffosColumnDefinition definition,
-                                           List<SiproDetalleConsolidadoRegistro> registros) {
+                                           List<SiproDetalleConsolidadoRegistro> registros,
+                                           Map<Long, Long> documentosAsignados) {
         if (!definition.parametroBooleano("useSequenceWhenNullOrZero", true)) {
             return 0;
         }
@@ -398,7 +418,12 @@ public class CreffosParametricGenerator {
         int requestedCount = 0;
         for (SiproDetalleConsolidadoRegistro registro : registros) {
             String currentValue = extractSingleField(registro, sourceField);
-            if (isBlankOrZero(currentValue)) {
+            if (!isBlankOrZero(currentValue)) {
+                continue;
+            }
+            Long id = registro.getIdConsolidadoRegistro();
+            boolean yaAsignadoPorColgaap = id != null && documentosAsignados.containsKey(id);
+            if (!yaAsignadoPorColgaap) {
                 requestedCount++;
             }
         }
@@ -409,7 +434,8 @@ public class CreffosParametricGenerator {
                                 Map<String, Object> source,
                                 Map<String, String> output,
                                 Map<String, Map<String, String>> lookupCache,
-                                SequenceState sequenceState) {
+                                SequenceState sequenceState,
+                                Long idConsolidadoRegistro) {
         String function = safeText(definition.funcionJava());
         if (function.isBlank()) {
             function = safeText(definition.origenDato());
@@ -419,7 +445,8 @@ public class CreffosParametricGenerator {
             case "copiarDirecto", "copyDirect", "DIRECTO" -> copyDirect(definition, source);
             case "asignarConstante", "constantValue", "CONSTANTE" -> constantValue(definition);
             case "dejarVacio", "VACIO" -> "";
-            case "resolverDocumentoConsecutivo", "resolveDocumentoConsecutivo" -> resolveSequence(definition, source, sequenceState);
+            case "resolverDocumentoConsecutivo", "resolveDocumentoConsecutivo" ->
+                    resolveSequence(definition, source, sequenceState, idConsolidadoRegistro);
             case "copiarMismoValorSiInformado", "copyIfSourcePresent" -> copyIfSourcePresent(definition, source);
             case "asignarConstanteSiCampoInformado", "constantIfSourcePresent" -> constantIfSourcePresent(definition, source);
             case "asignarCeroSiSalidaInformada", "constantIfOutputPresent" ->
@@ -448,13 +475,14 @@ public class CreffosParametricGenerator {
 
     private String resolveSequence(CreffosColumnDefinition definition,
                                    Map<String, Object> source,
-                                   SequenceState sequenceState) {
+                                   SequenceState sequenceState,
+                                   Long idConsolidadoRegistro) {
         String sourceField = firstNonBlank(definition.parametroTexto("sourceField"), definition.columnaOrigen(), definition.nombreColumna());
         String currentValue = getSourceValue(source, sourceField);
         if (!definition.parametroBooleano("useSequenceWhenNullOrZero", true) || !isBlankOrZero(currentValue)) {
             return currentValue;
         }
-        return String.valueOf(sequenceState.nextValue());
+        return sequenceState.resolverPara(idConsolidadoRegistro);
     }
 
     private String copyIfSourcePresent(CreffosColumnDefinition definition, Map<String, Object> source) {
@@ -500,8 +528,14 @@ public class CreffosParametricGenerator {
     private String resolveClasificacionCpuc(CreffosColumnDefinition definition, Map<String, Object> source) {
         String modalidad = getSourceValue(source, "modalidad");
         String tipoId = firstNonBlank(getSourceValue(source, "tipo_id"), getSourceValue(source, "tipoId"));
+        String productoOrigen = getSourceValue(source, "producto_origen");
+        String clasificacion = getSourceValue(source, "clasificacion");
+        String productoLeasing = firstNonBlank(definition.parametroTexto("leasingProductName"), "LEASING");
         String modalidadHip = firstNonBlank(definition.parametroTexto("modalidadHip"), "HIP");
         String modalidadDsc = firstNonBlank(definition.parametroTexto("modalidadDsc"), "DSC");
+        if (productoLeasing.equalsIgnoreCase(productoOrigen) && !isBlank(clasificacion)) {
+            return clasificacion;
+        }
 
         if (modalidadHip.equalsIgnoreCase(modalidad)) {
             return "3";
@@ -890,31 +924,51 @@ public class CreffosParametricGenerator {
         private long nextValue;
         private final long lastReservedValue;
         private final boolean enabled;
+        private final Map<Long, Long> documentosAsignados;
 
-        private SequenceState(long nextValue, long lastReservedValue, int increment, boolean enabled) {
+        private SequenceState(long nextValue, long lastReservedValue, int increment, boolean enabled,
+                              Map<Long, Long> documentosAsignados) {
             this.nextValue = nextValue;
             this.lastReservedValue = lastReservedValue;
             this.increment = increment;
             this.enabled = enabled;
+            this.documentosAsignados = documentosAsignados;
         }
 
-        static SequenceState disabled() {
-            return new SequenceState(0L, 0L, 0, false);
+        static SequenceState disabled(Map<Long, Long> documentosAsignados) {
+            return new SequenceState(0L, 0L, 0, false, documentosAsignados);
         }
 
-        static SequenceState fromReservation(ParametroUnicoService.SequenceReservation reservation) {
+        static SequenceState fromReservation(ParametroUnicoService.SequenceReservation reservation,
+                                             Map<Long, Long> documentosAsignados) {
             if (reservation == null || !reservation.enabled()) {
-                return disabled();
+                return disabled(documentosAsignados);
             }
             return new SequenceState(
                     reservation.nextValue(),
                     reservation.lastReservedValue(),
                     reservation.increment(),
-                    true
+                    true,
+                    documentosAsignados
             );
         }
 
-        long nextValue() {
+        /**
+         * Si Colgaap ya le asignó un consecutivo a esta fila (mismo id de registro), se reutiliza
+         * ese número — así el consolidado y CREFFSOS muestran exactamente el mismo valor sin que
+         * CREFFSOS tenga que pedir ni generar uno nuevo. Si no hay nada asignado para esta fila
+         * (por ejemplo, si la función viniera deshabilitada o la fila no pasó por Colgaap en esta
+         * misma corrida), se cae al comportamiento original: generar uno nuevo de la reserva.
+         */
+        String resolverPara(Long idConsolidadoRegistro) {
+            Long asignado = idConsolidadoRegistro == null ? null : documentosAsignados.get(idConsolidadoRegistro);
+            if (asignado != null) {
+                return String.valueOf(asignado);
+            }
+            return String.valueOf(nextValue());
+        }
+
+        private long nextValue() {
             if (!enabled) {
                 return 0L;
             }
