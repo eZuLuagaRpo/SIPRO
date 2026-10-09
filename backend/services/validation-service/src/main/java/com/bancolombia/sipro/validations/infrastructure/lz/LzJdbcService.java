@@ -56,6 +56,16 @@ public class LzJdbcService {
     @Value("${lz.ssl.truststore-type:${LZ_TRUSTSTORE_TYPE:JKS}}")
     private String truststoreType;
 
+    /**
+     * Ruta al certificado (PEM) que el driver de Impala lee directamente via el
+     * parametro nativo TrustedCerts= de la URL JDBC - mismo mecanismo que usa ABA
+     * (LZSecret.getUrl()), sin pasar por el truststore Java de arriba. Si viene vacio,
+     * no se agrega el parametro y la conexion sigue dependiendo solo de
+     * AllowSelfSignedCerts=1 (comportamiento actual, sin cambios).
+     */
+    @Value("${lz.ssl.trusted-certs-path:}")
+    private String trustedCertsPath;
+
     @Value("${lz.connect-timeout:120}")
     private int connectTimeoutSeconds;
 
@@ -142,11 +152,16 @@ public class LzJdbcService {
                 ? resolvedTruststorePath.toString()
                 : "(no encontrado - conexion SSL puede fallar)";
 
+        String trustedCertsInfo = (trustedCertsPath != null && !trustedCertsPath.isBlank())
+                ? trustedCertsPath.trim()
+                : "(no configurado)";
+
         log.info("┌─────────────────────────────────────────────────────┐");
         log.info("│  [LZ-JDBC] Configuracion al arranque                │");
         log.info("│  Host/Puerto : {}",  padRight(hostInfo, 37) + "│");
         log.info("│  Auth        : {}",  padRight(authMode, 37) + "│");
         log.info("│  Truststore  : {}",  padRight(tsInfo.length() > 37 ? "..." + tsInfo.substring(tsInfo.length() - 34) : tsInfo, 37) + "│");
+        log.info("│  TrustedCerts: {}",  padRight(trustedCertsInfo, 37) + "│");
         log.info("└─────────────────────────────────────────────────────┘");
     }
 
@@ -167,17 +182,27 @@ public class LzJdbcService {
      *
      * NO incluye UseSASL, KrbHostFQDN, KrbServiceName porque causan
      * negociacion SASL/Kerberos incompatible con AuthMech=3 LDAP.
+     *
+     * TrustedCerts= (opcional, 2026-10): mismo parametro nativo que usa ABA
+     * (LZSecret.getUrl()) para apuntar al PEM entregado por provision (p.ej.
+     * /cacerts). Solo se agrega si lz.ssl.trusted-certs-path viene configurado.
      */
     private String buildJdbcUrl(String user, String password) {
-        return String.format(
-            "jdbc:impala://%s:%d;"
-            + "AuthMech=3;"
-            + "SSL=1;AllowSelfSignedCerts=1;"
-            + "ConnectTimeout=%d;SocketTimeout=%d;"
-            + "QueryTimeout=0;"
-            + "UID=%s;PWD=%s",
-            lzHost, lzPort, connectTimeoutSeconds, socketTimeoutSeconds, user, password
-        );
+        StringBuilder url = new StringBuilder("jdbc:impala://")
+                .append(lzHost).append(':').append(lzPort).append(';')
+                .append("AuthMech=3;")
+                .append("SSL=1;AllowSelfSignedCerts=1;");
+
+        if (trustedCertsPath != null && !trustedCertsPath.isBlank()) {
+            url.append("TrustedCerts=").append(trustedCertsPath.trim()).append(';');
+        }
+
+        url.append("ConnectTimeout=").append(connectTimeoutSeconds).append(';')
+                .append("SocketTimeout=").append(socketTimeoutSeconds).append(';')
+                .append("QueryTimeout=0;")
+                .append("UID=").append(user).append(";PWD=").append(password);
+
+        return url.toString();
     }
 
     /**

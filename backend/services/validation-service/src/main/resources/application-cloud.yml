@@ -212,6 +212,10 @@ lz:
     truststore-path:     '#{LZ_TRUSTSTORE_PATH}#'
     truststore-password: '#{LZ_TRUSTSTORE_PWD}#'
     truststore-type: JKS
+    # Ruta al PEM que el driver de Impala lee directo via el parametro nativo
+    # TrustedCerts= de la URL JDBC (mismo mecanismo que usa ABA) — no tiene relacion
+    # con truststore-path de arriba (ese es un keystore Java .jks, formato distinto).
+    trusted-certs-path: '#{LZ_TRUSTED_CERTS_PATH}#'
 
   connect-timeout: 120
   socket-timeout: 1800
