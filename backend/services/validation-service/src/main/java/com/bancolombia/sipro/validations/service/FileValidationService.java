@@ -322,17 +322,17 @@ public class FileValidationService {
         // Validar contenido del archivo control (.txt) para Full IFRS
         if (controlSource != null && Long.valueOf(2L).equals(segmentoIdFinal)) {
             try {
-                StringBuilder sbCtrl = new StringBuilder();
-                try (java.io.BufferedReader reader = new java.io.BufferedReader(
-                        new java.io.InputStreamReader(controlSource.openStream(), StandardCharsets.UTF_8))) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        if (sbCtrl.length() > 0) sbCtrl.append("\n");
-                        sbCtrl.append(line);
-                    }
+                // Lectura directa del contenido crudo (sin pasar por BufferedReader.readLine()):
+                // readLine() le quita el salto de línea a cada línea que devuelve, así que un
+                // archivo control que sea SOLO un Enter (sin ningún otro carácter) terminaba
+                // reconstruyéndose como una cadena vacía — el Enter se perdía antes de llegar
+                // a validateControlFile, y por eso no se detectaba como espacio en blanco.
+                String ctrlContent;
+                try (InputStream is = controlSource.openStream()) {
+                    ctrlContent = new String(is.readAllBytes(), StandardCharsets.UTF_8);
                 }
                 List<DynamicExcelValidationService.ValidationError> ctrlErrors =
-                    dynamicValidator.validateControlFile(sbCtrl.toString(), xlsxDataRowCount, segmentoIdFinal);
+                    dynamicValidator.validateControlFile(ctrlContent, xlsxDataRowCount, segmentoIdFinal);
                 validationErrors = new java.util.ArrayList<>(validationErrors);
                 validationErrors.addAll(ctrlErrors);
             } catch (Exception e) {

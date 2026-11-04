@@ -77,17 +77,24 @@ public class EmailPlanillaNotificationService implements PlanillaNotificationSer
      */
     @Override
     public void notificarSolicitud(SiproDetalleCargaPlanillas planilla) {
-        boolean sinDatos = Boolean.TRUE.equals(planilla.getNoReportaDatos());
-        String template = sinDatos ? "solicitud-no-carga.html" : "solicitud-si-carga.html";
-        String subject = sinDatos
-                ? String.format("SIPRO | Solicitud de no carga | %s | %s", textoPlano(planilla.getProducto()), formatFechaCorta(planilla.getFechaCorteInformacion()))
-                : String.format("SIPRO | Solicitud de aprobación de carga manual | %s | %s", textoPlano(planilla.getProducto()), formatFechaCorta(planilla.getFechaCorteInformacion()));
+        try {
+            boolean sinDatos = Boolean.TRUE.equals(planilla.getNoReportaDatos());
+            String template = sinDatos ? "solicitud-no-carga.html" : "solicitud-si-carga.html";
+            String subject = sinDatos
+                    ? String.format("SIPRO | Solicitud de no carga | %s | %s", textoPlano(planilla.getProducto()), formatFechaCorta(planilla.getFechaCorteInformacion()))
+                    : String.format("SIPRO | Solicitud de aprobación de carga manual | %s | %s", textoPlano(planilla.getProducto()), formatFechaCorta(planilla.getFechaCorteInformacion()));
 
             NotificationUsers users = resolveNotificationUsers(planilla);
             Map<String, String> model = buildBaseModel(planilla, users);
-        model.put("url_sipro", escape(resolveActionUrl()));
+            model.put("url_sipro", escape(resolveActionUrl()));
             EmailMessage email = new EmailMessage(subject, recipients(users.lider().email()), render(template, model));
-        send(email, "solicitud", planilla.getId());
+            send(email, "solicitud", planilla.getId());
+        } catch (Exception ex) {
+            // Un fallo aqui no debe tumbar la solicitud de aprobacion que ya quedo guardada en BD
+            // (este metodo corre despues del commit, via runAfterCommit) — solo se deja constancia.
+            logger.error("No se pudo enviar el correo de solicitud para la planilla {}: {}",
+                    planilla.getId(), ex.getMessage(), ex);
+        }
     }
 
     /**
@@ -95,6 +102,7 @@ public class EmailPlanillaNotificationService implements PlanillaNotificationSer
      */
     @Override
     public void notificarAprobacion(SiproDetalleCargaPlanillas planilla) {
+        try {
         boolean sinDatos = Boolean.TRUE.equals(planilla.getNoReportaDatos());
         String template = sinDatos ? "confirmar-aprobado-no-carga.html" : "confirmar-aprobado-si-carga.html";
         String subject = sinDatos
@@ -162,6 +170,12 @@ public class EmailPlanillaNotificationService implements PlanillaNotificationSer
                 recipients(users.usuarioCarga().email(), users.lider().email()),
                 render(template, model));
         send(email, "aprobacion", planilla.getId());
+        } catch (Exception ex) {
+            // Un fallo aqui no debe tumbar la aprobacion que ya quedo guardada en BD
+            // (este metodo corre despues del commit, via runAfterCommit) — solo se deja constancia.
+            logger.error("No se pudo enviar el correo de aprobación para la planilla {}: {}",
+                    planilla.getId(), ex.getMessage(), ex);
+        }
     }
 
     /**
@@ -205,20 +219,27 @@ public class EmailPlanillaNotificationService implements PlanillaNotificationSer
      */
     @Override
     public void notificarRechazo(SiproDetalleCargaPlanillas planilla, String motivoRechazo) {
-        boolean sinDatos = Boolean.TRUE.equals(planilla.getNoReportaDatos());
-        String template = sinDatos ? "confirmar-rechazado-no-carga.html" : "confirmar-rechazado-si-carga.html";
-        String subject = sinDatos
-                ? String.format("SIPRO | No carga rechazada | %s | %s", textoPlano(planilla.getProducto()), formatFechaCorta(planilla.getFechaCorteInformacion()))
-                : String.format("SIPRO | Carga manual rechazada | %s | %s", textoPlano(planilla.getProducto()), formatFechaCorta(planilla.getFechaCorteInformacion()));
+        try {
+            boolean sinDatos = Boolean.TRUE.equals(planilla.getNoReportaDatos());
+            String template = sinDatos ? "confirmar-rechazado-no-carga.html" : "confirmar-rechazado-si-carga.html";
+            String subject = sinDatos
+                    ? String.format("SIPRO | No carga rechazada | %s | %s", textoPlano(planilla.getProducto()), formatFechaCorta(planilla.getFechaCorteInformacion()))
+                    : String.format("SIPRO | Carga manual rechazada | %s | %s", textoPlano(planilla.getProducto()), formatFechaCorta(planilla.getFechaCorteInformacion()));
 
             NotificationUsers users = resolveNotificationUsers(planilla);
             Map<String, String> model = buildBaseModel(planilla, users);
-        model.put("motivo_rechazo", escape(defaultIfBlank(motivoRechazo, "No informado")));
-        EmailMessage email = new EmailMessage(
-                subject,
-                recipients(users.usuarioCarga().email(), users.lider().email()),
-                render(template, model));
-        send(email, "rechazo", planilla.getId());
+            model.put("motivo_rechazo", escape(defaultIfBlank(motivoRechazo, "No informado")));
+            EmailMessage email = new EmailMessage(
+                    subject,
+                    recipients(users.usuarioCarga().email(), users.lider().email()),
+                    render(template, model));
+            send(email, "rechazo", planilla.getId());
+        } catch (Exception ex) {
+            // Un fallo aqui no debe tumbar el rechazo que ya quedo guardado en BD
+            // (este metodo corre despues del commit, via runAfterCommit) — solo se deja constancia.
+            logger.error("No se pudo enviar el correo de rechazo para la planilla {}: {}",
+                    planilla.getId(), ex.getMessage(), ex);
+        }
     }
 
             private Map<String, String> buildBaseModel(SiproDetalleCargaPlanillas planilla, NotificationUsers users) {
@@ -320,7 +341,7 @@ public class EmailPlanillaNotificationService implements PlanillaNotificationSer
             }
         }
 
-        return "URL_DEV";
+        return "URL_PDN";
     }
 
     private void send(EmailMessage email, String etapa, Long planillaId) {
