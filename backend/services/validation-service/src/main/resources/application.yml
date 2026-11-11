@@ -149,6 +149,7 @@ sipro:
         - ${APP_ADMIN_SQL_OPERATION_1:SELECT}
         - ${APP_ADMIN_SQL_OPERATION_2:UPDATE}
         - ${APP_ADMIN_SQL_OPERATION_3:INSERT}
+        - ${APP_ADMIN_SQL_OPERATION_4:CREATE_INDEX}
       allowed-tables:
         - ${APP_ADMIN_SQL_TABLE_1:data_validation_rule}
         - ${APP_ADMIN_SQL_TABLE_2:productos}
@@ -174,7 +175,6 @@ sipro:
         - ${APP_ADMIN_SQL_FORBIDDEN_2:truncate}
         - ${APP_ADMIN_SQL_FORBIDDEN_3:drop}
         - ${APP_ADMIN_SQL_FORBIDDEN_4:alter}
-        - ${APP_ADMIN_SQL_FORBIDDEN_5:create}
         - ${APP_ADMIN_SQL_FORBIDDEN_6:grant}
         - ${APP_ADMIN_SQL_FORBIDDEN_7:revoke}
         - ${APP_ADMIN_SQL_FORBIDDEN_8:comment}

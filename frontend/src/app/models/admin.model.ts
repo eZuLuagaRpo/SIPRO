@@ -1,6 +1,6 @@
 import { ConsolidacionManualStatus } from './validation.model';
 
-export type AdminSqlOperation = 'SELECT' | 'UPDATE' | 'INSERT' | 'INSERT_OVERWRITE';
+export type AdminSqlOperation = 'SELECT' | 'UPDATE' | 'INSERT' | 'INSERT_OVERWRITE' | 'CREATE_INDEX';
 export type AdminLogLevel = 'ALL' | 'ERROR' | 'WARN' | 'INFO' | 'DEBUG';
 export type AdminLogScope = 'ALL' | 'CONSOLIDACION';
 

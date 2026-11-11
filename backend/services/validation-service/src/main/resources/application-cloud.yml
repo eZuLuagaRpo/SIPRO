@@ -136,6 +136,7 @@ sipro:
         - SELECT
         - UPDATE
         - INSERT
+        - CREATE_INDEX
       allowed-tables:
         - data_validation_rule
         - productos
@@ -161,7 +162,6 @@ sipro:
         - truncate
         - drop
         - alter
-        - create
         - grant
         - revoke
         - comment

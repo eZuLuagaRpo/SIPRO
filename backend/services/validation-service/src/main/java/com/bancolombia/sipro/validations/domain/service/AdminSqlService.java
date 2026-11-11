@@ -30,6 +30,9 @@ public class AdminSqlService {
     private static final Pattern TABLE_PATTERN = Pattern.compile(
             "(?i)\\b(from|join|update|into)\\s+([a-zA-Z_][\\w.\"]*)");
 
+    private static final Pattern CREATE_INDEX_TABLE_PATTERN = Pattern.compile(
+            "(?i)\\bindex\\s+(?:if\\s+not\\s+exists\\s+)?[\\w.\"]+\\s+on\\s+([a-zA-Z_][\\w.\"]*)");
+
     private final AdminPanelProperties adminPanelProperties;
     private final JdbcTemplate jdbcTemplate;
 
@@ -158,7 +161,7 @@ public class AdminSqlService {
             }
         }
 
-        throw new IllegalArgumentException("Tipo de operación no soportado. Usa SELECT, UPDATE o INSERT.");
+        throw new IllegalArgumentException("Tipo de operación no soportado. Usa SELECT, UPDATE, INSERT o CREATE INDEX.");
     }
 
     private String normalizarSql(String rawSql) {
@@ -211,8 +214,9 @@ public class AdminSqlService {
     }
 
     private Set<String> extraerTablas(String sql) {
-        Matcher matcher = TABLE_PATTERN.matcher(sql);
         Set<String> tables = new LinkedHashSet<>();
+
+        Matcher matcher = TABLE_PATTERN.matcher(sql);
         while (matcher.find()) {
             String tableToken = matcher.group(2);
             if (tableToken == null || tableToken.isBlank()) {
@@ -220,6 +224,16 @@ public class AdminSqlService {
             }
             tables.add(normalizarTabla(tableToken));
         }
+
+        Matcher createIndexMatcher = CREATE_INDEX_TABLE_PATTERN.matcher(sql);
+        while (createIndexMatcher.find()) {
+            String tableToken = createIndexMatcher.group(1);
+            if (tableToken == null || tableToken.isBlank()) {
+                continue;
+            }
+            tables.add(normalizarTabla(tableToken));
+        }
+
         return tables;
     }
 
@@ -239,7 +253,8 @@ public class AdminSqlService {
         SELECT("SELECT", "select", false, false),
         UPDATE("UPDATE", "update", true, true),
         INSERT("INSERT", "insert into", false, true),
-        INSERT_OVERWRITE("INSERT_OVERWRITE", "insert overwrite", false, true);
+        INSERT_OVERWRITE("INSERT_OVERWRITE", "insert overwrite", false, true),
+        CREATE_INDEX("CREATE_INDEX", "create index", false, true);
 
         private final String apiName;
         private final String sqlPrefix;

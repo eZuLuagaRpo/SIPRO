@@ -48,7 +48,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   private sqlCopyFeedbackTimeout: ReturnType<typeof setTimeout> | null = null;
   private consolidacionActividadProtegida = false;
   private fase2ModalCerradoPorUsuario = false;
-  private readonly defaultSqlOperations: AdminSqlOperation[] = ['SELECT', 'UPDATE', 'INSERT'];
+  private readonly defaultSqlOperations: AdminSqlOperation[] = ['SELECT', 'UPDATE', 'INSERT', 'CREATE_INDEX'];
 
   readonly excelIconPath = '/assets/images/icoExcel.png';
   readonly downloadIconPath = '/assets/images/download.png';
@@ -96,7 +96,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   eliminacionError = '';
   eliminacionProgressVisible = false;
 
-  readonly sqlOperations: AdminSqlOperation[] = ['SELECT', 'UPDATE', 'INSERT', 'INSERT_OVERWRITE'];
+  readonly sqlOperations: AdminSqlOperation[] = ['SELECT', 'UPDATE', 'INSERT', 'INSERT_OVERWRITE', 'CREATE_INDEX'];
   readonly maxSqlChars = 50000;
   sqlOperacion: AdminSqlOperation = 'SELECT';
   sqlTexto = [
@@ -344,7 +344,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   get sqlEscritura(): boolean {
-    return this.sqlOperacion === 'UPDATE' || this.sqlOperacion === 'INSERT' || this.sqlOperacion === 'INSERT_OVERWRITE';
+    return this.sqlOperacion === 'UPDATE' || this.sqlOperacion === 'INSERT'
+      || this.sqlOperacion === 'INSERT_OVERWRITE' || this.sqlOperacion === 'CREATE_INDEX';
   }
 
   get sqlColumns(): string[] {
@@ -729,6 +730,10 @@ export class AdminComponent implements OnInit, OnDestroy {
 
     if (operation === 'INSERT_OVERWRITE') {
       return 'INSERT OVERWRITE';
+    }
+
+    if (operation === 'CREATE_INDEX') {
+      return 'CREATE INDEX';
     }
 
     return operation;
