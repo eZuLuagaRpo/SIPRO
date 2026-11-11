@@ -43,7 +43,7 @@ public class CreffosParametricGenerator {
     private static final String DEFAULT_OUTPUT_FORMAT = "XLSX";
     private static final String DEFAULT_SHEET_NAME = "CREFFSOS";
     private static final int DEFAULT_NUMERIC_SCALE = 2;
-    private static final int LZ_LOOKUP_CHUNK_SIZE = 500;
+    private static final int DEFAULT_LZ_LOOKUP_CHUNK_SIZE = 2000;
     private static final Pattern SQL_IDENTIFIER = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
     // Misma contrasena que ya usa ConsolidacionResumenExcelReportService para "proteger hoja"
     // (no es cifrado real, es la proteccion de edicion de Excel). Intencionalmente igual, a
@@ -219,7 +219,9 @@ public class CreffosParametricGenerator {
         String qualifiedTable = qualifyLzTable(schema, table);
         boolean latestRequested = shouldUseLatestIngestion(filters);
         Map<String, String> resolved = new HashMap<>();
-        for (List<String> chunk : chunk(keys, LZ_LOOKUP_CHUNK_SIZE)) {
+        int chunkSize = parametroUnicoService.getInt("APP_CREFFSOS_LZ_LOOKUP_CHUNK_SIZE", DEFAULT_LZ_LOOKUP_CHUNK_SIZE);
+        long inicioLzLookup = System.currentTimeMillis();
+        for (List<String> chunk : chunk(keys, chunkSize)) {
             try {
                 List<Map<String, Object>> rows = lzJdbcService.executeQuery(
                         latestRequested
@@ -259,6 +261,8 @@ public class CreffosParametricGenerator {
                 return Map.of();
             }
         }
+        logger.info("CREFFSOS columna '{}': resolución contra LZ (Impala) de {} llaves tomó {} ms.",
+                definition.nombreColumna(), keys.size(), System.currentTimeMillis() - inicioLzLookup);
         return resolved;
     }
 

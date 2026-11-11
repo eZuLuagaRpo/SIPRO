@@ -205,8 +205,12 @@ app-admin{
   .admin-loading__spinner{width:18px;height:18px;border:3px solid rgba(44,42,41,.18);border-top-color:#2c2a29;border-radius:999px;animation:admin-spin .8s linear infinite}
   .modal-overlay{position:fixed;inset:0;background:rgba(15,17,26,.45);display:flex;align-items:center;justify-content:center;padding:24px;z-index:2000}
   .modal-content{width:min(640px,100%);max-height:min(88vh,900px);display:flex;flex-direction:column;background:#fff;border:1px solid #e6e8ec;border-radius:14px;box-shadow:0 30px 80px rgba(15,17,26,.2)}
-  .modal-header{padding:18px 24px;border-bottom:1px solid #e6e8ec}
+  .modal-header{padding:18px 24px;border-bottom:1px solid #e6e8ec;display:flex;align-items:center;justify-content:space-between;gap:12px}
   .modal-header h3{margin:0;display:flex;align-items:center;gap:8px;font-size:16px;font-weight:700;color:#2c2a29}
+  .modal-minimize-btn{background:transparent;border:none;cursor:pointer;color:#8a8f98;padding:4px;border-radius:6px;display:flex;align-items:center;flex-shrink:0}
+  .modal-minimize-btn:hover{background:#f1f3f6;color:#2c2a29}
+  .consolidacion-minimized-badge{position:fixed;right:24px;bottom:24px;z-index:1900;display:flex;align-items:center;gap:8px;padding:12px 18px;border-radius:999px;background:#2f6df6;color:#fff;border:none;box-shadow:0 12px 30px rgba(15,17,26,.25);font-size:13px;font-weight:700;cursor:pointer}
+  .consolidacion-minimized-badge:hover{background:#2558d1}
   .modal-body{padding:24px;overflow:auto}
   .progress-bar-container{height:8px;border-radius:999px;background:#edf1f7;overflow:hidden;margin-bottom:12px}
   .progress-bar{height:100%;border-radius:999px;background:#2f6df6}

@@ -84,6 +84,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   confirmacionConsolidacionParcial = false;
   consolidacionEnCurso = false;
   consolidacionModalVisible = false;
+  consolidacionModalMinimizado = false;
   consolidacionRespuesta = '';
   consolidacionError = '';
   eliminacionModalVisible = false;
@@ -782,6 +783,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 
     this.consolidacionEnCurso = true;
     this.consolidacionModalVisible = true;
+    this.consolidacionModalMinimizado = false;
     this.consolidacionError = '';
     this.consolidacionRespuesta = '';
     this.dashboardFeedback = '';
@@ -813,6 +815,7 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.consolidacionRespuesta = '';
         this.consolidacionEnCurso = false;
         this.consolidacionModalVisible = true;
+        this.consolidacionModalMinimizado = false;
         this.finalizarActividadProtegidaConsolidacion();
       }
     });
@@ -830,11 +833,20 @@ export class AdminComponent implements OnInit, OnDestroy {
 
     this.cargarDashboard(this.periodoSeleccionado?.valor ?? undefined, true);
     this.consolidacionModalVisible = false;
+    this.consolidacionModalMinimizado = false;
     this.confirmacionConsolidacion = false;
     this.confirmacionConsolidacionParcial = false;
     this.observacionConsolidacion = '';
     this.consolidacionRespuesta = '';
     this.consolidacionError = '';
+  }
+
+  minimizarModalConsolidacion(): void {
+    this.consolidacionModalMinimizado = true;
+  }
+
+  restaurarModalConsolidacion(): void {
+    this.consolidacionModalMinimizado = false;
   }
 
   abrirModalEliminarConsolidacion(item: AdminHistoricoConsolidacion): void {
@@ -1219,6 +1231,9 @@ export class AdminComponent implements OnInit, OnDestroy {
 
         if (response.estadoConsolidacion?.terminal === false && this.periodoSeleccionado?.valor) {
           this.consolidacionEnCurso = true;
+          if (!this.consolidacionModalVisible) {
+            this.consolidacionModalMinimizado = false;
+          }
           this.consolidacionModalVisible = true;
           this.iniciarActividadProtegidaConsolidacion();
           if (!this.consolidacionLogEntries.length) {
@@ -1228,6 +1243,9 @@ export class AdminComponent implements OnInit, OnDestroy {
         } else if (response.estadoConsolidacion?.fase2EnCurso && this.periodoSeleccionado?.valor) {
           this.consolidacionEnCurso = true;
           if (!this.fase2ModalCerradoPorUsuario) {
+            if (!this.consolidacionModalVisible) {
+              this.consolidacionModalMinimizado = false;
+            }
             this.consolidacionModalVisible = true;
             if (!this.consolidacionLogEntries.length) {
               this.consultarLogs(true, 'CONSOLIDACION');
