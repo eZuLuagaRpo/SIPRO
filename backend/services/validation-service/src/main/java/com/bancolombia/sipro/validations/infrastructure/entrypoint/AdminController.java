@@ -30,6 +30,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.Locale;
 
 /**
  * Endpoints del panel de administrador SIPRO.
@@ -118,7 +119,10 @@ public class AdminController {
                     ? request.tipoOperacion()
                     : "DESCONOCIDA";
 
-            if ("SELECT".equalsIgnoreCase(operation)) {
+            String sqlTexto = request != null && request.sql() != null ? request.sql().trim() : "";
+            boolean esCreateIndex = sqlTexto.toUpperCase(Locale.ROOT).startsWith("CREATE INDEX");
+
+            if (!esCreateIndex && "SELECT".equalsIgnoreCase(operation)) {
                 return ResponseEntity.ok(adminSqlService.ejecutarLectura(request, principal));
             }
 

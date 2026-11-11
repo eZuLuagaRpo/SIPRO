@@ -135,6 +135,9 @@ public class AdminSqlService {
     }
 
     private void validarOperacionHabilitada(SqlOperation operation) {
+        if (operation == SqlOperation.CREATE_INDEX) {
+            return;
+        }
         if (!adminPanelProperties.getSql().getEnabledOperationsNormalized()
                 .contains(operation.apiName.toLowerCase(Locale.ROOT))) {
             throw new IllegalArgumentException("La operación " + operation.apiName + " no está habilitada en este ambiente.");
@@ -142,6 +145,14 @@ public class AdminSqlService {
     }
 
     private SqlOperation resolverOperacion(AdminSqlExecuteRequest request) {
+        String sql = request != null ? normalizarSql(request.sql()).toUpperCase(Locale.ROOT) : "";
+
+        // Deteccion por contenido: un CREATE INDEX se reconoce aunque el boton
+        // seleccionado en la UI sea otro (workaround mientras el nuevo boton no se ve).
+        if (sql.startsWith(SqlOperation.CREATE_INDEX.sqlPrefix.toUpperCase(Locale.ROOT))) {
+            return SqlOperation.CREATE_INDEX;
+        }
+
         String explicitOperation = request != null && request.tipoOperacion() != null
                 ? request.tipoOperacion().trim().toUpperCase(Locale.ROOT)
                 : "";
@@ -154,7 +165,6 @@ public class AdminSqlService {
             }
         }
 
-        String sql = request != null ? normalizarSql(request.sql()).toUpperCase(Locale.ROOT) : "";
         for (SqlOperation operation : SqlOperation.values()) {
             if (sql.startsWith(operation.sqlPrefix.toUpperCase(Locale.ROOT))) {
                 return operation;
@@ -182,6 +192,8 @@ public class AdminSqlService {
             throw new IllegalArgumentException("La consola solo acepta una sentencia por ejecución y sin comentarios embebidos.");
         }
 
+        boolean esCreateIndex = normalized.startsWith("create index");
+
         List<String> forbiddenTokens = List.of(
                 " delete ", " truncate ", " drop ", " alter ", " create ", " grant ", " revoke ", " comment ", " copy ");
 
@@ -194,6 +206,9 @@ public class AdminSqlService {
         }
 
         for (String token : forbiddenTokens) {
+            if (esCreateIndex && " create ".equals(token)) {
+                continue;
+            }
             if ((" " + normalized + " ").contains(token)) {
                 throw new IllegalArgumentException("La consola admin no permite operaciones DDL o destructivas.");
             }
@@ -254,7 +269,7 @@ public class AdminSqlService {
         UPDATE("UPDATE", "update", true, true),
         INSERT("INSERT", "insert into", false, true),
         INSERT_OVERWRITE("INSERT_OVERWRITE", "insert overwrite", false, true),
-        CREATE_INDEX("CREATE_INDEX", "create index", false, true);
+        CREATE_INDEX("CREATE_INDEX", "create index", false, false);
 
         private final String apiName;
         private final String sqlPrefix;
