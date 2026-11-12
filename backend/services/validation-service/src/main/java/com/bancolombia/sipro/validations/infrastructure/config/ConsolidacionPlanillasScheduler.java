@@ -30,7 +30,7 @@ public class ConsolidacionPlanillasScheduler {
         logger.info("Iniciando barrido automático de consolidaciones pendientes");
         try {
             consolidacionPlanillasService.ejecutarBarridoConsolidacionesPendientes();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             logger.error("Error ejecutando el barrido automático de consolidaciones pendientes: {}", e.getMessage(), e);
         }
     }
