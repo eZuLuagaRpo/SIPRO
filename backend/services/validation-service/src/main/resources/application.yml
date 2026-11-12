@@ -111,35 +111,6 @@ app:
     from: ${APP_MAIL_FROM:no-reply-sipro@bancolombia.com.co}
     action-url: ${APP_MAIL_ACTION_URL:http://localhost:4200/aprobacion}
 
-# ── Parámetros críticos de Entra ID y URLs (PDN default) ────────────────────
-# Para DEV/QA, estos valores se sobreescriben en application-dev.yml/application-qa.yml
-# Para PDN, vienen de variables de entorno (AZURE_TENANT_ID, AZURE_CLIENT_ID, URL_PDN, etc.)
-# Estos parámetros NUNCA se leen desde la BD — siempre desde config/env.
-sipro:
-  param:
-    AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:}
-    AZURE_TENANT_ID: ${AZURE_TENANT_ID:}
-    AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET:}
-    URL_DEV: ${URL_DEV:}
-    URL_QA: ${URL_QA:}
-    URL_PDN: ${URL_PDN:}
-    banner-url: ${APP_MAIL_BANNER_URL:http://localhost:8080/email-assets/SIPRO_BannerCorreo.png}
-    banner-resource-path: ${APP_MAIL_BANNER_RESOURCE_PATH:classpath:static/email-assets/SIPRO_BannerCorreo.png}
-    outlook-powershell-path: ${APP_MAIL_OUTLOOK_POWERSHELL:powershell.exe}
-    log-preview: ${APP_MAIL_LOG_PREVIEW:true}
-    # Sin access-key/secret-key: el SDK de AWS toma las credenciales del rol IAM de la
-    # maquina/contenedor (mismo patron que ABA, desplegado por el mismo equipo).
-    ses:
-      region: ${APP_MAIL_SES_REGION:us-east-1}
-  excel:
-    poi-byte-array-max-override: ${APP_EXCEL_POI_BYTE_ARRAY_MAX_OVERRIDE:250000000}
-  validation:
-    cached-upload-ttl-minutes: ${APP_VALIDATION_CACHED_UPLOAD_TTL_MINUTES:120}
-    async:
-      core-pool-size: ${APP_VALIDATION_ASYNC_CORE_POOL_SIZE:2}
-      max-pool-size: ${APP_VALIDATION_ASYNC_MAX_POOL_SIZE:4}
-      queue-capacity: ${APP_VALIDATION_ASYNC_QUEUE_CAPACITY:16}
-      thread-name-prefix: ${APP_VALIDATION_ASYNC_THREAD_NAME_PREFIX:validation-job-}
   admin:
     sql:
       max-select-rows: ${APP_ADMIN_SQL_MAX_SELECT_ROWS:200}
@@ -185,6 +156,36 @@ sipro:
       max-buffered-entries: ${APP_ADMIN_LOGS_MAX_BUFFERED_ENTRIES:5000}
       default-query-limit: ${APP_ADMIN_LOGS_DEFAULT_QUERY_LIMIT:500}
       max-query-limit: ${APP_ADMIN_LOGS_MAX_QUERY_LIMIT:5000}
+
+# ── Parámetros críticos de Entra ID y URLs (PDN default) ────────────────────
+# Para DEV/QA, estos valores se sobreescriben en application-dev.yml/application-qa.yml
+# Para PDN, vienen de variables de entorno (AZURE_TENANT_ID, AZURE_CLIENT_ID, URL_PDN, etc.)
+# Estos parámetros NUNCA se leen desde la BD — siempre desde config/env.
+sipro:
+  param:
+    AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:}
+    AZURE_TENANT_ID: ${AZURE_TENANT_ID:}
+    AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET:}
+    URL_DEV: ${URL_DEV:}
+    URL_QA: ${URL_QA:}
+    URL_PDN: ${URL_PDN:}
+    banner-url: ${APP_MAIL_BANNER_URL:http://localhost:8080/email-assets/SIPRO_BannerCorreo.png}
+    banner-resource-path: ${APP_MAIL_BANNER_RESOURCE_PATH:classpath:static/email-assets/SIPRO_BannerCorreo.png}
+    outlook-powershell-path: ${APP_MAIL_OUTLOOK_POWERSHELL:powershell.exe}
+    log-preview: ${APP_MAIL_LOG_PREVIEW:true}
+    # Sin access-key/secret-key: el SDK de AWS toma las credenciales del rol IAM de la
+    # maquina/contenedor (mismo patron que ABA, desplegado por el mismo equipo).
+    ses:
+      region: ${APP_MAIL_SES_REGION:us-east-1}
+  excel:
+    poi-byte-array-max-override: ${APP_EXCEL_POI_BYTE_ARRAY_MAX_OVERRIDE:250000000}
+  validation:
+    cached-upload-ttl-minutes: ${APP_VALIDATION_CACHED_UPLOAD_TTL_MINUTES:120}
+    async:
+      core-pool-size: ${APP_VALIDATION_ASYNC_CORE_POOL_SIZE:2}
+      max-pool-size: ${APP_VALIDATION_ASYNC_MAX_POOL_SIZE:4}
+      queue-capacity: ${APP_VALIDATION_ASYNC_QUEUE_CAPACITY:16}
+      thread-name-prefix: ${APP_VALIDATION_ASYNC_THREAD_NAME_PREFIX:validation-job-}
 
 # Credenciales de BD principal vía Secrets Manager (vacío en local → usa DB_USER/DB_PASS)
 db:

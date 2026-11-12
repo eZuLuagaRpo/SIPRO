@@ -1,17 +1,19 @@
 package com.bancolombia.sipro.validations.domain.service;
 
 import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.classic.spi.IThrowableProxy;
 import com.bancolombia.sipro.validations.application.dto.AdminLogStreamResponse;
 import com.bancolombia.sipro.validations.infrastructure.config.AdminPanelProperties;
 import org.springframework.stereotype.Service;
 
 import java.time.ZoneId;
+import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.Deque;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.ArrayDeque;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -50,13 +52,17 @@ public class AdminLogBufferService {
 
         private final AdminPanelProperties adminPanelProperties;
     private final AtomicLong sequence = new AtomicLong();
-    private final Deque<BufferedLogItem> buffer = new ConcurrentLinkedDeque<>();
+    private final Deque<BufferedLogItem> buffer = new ArrayDeque<>();
+    private final AdminDiagnosticService diagnosticService;
 
-        public AdminLogBufferService(AdminPanelProperties adminPanelProperties) {
+        public AdminLogBufferService(AdminPanelProperties adminPanelProperties, AdminDiagnosticService diagnosticService) {
                 this.adminPanelProperties = adminPanelProperties;
+                this.diagnosticService = diagnosticService;
         }
 
-    public void append(ILoggingEvent event) {
+    public synchronized void append(ILoggingEvent event) {
+        String executionId = event.getMDCPropertyMap().getOrDefault(AdminDiagnosticService.EXECUTION_MDC_KEY, "");
+        diagnosticService.registrarActividad(executionId, event.getFormattedMessage());
                 if (!adminPanelProperties.getLogs().isStreamingEnabled()) {
                         return;
                 }
@@ -69,16 +75,19 @@ public class AdminLogBufferService {
                 event.getLoggerName(),
                 event.getThreadName(),
                 event.getMDCPropertyMap().getOrDefault(MDC_SCOPE_KEY, ""),
-                event.getFormattedMessage()));
+                event.getFormattedMessage(),
+                executionId,
+                resumirExcepcion(event.getThrowableProxy())));
 
                 while (buffer.size() > adminPanelProperties.getLogs().getEffectiveMaxBufferedEntries()) {
             buffer.pollFirst();
         }
     }
 
-    public AdminLogStreamResponse obtenerLogs(Long afterId, String level, Integer limit, String scope) {
+    public synchronized AdminLogStreamResponse obtenerLogs(Long afterId, String level, Integer limit, String scope) {
                 if (!adminPanelProperties.getLogs().isStreamingEnabled()) {
-                        return new AdminLogStreamResponse(sequence.get(), sequence.get(), 0, List.of());
+                        return new AdminLogStreamResponse(sequence.get(), sequence.get(), 0, List.of(),
+                                diagnosticService.instanceId(), Instant.now(), 0, false);
                 }
 
         long latestId = sequence.get();
@@ -101,14 +110,41 @@ public class AdminLogBufferService {
                         item.logger(),
                         item.thread(),
                         item.scope(),
-                        item.message()))
+                        item.message(),
+                        item.executionId(),
+                        item.detalleError()))
                 .toList();
 
         long cursorId = items.isEmpty()
                 ? latestId
                 : items.get(items.size() - 1).id();
 
-        return new AdminLogStreamResponse(latestId, cursorId, buffer.size(), items);
+        long oldestId = buffer.isEmpty() ? 0 : buffer.getFirst().id();
+        boolean entriesLost = afterId != null && afterId > 0
+                && (afterId < oldestId - 1 || afterId > latestId);
+        return new AdminLogStreamResponse(latestId, cursorId, buffer.size(), items,
+                diagnosticService.instanceId(), Instant.now(), oldestId, entriesLost);
+    }
+
+    private String resumirExcepcion(IThrowableProxy throwable) {
+        if (throwable == null) {
+            return null;
+        }
+        StringBuilder detail = new StringBuilder();
+        for (int cause = 0; throwable != null && cause < 5; cause++, throwable = throwable.getCause()) {
+            if (cause > 0) {
+                detail.append("\nCausado por: ");
+            }
+            // Los mensajes de excepcion JDBC pueden contener filas y credenciales.
+            detail.append(throwable.getClassName());
+            var stack = throwable.getStackTraceElementProxyArray();
+            if (stack != null) {
+                for (int index = 0; index < Math.min(stack.length, 12); index++) {
+                    detail.append("\n  ").append(stack[index].getStackTraceElement());
+                }
+            }
+        }
+        return detail.toString();
     }
 
     private record BufferedLogItem(
@@ -118,7 +154,9 @@ public class AdminLogBufferService {
             String logger,
             String thread,
                         String scope,
-            String message) {
+            String message,
+            String executionId,
+            String detalleError) {
     }
 
         private boolean matchesScope(BufferedLogItem item, String normalizedScope) {

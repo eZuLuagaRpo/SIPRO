@@ -83,8 +83,8 @@ management:
 
 security:
   ad:
-    url: '#{AD_URL}#'
-    domain: '#{AD_DOMAIN}#'
+    url: $(AD_URL)
+    domain: $(AD_DOMAIN)
     groupsMapping: classpath:security/roles.yml
 
 # Bloque app: unificado (evita que YAML descarte el primer bloque por clave duplicada)
@@ -96,7 +96,7 @@ app:
       queue-capacity: 25
 
   cors:
-    allowed-origins: '#{APP_CORS_ALLOWED_ORIGINS}#'
+    allowed-origins: $(APP_CORS_ALLOWED_ORIGINS)
 
   storage:
     type: local
@@ -104,29 +104,24 @@ app:
       # Punto de montaje LOCAL de Linux (no una ruta UNC de Windows) — lo entrega
       # el equipo de provision despues de montar el recurso de red descrito en
       # nas.route (ver mas abajo). Ejemplo esperado: /mnt/sipro-nas/planillas.
-      base-dir: '#{APP_STORAGE_LOCAL_BASE_DIR}#'
+      base-dir: $(APP_STORAGE_LOCAL_BASE_DIR)
 
   lz:
-    schema: '#{APP_LZ_SCHEMA}#'
+    schema: $(APP_LZ_SCHEMA)
     tables:
-      mdm: '#{APP_LZ_TABLE_MDM}#'
+      mdm: $(APP_LZ_TABLE_MDM)
 
   mail:
-    enabled: '#{APP_MAIL_ENABLED}#'
-    transport: '#{APP_MAIL_TRANSPORT}#'
-    from: '#{APP_MAIL_FROM}#'
-    action-url: '#{APP_MAIL_ACTION_URL}#'
-    banner-url: '#{APP_MAIL_BANNER_URL}#'
+    enabled: $(APP_MAIL_ENABLED)
+    transport: $(APP_MAIL_TRANSPORT)
+    from: $(APP_MAIL_FROM)
+    action-url: $(APP_MAIL_ACTION_URL)
+    banner-url: $(APP_MAIL_BANNER_URL)
     # Sin access-key/secret-key: el SDK de AWS toma las credenciales del rol IAM de la
     # maquina/contenedor (mismo patron que ABA, desplegado por el mismo equipo).
     ses:
-      region: '#{APP_MAIL_SES_REGION}#'
+      region: $(APP_MAIL_SES_REGION)
 
-sipro:
-  excel:
-    poi-byte-array-max-override: 250000000
-  validation:
-    cached-upload-ttl-minutes: 120
   admin:
     sql:
       max-select-rows: 200
@@ -136,7 +131,6 @@ sipro:
         - SELECT
         - UPDATE
         - INSERT
-        - CREATE_INDEX
       allowed-tables:
         - data_validation_rule
         - productos
@@ -162,6 +156,7 @@ sipro:
         - truncate
         - drop
         - alter
+        - create
         - grant
         - revoke
         - comment
@@ -172,13 +167,19 @@ sipro:
       max-buffered-entries: 5000
       default-query-limit: 500
       max-query-limit: 5000
+sipro:
+  excel:
+    poi-byte-array-max-override: 250000000
+  validation:
+    cached-upload-ttl-minutes: 120  
   param:
-    AZURE_CLIENT_ID: '#{AZURE_CLIENT_ID}#'
-    AZURE_TENANT_ID: '#{AZURE_TENANT_ID}#'
-    AZURE_CLIENT_SECRET: '#{AZURE_CLIENT_SECRET}#'
-    URL_DEV: '#{URL_DEV}#'
-    URL_QA: '#{URL_QA}#'
-    URL_PDN: '#{URL_PDN}#'
+    AZURE_CLIENT_ID: $(AZURE_CLIENT_ID)
+    AZURE_TENANT_ID: $(AZURE_TENANT_ID)
+    AZURE_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
+    URL_DEV: $(URL_DEV)
+    URL_QA: $(URL_QA)
+    URL_PROD: $(URL_PROD)
+    URL_PDN: $(URL_PDN)
     banner-resource-path: classpath:static/email-assets/SIPRO_BannerCorreo.png
     outlook-powershell-path: powershell.exe
     log-preview: false
@@ -186,42 +187,42 @@ sipro:
 # Credenciales de BD principal — inyectadas por DbSecretsPostProcessor al arrancar
 db:
   secrets:
-    name: '#{DB_SECRETS_NAME}#'
-    region: '#{DB_SECRETS_REGION}#'
+    name: $(DB_SECRETS_NAME)
+    region: $(DB_SECRETS_REGION)
 
 lz:
   # Host tokenizado: DEV/QA usan 10.8.85.237, PDN usa impala.bancolombia.corp
-  host: '#{LZ_HOST}#'
-  port: '#{LZ_PORT}#'
+  host: $(LZ_HOST)
+  port: $(LZ_PORT)
 
   # Credenciales directas (bypass de Secrets Manager).
   # DEV/QA: llenar LZ_USER y LZ_PASSWORD en el Variable Group.
   # PDN: dejar LZ_USER y LZ_PASSWORD vacios → LzSecretsService usa el bloque secrets abajo.
   dev:
-    user:     '#{LZ_USER}#'
-    password: '#{LZ_PASSWORD}#'
+    user:     $(LZ_USER)
+    password: $(LZ_PASSWORD)
 
   # Secrets Manager — necesario cuando LZ_USER/LZ_PASSWORD vienen vacios (PDN).
   # DEV/QA pueden dejarlo vacio si usan el bypass de credenciales directas.
   secrets:
-    endpoint: '#{LZ_SECRETS_ENDPOINT}#'
-    region:   '#{LZ_SECRETS_REGION}#'
-    name:     '#{LZ_SECRETS_NAME}#'
+    endpoint: $(LZ_SECRETS_ENDPOINT)
+    region:   $(LZ_SECRETS_REGION)
+    name:     $(LZ_SECRETS_NAME)
 
   ssl:
-    truststore-path:     '#{LZ_TRUSTSTORE_PATH}#'
-    truststore-password: '#{LZ_TRUSTSTORE_PWD}#'
+    truststore-path:     $(LZ_TRUSTSTORE_PATH)
+    truststore-password: $(LZ_TRUSTSTORE_PWD)
     truststore-type: JKS
     # Ruta al PEM que el driver de Impala lee directo via el parametro nativo
     # TrustedCerts= de la URL JDBC (mismo mecanismo que usa ABA) — no tiene relacion
     # con truststore-path de arriba (ese es un keystore Java .jks, formato distinto).
-    trusted-certs-path: '#{LZ_TRUSTED_CERTS_PATH}#'
+    trusted-certs-path: $(LZ_TRUSTED_CERTS_PATH)
 
   connect-timeout: 120
   socket-timeout: 1800
 
   ingestion:
-    validate-on-startup: '#{LZ_VALIDATE_ON_STARTUP}#'
+    validate-on-startup: $(LZ_VALIDATE_ON_STARTUP)
 
 # Datos del recurso de red (NAS) que el equipo de provision monta como carpeta
 # local de Linux ANTES de que arranque la aplicacion. La aplicacion NO lee estas
@@ -232,6 +233,6 @@ lz:
 # app.storage.local.base-dir (ver mas arriba) — ese si debe ser una ruta de Linux
 # (ej. /mnt/sipro-nas/planillas), nunca la ruta UNC de Windows tal cual.
 nas:
-  route:    '#{RUTA_NAS}#'
-  user:     '#{USER_NAS}#'
-  password: '#{PWD_NAS}#'
+  RUTA_NAS:    $(RUTA_NAS)
+  USER_NAS:    $(USER_NAS)
+  PWD_NAS:     $(PWD_NAS)

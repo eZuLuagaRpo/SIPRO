@@ -14,9 +14,13 @@ public record AdminSqlExecuteResponse(
         List<String> columnas,
         List<Map<String, Object>> filas,
         String sqlEjecutada,
-        boolean resultadoTruncado) {
+        boolean resultadoTruncado,
+        long duracionMs,
+        String sqlState,
+        String tipoError) {
 
     public static AdminSqlExecuteResponse failure(String tipoOperacion, String mensaje) {
-        return new AdminSqlExecuteResponse(false, tipoOperacion, mensaje, null, List.of(), List.of(), null, false);
+        return new AdminSqlExecuteResponse(false, tipoOperacion, mensaje, null, List.of(), List.of(), null, false,
+                0, null, "VALIDACION");
     }
 }

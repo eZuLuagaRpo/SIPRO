@@ -138,9 +138,9 @@ public class AdminPanelProperties {
     public static class Logs {
         private boolean streamingEnabled = true;
         private boolean downloadEnabled = true;
-        private int maxBufferedEntries = 1000;
-        private int defaultQueryLimit = 200;
-        private int maxQueryLimit = 500;
+        private int maxBufferedEntries = 2500;
+        private int defaultQueryLimit = 500;
+        private int maxQueryLimit = 2500;
 
         public boolean isStreamingEnabled() {
             return streamingEnabled;

@@ -5,8 +5,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
-import java.util.concurrent.Executor;
-
 @Configuration
 @EnableConfigurationProperties(ValidationAsyncProperties.class)
 /**
@@ -21,7 +19,7 @@ import java.util.concurrent.Executor;
 public class ValidationAsyncConfiguration {
 
     @Bean(name = "validationTaskExecutor")
-    public Executor validationTaskExecutor(ValidationAsyncProperties properties) {
+    public ThreadPoolTaskExecutor validationTaskExecutor(ValidationAsyncProperties properties) {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         // Todos estos valores salen de properties para poder ajustar capacidad por ambiente
         // sin recompilar el backend.

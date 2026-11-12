@@ -64,14 +64,3 @@ lz:
 # busca estos valores como fallback con prefijo sipro.param.<CLAVE>.
 # Configura estas variables de entorno en tu IDE (Run/Debug Configurations)
 # si necesitas sobreescribir los defaults locales.
-sipro:
-  param:
-    AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:}
-    AZURE_TENANT_ID: ${AZURE_TENANT_ID:}
-    AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET:}
-    URL_DEV: ${URL_DEV:http://localhost:4200}
-    URL_QA: ${URL_QA:}
-    URL_PDN: ${URL_PDN:}
-    AZURE_API_SCOPE: ${AZURE_API_SCOPE:}
-    AZURE_API_AUDIENCE: ${AZURE_API_AUDIENCE:}
-    APP_ADMIN_CONSOLIDACION_BYPASS_WINDOW: ${APP_ADMIN_CONSOLIDACION_BYPASS_WINDOW:true}

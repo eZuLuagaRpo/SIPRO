@@ -2,10 +2,12 @@ import { CommonModule } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Component, DestroyRef, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { finalize } from 'rxjs';
 import { Router, RouterModule } from '@angular/router';
 import {
   AdminArchivoEstado,
   AdminDashboardResponse,
+  AdminDiagnosticResponse,
   AdminEstadoPeriodoConsolidacion,
   AdminHistoricoConsolidacion,
   AdminLogItem,
@@ -48,7 +50,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   private sqlCopyFeedbackTimeout: ReturnType<typeof setTimeout> | null = null;
   private consolidacionActividadProtegida = false;
   private fase2ModalCerradoPorUsuario = false;
-  private readonly defaultSqlOperations: AdminSqlOperation[] = ['SELECT', 'UPDATE', 'INSERT', 'CREATE_INDEX'];
+  private readonly defaultSqlOperations: AdminSqlOperation[] = ['SELECT', 'UPDATE', 'INSERT'];
 
   readonly excelIconPath = '/assets/images/icoExcel.png';
   readonly downloadIconPath = '/assets/images/download.png';
@@ -97,7 +99,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   eliminacionError = '';
   eliminacionProgressVisible = false;
 
-  readonly sqlOperations: AdminSqlOperation[] = ['SELECT', 'UPDATE', 'INSERT', 'INSERT_OVERWRITE', 'CREATE_INDEX'];
+  readonly sqlOperations: AdminSqlOperation[] = ['SELECT', 'UPDATE', 'INSERT', 'INSERT_OVERWRITE'];
   readonly maxSqlChars = 50000;
   sqlOperacion: AdminSqlOperation = 'SELECT';
   sqlTexto = [
@@ -125,6 +127,23 @@ export class AdminComponent implements OnInit, OnDestroy {
   logsError = '';
   logsFromDate = '';
   logsToDate = '';
+  consolidacionLogsError = '';
+  logsWarning = '';
+  logsInstanceId = '';
+  logsUltimaActualizacion = '';
+  diagnostico: AdminDiagnosticResponse | null = null;
+  diagnosticoLoading = false;
+  diagnosticoError = '';
+  consultaDiagnostica = '';
+  private readonly logsEnConsulta = new Set<AdminLogScope>();
+  private readonly logsGeneration: Record<AdminLogScope, number> = { ALL: 0, CONSOLIDACION: 0 };
+  readonly consultasDiagnosticas = [
+    { id: 'conexion', nombre: 'Identidad de conexion' },
+    { id: 'sesiones', nombre: 'Sesiones y bloqueadores' },
+    { id: 'historico', nombre: 'Historial del periodo seleccionado' },
+    { id: 'planillas', nombre: 'Planillas del periodo seleccionado' },
+    { id: 'parametros', nombre: 'Parametros de consolidacion' }
+  ];
 
   constructor(
     private authService: AuthService,
@@ -345,8 +364,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   get sqlEscritura(): boolean {
-    return this.sqlOperacion === 'UPDATE' || this.sqlOperacion === 'INSERT'
-      || this.sqlOperacion === 'INSERT_OVERWRITE' || this.sqlOperacion === 'CREATE_INDEX';
+    return this.sqlOperacion === 'UPDATE' || this.sqlOperacion === 'INSERT' || this.sqlOperacion === 'INSERT_OVERWRITE';
   }
 
   get sqlColumns(): string[] {
@@ -507,7 +525,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   get modalLogEntries(): AdminLogItem[] {
-    return this.buildModalTerminalEntries(5);
+    return this.buildModalTerminalEntries();
   }
 
   get logsEmptyStateText(): string {
@@ -733,10 +751,6 @@ export class AdminComponent implements OnInit, OnDestroy {
       return 'INSERT OVERWRITE';
     }
 
-    if (operation === 'CREATE_INDEX') {
-      return 'CREATE INDEX';
-    }
-
     return operation;
   }
 
@@ -926,7 +940,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     const logEntries = this.buildModalTerminalEntries();
     const contenido = logEntries.length
       ? logEntries
-        .map(log => `[${log.timestamp}] [${log.level}] ${log.logger} :: ${log.message}`)
+        .map(log => this.formatearLogDiagnostico(log))
         .join('\n')
       : this.modalConsolidacionMensaje;
 
@@ -937,6 +951,67 @@ export class AdminComponent implements OnInit, OnDestroy {
     anchor.download = `sipro-consolidacion-${new Date().toISOString().replace(/[:.]/g, '-')}.log`;
     anchor.click();
     window.URL.revokeObjectURL(url);
+  }
+
+  capturarDiagnostico(): void {
+    if (this.diagnosticoLoading) {
+      return;
+    }
+    this.diagnosticoLoading = true;
+    this.diagnosticoError = '';
+    this.adminService.capturarDiagnostico(this.periodoSeleccionado?.valor)
+      .pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.diagnosticoLoading = false))
+      .subscribe({
+        next: response => this.diagnostico = response,
+        error: err => {
+          this.diagnostico = null;
+          this.diagnosticoError = err?.error?.message
+            || 'No se pudo capturar el diagnostico. Comprueba permisos y que el backend actualizado este desplegado.';
+        }
+      });
+  }
+
+  descargarDiagnostico(): void {
+    if (!this.diagnostico) {
+      return;
+    }
+    const blob = new Blob([JSON.stringify(this.diagnostico, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `sipro-diagnostico-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+  }
+
+  cargarConsultaDiagnostica(): void {
+    const periodo = this.periodoSeleccionado?.valor;
+    if (['historico', 'planillas'].includes(this.consultaDiagnostica)
+        && (!periodo || !/^\d{4}-\d{2}-\d{2}$/.test(periodo))) {
+      this.sqlError = 'Selecciona un periodo valido antes de cargar esta consulta.';
+      return;
+    }
+    const consultas: Record<string, string> = {
+      conexion: "SELECT current_database() AS bd, current_user AS usuario, current_schema() AS esquema, current_setting('search_path') AS search_path, CAST(inet_server_addr() AS text) AS servidor, inet_server_port() AS puerto, current_setting('TimeZone') AS zona_horaria FROM pg_catalog.pg_database WHERE datname = current_database() LIMIT 1",
+      sesiones: 'SELECT pid, application_name, state, CAST(clock_timestamp() - xact_start AS text) AS edad_transaccion, CAST(clock_timestamp() - query_start AS text) AS edad_ultima_consulta, wait_event_type, wait_event, CAST(pg_blocking_pids(pid) AS text) AS bloqueadores, LEFT(query, 1000) AS consulta FROM pg_catalog.pg_stat_activity WHERE datname = current_database() AND usename = current_user AND pid <> pg_backend_pid() ORDER BY xact_start NULLS LAST LIMIT 30',
+      historico: `SELECT id_consolidacion, periodo_valoracion, estado_consolidacion, fecha_hora_inicio, fecha_hora_fin, cantidad_archivos_consolidados, cantidad_registros_consolidados, mensaje_error FROM sipro_detalle_consolidaciones_planillas WHERE periodo_valoracion = DATE '${periodo}' ORDER BY id_consolidacion DESC LIMIT 10`,
+      planillas: `SELECT id, id_producto, fecha_corte_informacion, estado_planilla, activo, no_reporta_datos, peso_archivo_fuente FROM sipro_detalle_carga_planillas WHERE fecha_corte_informacion = DATE '${periodo}' ORDER BY id ASC LIMIT 200`,
+      parametros: "SELECT clave, valor FROM sipro_parametros_unico WHERE clave IN ('APP_CONSOLIDACION_TIMEOUT_MINUTOS', 'APP_CONSOLIDACION_LZ_LOOKUP_CHUNK_SIZE', 'APP_CONSOLIDACION_BATCH_INSERT_SIZE', 'APP_CONSOLIDACION_POST_CLOSE_DELAY_HOURS', 'APP_CONSOLIDACION_MAX_POST_CLOSE_DAYS', 'APP_CONSOLIDACION_FIXED_DELAY_MS') ORDER BY clave LIMIT 20"
+    };
+    const sql = consultas[this.consultaDiagnostica];
+    if (!sql) {
+      this.sqlError = 'Selecciona una consulta de diagnostico.';
+      return;
+    }
+    this.cambiarOperacionSql('SELECT');
+    this.sqlTexto = sql;
+    this.sqlError = '';
+  }
+
+  private formatearLogDiagnostico(log: AdminLogItem): string {
+    return `[${log.timestamp}] [${log.level}] instancia=${this.logsInstanceId || 'no informada'} `
+      + `hilo=${log.thread} ejecucion=${log.executionId || '-'} ${log.logger} :: ${log.message}`
+      + (log.detalleError ? `\n${log.detalleError}` : '');
   }
 
   ejecutarSql(): void {
@@ -978,7 +1053,8 @@ export class AdminComponent implements OnInit, OnDestroy {
       },
       error: err => {
         const backendResponse = err?.error as AdminSqlExecuteResponse | undefined;
-        this.sqlResultado = backendResponse ?? null;
+        this.sqlResultado = backendResponse && Array.isArray(backendResponse.columnas)
+          && Array.isArray(backendResponse.filas) ? backendResponse : null;
         this.sqlError = backendResponse?.mensaje || err?.error?.message || 'No fue posible ejecutar la sentencia.';
         this.sqlLoading = false;
       }
@@ -1034,7 +1110,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     }
 
     const contenido = this.logEntries
-      .map(log => `[${log.timestamp}] [${log.level}] ${log.logger} :: ${log.message}`)
+      .map(log => this.formatearLogDiagnostico(log))
       .join('\n');
 
     const blob = new Blob([contenido || 'Sin logs capturados'], { type: 'text/plain;charset=utf-8' });
@@ -1487,6 +1563,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   private reiniciarLogsConsolidacion(): void {
     this.consolidacionLogEntries = [];
     this.consolidacionLogAfterId = 0;
+    this.consolidacionLogsError = '';
+    this.logsGeneration.CONSOLIDACION++;
   }
 
   private consultarLogs(reset: boolean, scope: AdminLogScope = 'ALL'): void {
@@ -1495,6 +1573,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     }
 
     if (reset) {
+      this.logsGeneration[scope]++;
       if (scope === 'CONSOLIDACION') {
         this.consolidacionLogEntries = [];
         this.consolidacionLogAfterId = 0;
@@ -1503,11 +1582,15 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.logAfterId = 0;
       }
     }
+    if (this.logsEnConsulta.has(scope)) {
+      return;
+    }
+    this.logsEnConsulta.add(scope);
+    const generation = this.logsGeneration[scope];
 
     const isConsolidacionScope = scope === 'CONSOLIDACION';
     const currentEntries = isConsolidacionScope ? this.consolidacionLogEntries : this.logEntries;
     const currentCursor = isConsolidacionScope ? this.consolidacionLogAfterId : this.logAfterId;
-    const previousCursor = currentCursor;
     const requestLimit = (reset || isConsolidacionScope)
       ? this.logsConfig?.maximoConsulta ?? this.logsConfig?.limiteConsultaPorDefecto ?? 500
       : this.logsConfig?.limiteConsultaPorDefecto ?? 500;
@@ -1521,8 +1604,48 @@ export class AdminComponent implements OnInit, OnDestroy {
       isConsolidacionScope ? 'ALL' : this.logLevel,
       requestLimit,
       scope
+    ).pipe(
+      takeUntilDestroyed(this.destroyRef),
+      finalize(() => this.logsEnConsulta.delete(scope))
     ).subscribe({
       next: response => {
+        if (generation !== this.logsGeneration[scope]) {
+          return;
+        }
+        const instance = response.instanceId;
+        const cambioInstancia = !!instance && !!this.logsInstanceId && instance !== this.logsInstanceId;
+        if (instance) {
+          this.logsInstanceId = instance;
+        }
+        this.logsUltimaActualizacion = response.capturadoEn || new Date().toISOString();
+        if (isConsolidacionScope) {
+          this.consolidacionLogsError = '';
+        }
+        if (cambioInstancia) {
+          this.logsWarning = 'Cambio de instancia o reinicio detectado. Se reinicio la lectura de logs; el historial no es global.';
+          this.logEntries = [];
+          this.consolidacionLogEntries = [];
+          this.logAfterId = 0;
+          this.consolidacionLogAfterId = 0;
+          this.logsGeneration.ALL++;
+          this.logsGeneration.CONSOLIDACION++;
+          this.logsLoading = false;
+          return;
+        }
+        if (response.entriesLost) {
+          this.logsWarning = 'Hay una discontinuidad: algunas entradas ya no estan en el buffer o el proceso se reinicio.';
+          if (currentCursor > response.latestId) {
+            if (isConsolidacionScope) {
+              this.consolidacionLogEntries = [];
+              this.consolidacionLogAfterId = 0;
+            } else {
+              this.logEntries = [];
+              this.logAfterId = 0;
+              this.logsLoading = false;
+            }
+            return;
+          }
+        }
         const nuevos = response.items ?? [];
         const latestId = response.latestId ?? currentCursor;
         const cursorId = response.cursorId ?? (nuevos.length ? nuevos[nuevos.length - 1].id : latestId);
@@ -1556,14 +1679,18 @@ export class AdminComponent implements OnInit, OnDestroy {
           this.logAfterId = cursorId;
         }
 
-        if (cursorId > previousCursor && cursorId < latestId) {
-          this.consultarLogs(false, scope);
-        }
       },
       error: err => {
+        if (generation !== this.logsGeneration[scope]) {
+          return;
+        }
+        const message = err?.error?.message || 'No fue posible consultar los logs. La pantalla puede estar desactualizada.';
+        if (isConsolidacionScope) {
+          this.consolidacionLogsError = message;
+        }
         if (!isConsolidacionScope) {
           this.logsLoading = false;
-          this.logsError = err?.error?.message || 'No fue posible consultar los logs del panel.';
+          this.logsError = message;
         }
       }
     });

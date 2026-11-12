@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * Orquesta la consolidación manual en segundo plano y expone su estado por periodo.
@@ -28,17 +29,20 @@ public class ConsolidacionManualAsyncService {
     private final SiproDetalleConsolidacionesPlanillasRepository consolidacionRepository;
     private final Executor validationTaskExecutor;
     private final ArchivosBloqueadosFase2Service archivosBloqueadosFase2Service;
+    private final AdminDiagnosticService diagnosticService;
     private final Map<LocalDate, ConsolidacionManualStatusResponse> estadoTemporalPorPeriodo = new ConcurrentHashMap<>();
 
     public ConsolidacionManualAsyncService(
             ConsolidacionPlanillasService consolidacionPlanillasService,
             SiproDetalleConsolidacionesPlanillasRepository consolidacionRepository,
             @Qualifier("validationTaskExecutor") Executor validationTaskExecutor,
-            ArchivosBloqueadosFase2Service archivosBloqueadosFase2Service) {
+            ArchivosBloqueadosFase2Service archivosBloqueadosFase2Service,
+            AdminDiagnosticService diagnosticService) {
         this.consolidacionPlanillasService = consolidacionPlanillasService;
         this.consolidacionRepository = consolidacionRepository;
         this.validationTaskExecutor = validationTaskExecutor;
         this.archivosBloqueadosFase2Service = archivosBloqueadosFase2Service;
+        this.diagnosticService = diagnosticService;
     }
 
     /**
@@ -76,7 +80,19 @@ public class ConsolidacionManualAsyncService {
         respuesta.setFechaHoraInicio(OffsetDateTime.now());
         estadoTemporalPorPeriodo.put(periodoValoracion, respuesta);
 
-        validationTaskExecutor.execute(() -> ejecutarEnSegundoPlano(periodoValoracion, usuarioEjecutorId, observacion));
+        String executionId = diagnosticService.solicitar(periodoValoracion);
+        try {
+            validationTaskExecutor.execute(() -> ejecutarEnSegundoPlano(
+                    periodoValoracion, usuarioEjecutorId, observacion, executionId));
+        } catch (RejectedExecutionException ex) {
+            diagnosticService.finalizar(executionId, "ERROR");
+            respuesta.setEstado("ERROR");
+            respuesta.setTerminal(true);
+            respuesta.setMensaje("El executor rechazo la solicitud. Revise la cola y capacidad del servicio.");
+            respuesta.setFechaHoraFin(OffsetDateTime.now());
+            logger.error("Solicitud de consolidacion {} rechazada por el executor.", executionId, ex);
+            throw ex;
+        }
         return respuesta;
     }
 
@@ -95,8 +111,12 @@ public class ConsolidacionManualAsyncService {
 
     private void ejecutarEnSegundoPlano(LocalDate periodoValoracion,
                                         Long usuarioEjecutorId,
-                                        String observacion) {
+                                        String observacion,
+                                        String executionId) {
         MDC.put(AdminLogBufferService.MDC_SCOPE_KEY, AdminLogBufferService.CONSOLIDACION_SCOPE);
+        MDC.put(AdminDiagnosticService.EXECUTION_MDC_KEY, executionId);
+        diagnosticService.iniciar(executionId);
+        String estadoDiagnostico = "ERROR";
         ConsolidacionManualStatusResponse estadoEnProceso = construirRespuestaSimple(
                 periodoValoracion,
                 "EN_PROCESO",
@@ -110,6 +130,7 @@ public class ConsolidacionManualAsyncService {
             logger.info("Iniciando consolidación manual del periodo {} por usuario {}.", periodoValoracion, usuarioEjecutorId);
             boolean resultado = consolidacionPlanillasService.consolidarManual(periodoValoracion, usuarioEjecutorId, observacion);
             if (!resultado) {
+                estadoDiagnostico = "NO_EJECUTADA";
                 ConsolidacionManualStatusResponse respuesta = construirRespuestaSimple(
                         periodoValoracion,
                         "NO_EJECUTADA",
@@ -124,6 +145,7 @@ public class ConsolidacionManualAsyncService {
 
             logger.info("Consolidación manual del periodo {} finalizada correctamente.", periodoValoracion);
             obtenerEstado(periodoValoracion).ifPresent(estado -> estadoTemporalPorPeriodo.put(periodoValoracion, estado));
+            estadoDiagnostico = "COMPLETADO";
         } catch (Exception e) {
             logger.error("Error ejecutando consolidación manual asíncrona para periodo {}: {}",
                     periodoValoracion, e.getMessage(), e);
@@ -137,6 +159,8 @@ public class ConsolidacionManualAsyncService {
             respuesta.setMensajeError(e.getMessage());
             estadoTemporalPorPeriodo.put(periodoValoracion, respuesta);
         } finally {
+            diagnosticService.finalizar(executionId, estadoDiagnostico);
+            MDC.remove(AdminDiagnosticService.EXECUTION_MDC_KEY);
             MDC.remove(AdminLogBufferService.MDC_SCOPE_KEY);
         }
     }

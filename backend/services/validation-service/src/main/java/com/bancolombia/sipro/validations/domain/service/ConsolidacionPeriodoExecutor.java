@@ -61,6 +61,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -386,17 +387,40 @@ public class ConsolidacionPeriodoExecutor {
                                           VentanaCargaService.VentanaCalculada ventana,
                                           Long usuarioEjecutorId,
                                           String observacion) {
+        long inicioEtapa = System.nanoTime();
+        logger.info("Periodo {}: INICIO limpieza de consolidaciones previas.", periodoValoracion);
         eliminarConsolidacionesPrevias(periodoValoracion);
+        logger.info("Periodo {}: FIN limpieza de consolidaciones previas ({} ms).",
+                periodoValoracion, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - inicioEtapa));
 
+        inicioEtapa = System.nanoTime();
+        logger.info("Periodo {}: INICIO registro de cabecera en BD; planillas a consolidar={}.",
+                periodoValoracion, planillasAprobadas.size());
         OffsetDateTime ahora = OffsetDateTime.now();
         Long usuarioAuditoria = usuarioEjecutorId != null ? usuarioEjecutorId : 1L;
         SiproDetalleConsolidacionesPlanillas cabecera = crearCabeceraInicial(periodoValoracion, ventana, usuarioAuditoria,
                 observacion, ahora);
         consolidacionRepository.save(cabecera);
+        logger.info("Periodo {}: FIN registro de cabecera en BD; id={} ({} ms).",
+                periodoValoracion, cabecera.getIdConsolidacion(),
+                TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - inicioEtapa));
 
+        inicioEtapa = System.nanoTime();
+        logger.info("Periodo {}: INICIO preparacion del escritor Excel y archivos temporales.", periodoValoracion);
         try (ConsolidatedExcelWriter excelWriter = new ConsolidatedExcelWriter()) {
+            logger.info("Periodo {}: FIN preparacion del escritor Excel ({} ms).",
+                    periodoValoracion, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - inicioEtapa));
+            inicioEtapa = System.nanoTime();
+            logger.info("Periodo {}: INICIO consulta de validaciones de planillas en BD.", periodoValoracion);
             Map<Long, SiproDetalleArchivoValidacion> validacionesPorCarga = cargarValidaciones(planillasAprobadas);
+            logger.info("Periodo {}: FIN consulta de validaciones; encontradas={} ({} ms).",
+                    periodoValoracion, validacionesPorCarga.size(),
+                    TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - inicioEtapa));
+            inicioEtapa = System.nanoTime();
+            logger.info("Periodo {}: INICIO consulta de configuracion de consecutivos en BD.", periodoValoracion);
             DocumentoSecuenciaConfig documentoSecuenciaConfig = resolverDocumentoSecuenciaConfig();
+            logger.info("Periodo {}: FIN consulta de configuracion de consecutivos ({} ms).",
+                    periodoValoracion, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - inicioEtapa));
             // Consecutivos asignados hoy mismo (idConsolidadoRegistro -> numero), SOLO para que
             // CREFFSOS muestre el mismo numero sin generarlo de nuevo. A proposito nunca se
             // persiste en el campo "documento" del registro, para no afectar las columnas de
@@ -404,18 +428,28 @@ public class ConsolidacionPeriodoExecutor {
             // calificacion desde CENIE) — esas deben seguir viendo el dato original, vacio o no.
             Map<Long, Long> documentosAsignados = new HashMap<>();
 
+            inicioEtapa = System.nanoTime();
+            logger.info("Periodo {}: INICIO actualizacion de cabecera a EN_PROCESO en BD.", periodoValoracion);
             cabecera.setEstadoConsolidacion(ESTADO_EN_PROCESO);
             cabecera.setModificadoPorId(usuarioAuditoria);
             cabecera.setModificadoEn(ahora);
             consolidacionRepository.save(cabecera);
+            logger.info("Periodo {}: FIN actualizacion de cabecera a EN_PROCESO ({} ms).",
+                    periodoValoracion, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - inicioEtapa));
 
             int cantidadRegistros = 0;
             List<String> nombresArchivos = new ArrayList<>();
 
             for (SiproDetalleCargaPlanillas planilla : planillasAprobadas) {
+                inicioEtapa = System.nanoTime();
+                logger.info("Periodo {} planilla {}: INICIO registro de archivo en BD; sinDatos={}.",
+                        periodoValoracion, planilla.getId(), Boolean.TRUE.equals(planilla.getNoReportaDatos()));
                 SiproDetalleArchivoValidacion validacion = validacionesPorCarga.get(planilla.getId());
                 SiproDetalleConsolidacionArchivo archivoConsolidado = construirArchivoConsolidado(cabecera, planilla, validacion);
                 consolidacionArchivoRepository.save(archivoConsolidado);
+                logger.info("Periodo {} planilla {}: FIN registro de archivo en BD ({} ms).",
+                        periodoValoracion, planilla.getId(),
+                        TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - inicioEtapa));
 
                 int registrosArchivo = 0;
                 if (Boolean.TRUE.equals(planilla.getNoReportaDatos())) {
@@ -439,7 +473,11 @@ public class ConsolidacionPeriodoExecutor {
                 nombresArchivos.add(archivoConsolidado.getNombreArchivo());
             }
 
+            inicioEtapa = System.nanoTime();
+            logger.info("Periodo {}: INICIO generacion y almacenamiento del Excel consolidado.", periodoValoracion);
             String advertenciaExcelConsolidado = guardarExcelConsolidado(periodoValoracion, excelWriter);
+            logger.info("Periodo {}: FIN generacion y almacenamiento del Excel consolidado ({} ms).",
+                    periodoValoracion, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - inicioEtapa));
 
             // CREFFSOS se genera aquí, como cierre de la Fase 1: depende directamente de los
             // registros que se acaban de insertar en sipro_detalle_consolidado_registros
@@ -513,6 +551,8 @@ public class ConsolidacionPeriodoExecutor {
                     advertenciasPostProceso.size());
             return true;
         } catch (Exception e) {
+            logger.error("Periodo {}: fallo la consolidacion. Revise la ultima etapa INICIO sin FIN correspondiente.",
+                    periodoValoracion, e);
             OffsetDateTime fechaError = OffsetDateTime.now();
             cabecera.setEstadoConsolidacion(ESTADO_ERROR);
             cabecera.setFechaHoraFin(fechaError);
@@ -685,14 +725,32 @@ public class ConsolidacionPeriodoExecutor {
                     + " del periodo " + periodoValoracion + " está aprobada con datos pero no tiene ruta de almacenamiento.");
         }
 
+        long inicioEtapa = System.nanoTime();
+        logger.info("Periodo {} planilla {}: INICIO apertura de archivo para escaneo desde almacenamiento.",
+                periodoValoracion, planilla.getId());
         ExcelScanResult scanResult;
         try (InputStream inputStream = fileStorageService.openStream(rutaArchivo)) {
+            logger.info("Periodo {} planilla {}: FIN apertura de archivo para escaneo ({} ms).",
+                    periodoValoracion, planilla.getId(),
+                    TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - inicioEtapa));
+            inicioEtapa = System.nanoTime();
+            logger.info("Periodo {} planilla {}: INICIO escaneo XLSX; incluye descompresion y lectura de NITs.",
+                    periodoValoracion, planilla.getId());
             scanResult = escanearExcel(inputStream, planilla.getNombreArchivoFuente());
         }
+        logger.info("Periodo {} planilla {}: FIN escaneo XLSX; NITs unicos={} ({} ms).",
+                periodoValoracion, planilla.getId(), scanResult.nits().size(),
+                TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - inicioEtapa));
 
-        Map<String, String> tipoIdPorNit = cargarTipoIdPorNit(scanResult.nits());
+        Map<String, String> tipoIdPorNit = cargarTipoIdPorNit(periodoValoracion, planilla.getId(), scanResult.nits());
+        logger.info("Periodo {} planilla {}: INICIO consulta de parametros de insercion en BD.",
+                periodoValoracion, planilla.getId());
+        inicioEtapa = System.nanoTime();
         int batchInsertSize = Math.max(1,
                 parametroUnicoService.getInt("APP_CONSOLIDACION_BATCH_INSERT_SIZE", DEFAULT_BATCH_INSERT_SIZE));
+        logger.info("Periodo {} planilla {}: FIN consulta de parametros de insercion; lote={} ({} ms).",
+                periodoValoracion, planilla.getId(), batchInsertSize,
+                TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - inicioEtapa));
         List<SiproDetalleConsolidadoRegistro> batch = new ArrayList<>(batchInsertSize);
         final int[] cantidadRegistros = {0};
 
@@ -705,6 +763,9 @@ public class ConsolidacionPeriodoExecutor {
         final long[] ultimoDocumentoReservado = {-1L};
         final long incrementoDocumento = documentoSecuenciaConfig.increment();
         if (documentoSecuenciaConfig.enabled() && scanResult.documentosVacios() > 0) {
+            inicioEtapa = System.nanoTime();
+            logger.info("Periodo {} planilla {}: INICIO reserva de {} consecutivos en BD.",
+                    periodoValoracion, planilla.getId(), scanResult.documentosVacios());
             ParametroUnicoService.SequenceReservation reservation = parametroUnicoService.reserveSequenceRange(
                     documentoSecuenciaConfig.currentKey(),
                     documentoSecuenciaConfig.initialKey(),
@@ -714,6 +775,9 @@ public class ConsolidacionPeriodoExecutor {
                 siguienteDocumento[0] = reservation.nextValue();
                 ultimoDocumentoReservado[0] = reservation.lastReservedValue();
             }
+            logger.info("Periodo {} planilla {}: FIN reserva de consecutivos; habilitada={} ({} ms).",
+                    periodoValoracion, planilla.getId(), reservation.enabled(),
+                    TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - inicioEtapa));
         }
 
         // Pendientes de esta planilla: el registro todavía no tiene idConsolidadoRegistro hasta
@@ -721,7 +785,16 @@ public class ConsolidacionPeriodoExecutor {
         // justo después de cada persistencia, ya con el id real disponible.
         List<DocumentoPendiente> pendientesDocumento = new ArrayList<>();
 
+        inicioEtapa = System.nanoTime();
+        logger.info("Periodo {} planilla {}: INICIO reapertura de archivo para consolidar.",
+                periodoValoracion, planilla.getId());
         try (InputStream inputStream = fileStorageService.openStream(rutaArchivo)) {
+            logger.info("Periodo {} planilla {}: FIN reapertura de archivo ({} ms).",
+                    periodoValoracion, planilla.getId(),
+                    TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - inicioEtapa));
+            inicioEtapa = System.nanoTime();
+            logger.info("Periodo {} planilla {}: INICIO lectura y persistencia de filas; lote de insercion={}.",
+                    periodoValoracion, planilla.getId(), batchInsertSize);
             XlsxStreamingReader.readFirstSheet(inputStream, (rowNumber, rowValues) -> {
                 if (rowNumber == 1 || esFilaVacia(rowValues)) {
                     return;
@@ -768,6 +841,9 @@ public class ConsolidacionPeriodoExecutor {
 
         persistirBatch(batch);
         volcarDocumentosAsignados(pendientesDocumento, documentosAsignados);
+        logger.info("Periodo {} planilla {}: FIN lectura y persistencia; filas={} ({} ms).",
+                periodoValoracion, planilla.getId(), cantidadRegistros[0],
+                TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - inicioEtapa));
         logger.info("Periodo {} archivo {}: se consolidaron {} registros de datos.",
                 periodoValoracion, planilla.getNombreArchivoFuente(), cantidadRegistros[0]);
         return cantidadRegistros[0];
@@ -893,13 +969,21 @@ public class ConsolidacionPeriodoExecutor {
         }
     }
 
-    private Map<String, String> cargarTipoIdPorNit(Set<String> nits) {
+    private Map<String, String> cargarTipoIdPorNit(LocalDate periodoValoracion, Long idPlanilla, Set<String> nits) {
         if (nits == null || nits.isEmpty()) {
+            logger.info("Periodo {} planilla {}: cruce TIPO_ID omitido; no hay NITs para consultar.",
+                    periodoValoracion, idPlanilla);
             return Map.of();
         }
 
+        long inicioEtapa = System.nanoTime();
+        logger.info("Periodo {} planilla {}: INICIO consulta de parametros del cruce TIPO_ID en PostgreSQL.",
+                periodoValoracion, idPlanilla);
         int chunkSize = Math.max(1,
                 parametroUnicoService.getInt("APP_CONSOLIDACION_LZ_LOOKUP_CHUNK_SIZE", DEFAULT_LZ_LOOKUP_CHUNK_SIZE));
+        logger.info("Periodo {} planilla {}: FIN consulta de parametros del cruce; lote={} ({} ms).",
+                periodoValoracion, idPlanilla, chunkSize,
+                TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - inicioEtapa));
         List<String> nitsNormalizados = nits.stream()
                 .map(this::normalizeLookupDocument)
                 .filter(nit -> nit != null && !nit.isBlank())
@@ -907,15 +991,24 @@ public class ConsolidacionPeriodoExecutor {
                 .toList();
 
         Map<String, String> tipoIdPorNit = new LinkedHashMap<>();
+        int totalLotes = nitsNormalizados.isEmpty() ? 0 : 1 + (nitsNormalizados.size() - 1) / chunkSize;
         for (int start = 0; start < nitsNormalizados.size(); start += chunkSize) {
             int end = Math.min(start + chunkSize, nitsNormalizados.size());
             List<String> lote = nitsNormalizados.subList(start, end);
+            int numeroLote = start / chunkSize + 1;
+            long inicioLote = System.nanoTime();
+            logger.info("Periodo {} planilla {}: INICIO cruce TIPO_ID PostgreSQL lote {}/{}; NITs del lote={}.",
+                    periodoValoracion, idPlanilla, numeroLote, totalLotes, lote.size());
             for (ClienteLzRepository.DocumentoTipoIdProjection projection : clienteLzRepository.findLatestTipoIdByNumeroIdIn(lote)) {
                 String nit = normalizeLookupDocument(projection.getNumeroId());
                 if (!nit.isBlank()) {
                     tipoIdPorNit.putIfAbsent(nit, blankToNull(projection.getTipoId()));
                 }
             }
+            logger.info("Periodo {} planilla {}: FIN cruce TIPO_ID PostgreSQL lote {}/{}; "
+                            + "NITs consultados={}/{}; resueltos acumulados={} ({} ms).",
+                    periodoValoracion, idPlanilla, numeroLote, totalLotes, end, nitsNormalizados.size(),
+                    tipoIdPorNit.size(), TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - inicioLote));
         }
 
         logger.info("Cruce TIPO_ID resuelto para {} de {} NITs consultados en LZ local.",
