@@ -1,5 +1,8 @@
 package com.bancolombia.sipro.validations.domain.service;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.bancolombia.sipro.validations.domain.model.SiproDetalleArchivoValidacion;
 import com.bancolombia.sipro.validations.domain.model.SiproDetalleCargaPlanillas;
 import com.bancolombia.sipro.validations.domain.model.SiproDetalleConsolidacionArchivo;
@@ -18,11 +21,15 @@ import jakarta.persistence.Query;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.env.Environment;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -43,6 +50,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -118,9 +127,15 @@ class ConsolidacionPeriodoExecutorTest {
     private Query advisoryLockQuery;
 
     private ConsolidacionPeriodoExecutor service;
+    private Logger diagnosticLogger;
+    private ListAppender<ILoggingEvent> diagnosticLogs;
 
     @BeforeEach
     void setUp() {
+        diagnosticLogger = (Logger) LoggerFactory.getLogger(ConsolidacionPeriodoExecutor.class);
+        diagnosticLogs = new ListAppender<>();
+        diagnosticLogs.start();
+        diagnosticLogger.addAppender(diagnosticLogs);
         service = new ConsolidacionPeriodoExecutor(
                 planillaRepository,
                 validacionRepository,
@@ -156,6 +171,12 @@ class ConsolidacionPeriodoExecutorTest {
             lenient().when(advisoryLockQuery.setParameter(anyString(), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(advisoryLockQuery);
             lenient().when(advisoryLockQuery.getSingleResult()).thenReturn(Boolean.TRUE);
+    }
+
+    @AfterEach
+    void detachDiagnosticLogs() {
+        diagnosticLogger.detachAppender(diagnosticLogs);
+        diagnosticLogs.stop();
     }
 
             @Test
@@ -224,7 +245,7 @@ class ConsolidacionPeriodoExecutorTest {
             return response;
         });
         when(parametroUnicoService.getInt(eq("APP_CONSOLIDACION_BATCH_INSERT_SIZE"), anyInt())).thenReturn(1);
-        when(parametroUnicoService.getInt(eq("APP_CONSOLIDACION_LZ_LOOKUP_CHUNK_SIZE"), anyInt())).thenReturn(1000);
+        when(parametroUnicoService.getInt(eq("APP_CONSOLIDACION_LZ_LOOKUP_CHUNK_SIZE"), anyInt())).thenReturn(1);
         when(creffosConsolidationService.generarYPublicarCreffsos(periodo))
             .thenReturn(CreffosConsolidationService.PublicationResult.generated(
                 "consolidados/2026-05-31/CREFFSOS.xlsx",
@@ -293,6 +314,64 @@ class ConsolidacionPeriodoExecutorTest {
         verify(consolidadoRegistroRepository, atLeast(2)).flush();
         verify(entityManager, atLeast(2)).clear();
         verify(notificacionConsolidacionService).enviarConfirmacion(anyLong());
+
+        List<String> messages = diagnosticLogs.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
+        assertThat(messages.stream()
+                .filter(message -> message.contains("planilla 96:"))
+                .map(message -> message.substring(message.indexOf(": ") + 2).split("[;(]")[0].trim())
+                .toList())
+                .containsSubsequence(
+                        "INICIO apertura de archivo para escaneo desde almacenamiento.",
+                        "FIN apertura de archivo para escaneo",
+                        "INICIO escaneo XLSX",
+                        "FIN escaneo XLSX",
+                        "INICIO cruce TIPO_ID PostgreSQL lote 1/2",
+                        "FIN cruce TIPO_ID PostgreSQL lote 1/2",
+                        "INICIO cruce TIPO_ID PostgreSQL lote 2/2",
+                        "FIN cruce TIPO_ID PostgreSQL lote 2/2",
+                        "INICIO reapertura de archivo para consolidar.",
+                        "FIN reapertura de archivo",
+                        "INICIO lectura y persistencia de filas",
+                        "FIN lectura y persistencia");
+        assertThat(messages).anyMatch(message ->
+                message.matches(".*FIN escaneo XLSX; NITs unicos=2 \\(\\d+ ms\\)\\."));
+        assertThat(messages).anyMatch(message ->
+                message.contains("FIN cruce TIPO_ID PostgreSQL lote 2/2; NITs consultados=2/2; resueltos acumulados=2"));
+        assertThat(messages).noneMatch(message -> message.contains("9001") || message.contains("9002"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void debeDejarInicioSinFinDeLaOperacionQueFalla(boolean fallaApertura) throws Exception {
+        LocalDate periodo = LocalDate.of(2026, 5, 31);
+        String ruta = "aprobados/2026-05-31/archivo-diagnostico.xlsx";
+        SiproDetalleCargaPlanillas planilla = crearPlanilla(121L, 1L, "Producto", false, ruta);
+        when(ventanaCargaService.obtenerVentana(periodo)).thenReturn(Optional.of(ventanaRegla(periodo)));
+        when(planillaRepository.findPlanillasAprobadasByFechaCorteAndSegmentoId(periodo, 1L))
+                .thenReturn(List.of(planilla));
+        if (fallaApertura) {
+            when(fileStorageService.openStream(ruta)).thenThrow(new IOException("Fallo de lectura simulado"));
+        } else {
+            byte[] excel = crearExcelBytes(List.of(List.of("9001")));
+            when(fileStorageService.openStream(ruta)).thenReturn(new ByteArrayInputStream(excel));
+            when(clienteLzRepository.findLatestTipoIdByNumeroIdIn(anyCollection()))
+                    .thenThrow(new IllegalStateException("Fallo de consulta simulado"));
+        }
+
+        iniciarSincronizacionTransaccional();
+        try {
+            assertThrows(IllegalStateException.class,
+                    () -> service.consolidarPeriodoForzado(periodo, 1L, "Diagnostico"));
+        } finally {
+            limpiarSincronizacionTransaccional();
+        }
+
+        String etapa = fallaApertura ? "apertura de archivo para escaneo" : "cruce TIPO_ID PostgreSQL lote 1/1";
+        List<String> messages = diagnosticLogs.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
+        assertThat(messages).anyMatch(message -> message.contains("planilla 121: INICIO " + etapa));
+        assertThat(messages).noneMatch(message -> message.contains("planilla 121: FIN " + etapa));
+        assertThat(messages).anyMatch(message -> message.contains("fallo la consolidacion"));
+        verify(consolidadoRegistroRepository, never()).saveAll(any());
     }
 
     @Test

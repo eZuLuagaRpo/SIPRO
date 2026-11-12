@@ -46,11 +46,6 @@ backend/
 ├── settings.gradle
 ├── gradle.properties
 ├── gradlew.bat
-├── SECURITY.md
-├── deployment/
-│   ├── Dockerfile
-│   ├── README.md
-│   └── helm/
 └── services/
     └── validation-service/
         ├── build.gradle
@@ -142,18 +137,7 @@ El truststore de Impala ya no se inyecta como JVM arg global; LzJdbcService lo a
 | GET | /api/main/productos | Catalogo de productos |
 | GET | /api/main/segmentos | Catalogo de segmentos |
 | GET | /api/main/consolidacion/resumen | Resumen consolidado mensual |
-
-### Panel de administrador (/admin, /parametros)
-
-Todos requieren rol Soporte Técnico (id_rol=3) o Admin_Permisos (id_rol=6) segun `AdminAccessService`; el detalle de que rol puede hacer que se explica en [SECURITY.md](SECURITY.md) y en el README raiz del repo.
-
-| Metodo | Endpoint | Descripcion |
-|--------|----------|-------------|
-| GET | /api/admin/dashboard | Resumen del panel (estado de periodos, ultima consolidacion) |
-| POST | /api/admin/consolidacion/manual | Inicio de consolidacion manual por periodo, exclusivo Admin_Permisos |
-| DELETE | /api/admin/consolidacion/{idConsolidacion} | Elimina una consolidacion, exclusivo Admin_Permisos |
-| POST | /api/admin/sql/execute | Consola SQL restringida (lectura/escritura sobre tablas permitidas) |
-| GET | /api/admin/logs | Logs en vivo del backend para el modal de seguimiento (soporta filtro por scope, nivel y paginacion incremental por id) |
+| POST | /api/admin/consolidacion/manual | Inicio de consolidacion manual (panel /admin, exclusivo Admin_Permisos). El estado se consulta como parte de /api/admin/dashboard. |
 
 ### Configuracion y LZ
 
@@ -174,8 +158,8 @@ Todos requieren rol Soporte Técnico (id_rol=3) o Admin_Permisos (id_rol=6) segu
 - ValidationAsyncService usa un ejecutor dedicado llamado validationTaskExecutor.
 - ConsolidacionManualAsyncService reaprovecha ese ejecutor y persiste estado por periodo sin crear tablas nuevas.
 - El resumen consolidado diferencia observaciones internas de calidad de diferencias reales con CREFFSOS.
-- SecurityConfig exige autenticacion en toda ruta salvo una lista blanca corta (login, config publica de Entra, health/actuator); `EntraAuthenticationFilter` valida el idToken de Entra ID (JWKS real) en cada peticion, en todos los perfiles, no solo en produccion. Ver [SECURITY.md](SECURITY.md).
-- Los controladores REST estan repartidos en dos paquetes: `api/` e `infrastructure/entrypoint/`.
+- SecurityConfig esta relajado en dev con permitAll; cualquier endurecimiento futuro debe ser incremental.
+- El modulo mantiene coexistencia entre controladores legacy en api/ y entrypoints hexagonales en infrastructure/entrypoint/.
 
 ## Documentacion relacionada
 

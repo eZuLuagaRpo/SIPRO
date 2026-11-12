@@ -115,6 +115,9 @@ export interface AdminSqlExecuteResponse {
   filas: Array<Record<string, unknown>>;
   sqlEjecutada: string | null;
   resultadoTruncado: boolean;
+  duracionMs?: number;
+  sqlState?: string | null;
+  tipoError?: string | null;
 }
 
 export interface AdminDeleteConsolidacionRequest {
@@ -134,6 +137,10 @@ export interface AdminLogStreamResponse {
   cursorId: number;
   totalBuffered: number;
   items: AdminLogItem[];
+  instanceId?: string;
+  capturadoEn?: string;
+  oldestId?: number;
+  entriesLost?: boolean;
 }
 
 export interface AdminLogItem {
@@ -144,4 +151,45 @@ export interface AdminLogItem {
   thread: string;
   scope: string;
   message: string;
+  executionId?: string;
+  detalleError?: string | null;
+}
+
+export interface AdminDiagnosticResponse {
+  instanceId: string;
+  inicioProceso: string;
+  version: string;
+  fechaBuild: string | null;
+  javaVersion: string;
+  capturadoEn: string;
+  alcance: string;
+  ejecucion: {
+    executionId: string;
+    periodo: string;
+    estado: string;
+    solicitadoEn: string;
+    iniciadoEn: string | null;
+    terminadoEn: string | null;
+    ultimaEtapa: string | null;
+    ultimaActividad: string;
+    milisegundosSinActividad: number;
+    threadId: number | null;
+    thread: string | null;
+  } | null;
+  executor: {
+    activos: number;
+    poolSize: number;
+    corePoolSize: number;
+    maxPoolSize: number;
+    enCola: number;
+    completadas: number;
+  };
+  hilos: Array<{
+    id: number;
+    nombre: string;
+    estado: string;
+    lock: string | null;
+    propietarioLock: string | null;
+    stack: string[];
+  }>;
 }

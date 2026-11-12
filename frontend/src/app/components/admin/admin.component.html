@@ -320,6 +320,16 @@
               </span>
             </div>
             <div class="sql-toolbar">
+              <label for="consultaDiagnostica">Diagnostico de solo lectura:</label>
+              <select id="consultaDiagnostica" class="form-input" [(ngModel)]="consultaDiagnostica" [disabled]="sqlLoading">
+                <option value="">Seleccionar consulta</option>
+                <option *ngFor="let consulta of consultasDiagnosticas" [value]="consulta.id">{{ consulta.nombre }}</option>
+              </select>
+              <button type="button" class="btn" [disabled]="sqlLoading || !consultaDiagnostica"
+                (click)="cargarConsultaDiagnostica()">Cargar en editor</button>
+              <small>No se ejecuta automaticamente. Usa el usuario y search_path de la conexion del backend.</small>
+            </div>
+            <div class="sql-toolbar">
               <span class="toolbar-label">Tipo de operación:</span>
               <button type="button" class="btn sql-btn" *ngFor="let operation of operacionesSqlDisponibles"
                 [class.active]="sqlOperacion === operation"
@@ -436,16 +446,24 @@
 
               <div class="sql-result-summary">
                 <div>
+                  <span>Duracion</span>
+                  <strong>{{ result.duracionMs ?? 0 }} ms</strong>
+                </div>
+                <div *ngIf="result.sqlState || result.tipoError">
+                  <span>Error / SQLSTATE</span>
+                  <strong>{{ result.tipoError }} / {{ result.sqlState || 'No disponible' }}</strong>
+                </div>
+                <div>
                   <span>{{ result.tipoOperacion?.toUpperCase() === 'SELECT' ? 'Filas devueltas' : 'Filas afectadas' }}</span>
                   <strong>{{ formatNumber(result.tipoOperacion?.toUpperCase() === 'SELECT' ? result.filas.length : result.filasAfectadas) }}</strong>
                 </div>
                 <div>
-                  <span>Resultado truncado</span>
+                  <span>Limite automatico agregado</span>
                   <strong>{{ result.resultadoTruncado ? 'Sí' : 'No' }}</strong>
                 </div>
               </div>
 
-              <div class="table-scroll-wrapper expanded" *ngIf="result.filas?.length">
+              <div class="table-scroll-wrapper expanded" *ngIf="sqlColumns.length">
                 <table class="compact-table">
                   <thead>
                     <tr>
@@ -453,6 +471,7 @@
                     </tr>
                   </thead>
                   <tbody>
+                    <tr *ngIf="!result.filas.length"><td [attr.colspan]="sqlColumns.length">Sin filas para mostrar.</td></tr>
                     <tr *ngFor="let row of result.filas">
                       <td *ngFor="let column of sqlColumns">{{ formatSqlValue(row[column]) }}</td>
                     </tr>
@@ -460,6 +479,38 @@
                 </table>
               </div>
             </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <div class="card-title-wrap"><span>Diagnostico puntual de esta instancia</span></div>
+            <button type="button" class="btn" [disabled]="diagnosticoLoading" (click)="capturarDiagnostico()">
+              {{ diagnosticoLoading ? 'Capturando...' : 'Capturar diagnostico' }}
+            </button>
+          </div>
+          <div class="card-body">
+            <p>Captura bajo demanda, sin cancelar tareas ni iniciar otra consolidacion. Hasta 20 hilos y 30 frames por hilo; no incluye variables ni archivos.</p>
+            <p *ngIf="diagnosticoError" class="feedback feedback--error">{{ diagnosticoError }}</p>
+            <ng-container *ngIf="diagnostico as captura">
+              <p>Instancia: {{ captura.instanceId }} | Version: {{ captura.version }} | Build: {{ captura.fechaBuild || 'No informado' }}</p>
+              <p>Proceso iniciado: {{ captura.inicioProceso }} | Capturado: {{ captura.capturadoEn }} | Java: {{ captura.javaVersion }}</p>
+              <p>{{ captura.alcance }}</p>
+              <p>Executor compartido: {{ captura.executor.activos }} hilos activos; {{ captura.executor.enCola }} tareas en cola.</p>
+              <p *ngIf="!captura.ejecucion">No hay una ejecucion manual registrada para este periodo en esta instancia. Esto no descarta una ejecucion en otra instancia.</p>
+              <div *ngIf="captura.ejecucion as ejecucion">
+                <p>Ejecucion: {{ ejecucion.executionId }} | Periodo: {{ ejecucion.periodo }} | Estado local: {{ ejecucion.estado }}</p>
+                <p>Ultima etapa: {{ ejecucion.ultimaEtapa || 'Sin etapa registrada' }}</p>
+                <p>Hilo: {{ ejecucion.thread || 'Aun no asignado' }} | Ultima actividad: {{ ejecucion.ultimaActividad }} | Intervalo sin actividad registrada: {{ ejecucion.milisegundosSinActividad }} ms</p>
+                <p>La ausencia de logs nuevos no demuestra un bloqueo. El estado local no sustituye el estado confirmado en BD.</p>
+              </div>
+              <details *ngFor="let hilo of captura.hilos">
+                <summary>{{ hilo.nombre }} — {{ hilo.estado }} (ID {{ hilo.id }})</summary>
+                <p>Lock: {{ hilo.lock || 'Ninguno informado' }} | Propietario: {{ hilo.propietarioLock || 'No informado' }}</p>
+                <pre class="diagnostic-stack">{{ hilo.stack.join('\n') }}</pre>
+              </details>
+              <button type="button" class="btn" (click)="descargarDiagnostico()">Descargar captura .json</button>
+            </ng-container>
           </div>
         </section>
 
@@ -509,6 +560,8 @@
             </div>
 
             <p *ngIf="logsError" class="feedback feedback--error">{{ logsError }}</p>
+            <p *ngIf="logsWarning" class="feedback">{{ logsWarning }}</p>
+            <p *ngIf="logsInstanceId">Instancia: {{ logsInstanceId }} | Ultima respuesta de logs: {{ logsUltimaActualizacion }}</p>
 
             <div class="terminal">
               <div class="terminal-header">
@@ -541,8 +594,10 @@
                     <span class="terminal-time" [title]="log.timestamp">{{ log.timestamp }}</span>
                     <span class="terminal-source" [title]="log.logger">{{ log.logger }}</span>
                     <span class="terminal-thread" [title]="log.thread">{{ log.thread }}</span>
+                    <span *ngIf="log.executionId">Ejecucion: {{ log.executionId }}</span>
                   </div>
                   <div class="terminal-message">{{ log.message }}</div>
+                  <details *ngIf="log.detalleError"><summary>Causas y stack (acotados)</summary><pre class="diagnostic-stack">{{ log.detalleError }}</pre></details>
                 </div>
               </div>
               <div class="terminal-footer">
@@ -596,6 +651,9 @@
                   [style.width]="modalConsolidacionTerminada ? '100%' : null"></div>
               </div>
               <p class="modal-status">{{ modalConsolidacionMensaje }}</p>
+              <p *ngIf="consolidacionLogsError" class="feedback feedback--error">{{ consolidacionLogsError }}</p>
+              <p *ngIf="logsWarning" class="feedback">{{ logsWarning }}</p>
+              <p *ngIf="logsInstanceId">Instancia: {{ logsInstanceId }} | Ultima respuesta: {{ logsUltimaActualizacion }}</p>
 
               <div class="terminal modal-terminal">
                 <div class="terminal-body dark-scroll modal-terminal-body">
@@ -605,18 +663,24 @@
                       <span class="terminal-level" [ngClass]="obtenerClaseLog(log.level)">[{{ log.level }}]</span>
                       <span class="terminal-time" [title]="log.timestamp">{{ log.timestamp }}</span>
                       <span class="terminal-source" [title]="log.logger">{{ log.logger }}</span>
+                      <span>{{ log.thread }}</span>
+                      <span *ngIf="log.executionId">Ejecucion: {{ log.executionId }}</span>
                     </div>
                     <div class="terminal-message">{{ log.message }}</div>
+                    <details *ngIf="log.detalleError"><summary>Causas y stack (acotados)</summary><pre class="diagnostic-stack">{{ log.detalleError }}</pre></details>
                   </div>
                 </div>
               </div>
 
-              <div class="modal-actions" *ngIf="modalConsolidacionTerminada || fase2EnCurso">
-                <button type="button" class="btn" (click)="descargarLogConsolidacion()">
+              <div class="modal-actions">
+                <button type="button" class="btn" [disabled]="!logsDownloadEnabled" (click)="descargarLogConsolidacion()">
                   <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                   Descargar log
                 </button>
-                <button type="button" class="btn" (click)="cerrarModalConsolidacion()">Aceptar y cerrar</button>
+                <button type="button" class="btn" [disabled]="diagnosticoLoading" (click)="capturarDiagnostico()">Capturar diagnostico</button>
+                <button type="button" class="btn" *ngIf="diagnostico" (click)="descargarDiagnostico()">Descargar captura</button>
+                <p *ngIf="diagnosticoError" class="feedback feedback--error">{{ diagnosticoError }}</p>
+                <button type="button" class="btn" *ngIf="modalConsolidacionTerminada || fase2EnCurso" (click)="cerrarModalConsolidacion()">Aceptar y cerrar</button>
               </div>
             </div>
           </div>

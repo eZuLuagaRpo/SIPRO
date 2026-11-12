@@ -64,6 +64,10 @@ bootJar {
     archiveFileName = 'sipro.jar'
 }
 
+springBoot {
+    buildInfo()
+}
+
 jar {
     enabled = false
 }

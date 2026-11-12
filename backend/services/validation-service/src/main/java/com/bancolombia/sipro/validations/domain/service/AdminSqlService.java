@@ -6,16 +6,27 @@ import com.bancolombia.sipro.validations.infrastructure.config.AdminPanelPropert
 import com.bancolombia.sipro.validations.infrastructure.security.SiproAuthenticatedUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.postgresql.util.PGobject;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Array;
+import java.sql.Blob;
+import java.sql.Clob;
+import java.sql.SQLException;
+import java.sql.SQLXML;
+import java.time.temporal.TemporalAccessor;
 import java.util.ArrayList;
+import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -43,6 +54,7 @@ public class AdminSqlService {
 
     @Transactional(readOnly = true)
     public AdminSqlExecuteResponse ejecutarLectura(AdminSqlExecuteRequest request, SiproAuthenticatedUser principal) {
+        long inicio = System.nanoTime();
         SqlOperation operation = resolverOperacion(request);
         if (operation != SqlOperation.SELECT) {
             throw new IllegalArgumentException("La operación solicitada no corresponde a una consulta de lectura.");
@@ -50,8 +62,24 @@ public class AdminSqlService {
 
         ValidatedSql validated = validar(request, operation);
         String effectiveSql = agregarLimiteSiHaceFalta(validated.sql());
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(effectiveSql);
-        List<String> columns = rows.isEmpty() ? List.of() : new ArrayList<>(rows.get(0).keySet());
+        List<String> columns = new ArrayList<>();
+        List<Map<String, Object>> rows = jdbcTemplate.query(effectiveSql,
+                (ResultSetExtractor<List<Map<String, Object>>>) resultSet -> {
+                    var metadata = resultSet.getMetaData();
+                    int count = metadata.getColumnCount();
+                    for (int index = 1; index <= count; index++) {
+                        columns.add(metadata.getColumnLabel(index));
+                    }
+                    List<Map<String, Object>> results = new ArrayList<>();
+                    while (resultSet.next()) {
+                        Map<String, Object> row = new LinkedHashMap<>();
+                        for (int index = 1; index <= count; index++) {
+                            row.put(columns.get(index - 1), normalizarValor(resultSet.getObject(index)));
+                        }
+                        results.add(row);
+                    }
+                    return results;
+                });
 
         logger.info("ADMIN_SQL_SELECT usuario={} email={} tablas={} sql={} filas={} truncado={}",
                 principal.idUsuario(), principal.email(), validated.tables(), effectiveSql, rows.size(),
@@ -67,11 +95,13 @@ public class AdminSqlService {
                 columns,
                 rows,
                 effectiveSql,
-                !effectiveSql.equals(validated.sql()));
+                !effectiveSql.equals(validated.sql()),
+                TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - inicio), null, null);
     }
 
     @Transactional
     public AdminSqlExecuteResponse ejecutarEscritura(AdminSqlExecuteRequest request, SiproAuthenticatedUser principal) {
+        long inicio = System.nanoTime();
         SqlOperation operation = resolverOperacion(request);
         if (operation == SqlOperation.SELECT) {
             throw new IllegalArgumentException("Usa el flujo de lectura para consultas SELECT.");
@@ -97,7 +127,58 @@ public class AdminSqlService {
                 List.of(),
                 List.of(),
                 validated.sql(),
-                false);
+                false, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - inicio), null, null);
+    }
+
+    static Object normalizarValor(Object value) throws SQLException {
+        if (value == null || value instanceof String || value instanceof Number || value instanceof Boolean) {
+            return value;
+        }
+        if (value instanceof Array array) {
+            try {
+                return normalizarValor(array.getArray());
+            } finally {
+                array.free();
+            }
+        }
+        if (value instanceof PGobject pgObject) {
+            return pgObject.getValue();
+        }
+        if (value instanceof SQLXML xml) {
+            try {
+                return xml.getString();
+            } finally {
+                xml.free();
+            }
+        }
+        if (value instanceof Clob clob) {
+            try {
+                return clob.getSubString(1, Math.toIntExact(clob.length()));
+            } finally {
+                clob.free();
+            }
+        }
+        if (value instanceof Blob blob) {
+            try {
+                return Base64.getEncoder().encodeToString(blob.getBytes(1, Math.toIntExact(blob.length())));
+            } finally {
+                blob.free();
+            }
+        }
+        if (value instanceof byte[] bytes) {
+            return Base64.getEncoder().encodeToString(bytes);
+        }
+        if (value.getClass().isArray()) {
+            List<Object> values = new ArrayList<>();
+            for (int index = 0; index < java.lang.reflect.Array.getLength(value); index++) {
+                values.add(normalizarValor(java.lang.reflect.Array.get(value, index)));
+            }
+            return values;
+        }
+        if (value instanceof java.util.Date || value instanceof TemporalAccessor || value instanceof java.util.UUID) {
+            return value.toString();
+        }
+        throw new SQLException("Tipo JDBC no soportado por el panel: " + value.getClass().getSimpleName(), "0A000");
     }
 
     private ValidatedSql validar(AdminSqlExecuteRequest request, SqlOperation operation) {

@@ -6,6 +6,7 @@ import {
   AdminDeleteConsolidacionRequest,
   AdminDeleteConsolidacionResponse,
   AdminDashboardResponse,
+  AdminDiagnosticResponse,
   AdminLogLevel,
   AdminLogScope,
   AdminLogStreamResponse,
@@ -49,6 +50,14 @@ export class AdminService {
 
   ejecutarSql(request: AdminSqlExecuteRequest): Observable<AdminSqlExecuteResponse> {
     return this.http.post<AdminSqlExecuteResponse>(`${environment.apiUrl}/admin/sql/execute`, request);
+  }
+
+  capturarDiagnostico(periodo?: string): Observable<AdminDiagnosticResponse> {
+    let params = new HttpParams();
+    if (periodo) {
+      params = params.set('periodo', periodo);
+    }
+    return this.http.get<AdminDiagnosticResponse>(`${environment.apiUrl}/admin/diagnostico`, { params });
   }
 
   obtenerLogs(

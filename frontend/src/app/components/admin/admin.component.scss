@@ -1,5 +1,12 @@
 :host{display:block}
 
+.diagnostic-stack {
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	max-height: 24rem;
+	overflow: auto;
+}
+
 .sipro-subnav__disabled {
 	display: flex;
 	align-items: center;
