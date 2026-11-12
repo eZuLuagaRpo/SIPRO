@@ -85,7 +85,8 @@ public class ConsolidacionManualAsyncService {
             validationTaskExecutor.execute(() -> ejecutarEnSegundoPlano(
                     periodoValoracion, usuarioEjecutorId, observacion, executionId));
         } catch (RejectedExecutionException ex) {
-            diagnosticService.finalizar(executionId, "ERROR");
+            diagnosticService.finalizar(executionId, "ERROR",
+                    "RejectedExecutionException: " + ex.getMessage());
             respuesta.setEstado("ERROR");
             respuesta.setTerminal(true);
             respuesta.setMensaje("El executor rechazo la solicitud. Revise la cola y capacidad del servicio.");
@@ -117,6 +118,7 @@ public class ConsolidacionManualAsyncService {
         MDC.put(AdminDiagnosticService.EXECUTION_MDC_KEY, executionId);
         diagnosticService.iniciar(executionId);
         String estadoDiagnostico = "ERROR";
+        String detalleErrorDiagnostico = null;
         ConsolidacionManualStatusResponse estadoEnProceso = construirRespuestaSimple(
                 periodoValoracion,
                 "EN_PROCESO",
@@ -146,7 +148,7 @@ public class ConsolidacionManualAsyncService {
             logger.info("Consolidación manual del periodo {} finalizada correctamente.", periodoValoracion);
             obtenerEstado(periodoValoracion).ifPresent(estado -> estadoTemporalPorPeriodo.put(periodoValoracion, estado));
             estadoDiagnostico = "COMPLETADO";
-        } catch (Exception e) {
+        } catch (Throwable e) {
             logger.error("Error ejecutando consolidación manual asíncrona para periodo {}: {}",
                     periodoValoracion, e.getMessage(), e);
             ConsolidacionManualStatusResponse respuesta = construirRespuestaSimple(
@@ -158,8 +160,10 @@ public class ConsolidacionManualAsyncService {
             respuesta.setFechaHoraFin(OffsetDateTime.now());
             respuesta.setMensajeError(e.getMessage());
             estadoTemporalPorPeriodo.put(periodoValoracion, respuesta);
+            detalleErrorDiagnostico = e.getClass().getName()
+                    + (e.getMessage() != null ? ": " + e.getMessage() : "");
         } finally {
-            diagnosticService.finalizar(executionId, estadoDiagnostico);
+            diagnosticService.finalizar(executionId, estadoDiagnostico, detalleErrorDiagnostico);
             MDC.remove(AdminDiagnosticService.EXECUTION_MDC_KEY);
             MDC.remove(AdminLogBufferService.MDC_SCOPE_KEY);
         }

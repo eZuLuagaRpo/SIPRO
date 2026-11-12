@@ -550,7 +550,7 @@ public class ConsolidacionPeriodoExecutor {
                     cantidadRegistros,
                     advertenciasPostProceso.size());
             return true;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             logger.error("Periodo {}: fallo la consolidacion. Revise la ultima etapa INICIO sin FIN correspondiente.",
                     periodoValoracion, e);
             OffsetDateTime fechaError = OffsetDateTime.now();
@@ -1282,7 +1282,7 @@ public class ConsolidacionPeriodoExecutor {
         return normalizedFirst != null ? normalizedFirst : blankToNull(second);
     }
 
-    private String resumirError(Exception e) {
+    private String resumirError(Throwable e) {
         Throwable raiz = e;
         while (raiz.getCause() != null) {
             raiz = raiz.getCause();
@@ -1291,7 +1291,7 @@ public class ConsolidacionPeriodoExecutor {
         return raiz.getClass().getSimpleName() + ": " + (mensaje != null ? mensaje : "sin detalle");
     }
 
-    private String resumirErrorUsuario(Exception e) {
+    private String resumirErrorUsuario(Throwable e) {
         Throwable raiz = e;
         while (raiz.getCause() != null) {
             raiz = raiz.getCause();

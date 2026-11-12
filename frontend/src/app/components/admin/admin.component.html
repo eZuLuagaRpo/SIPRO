@@ -502,6 +502,7 @@
                 <p>Ejecucion: {{ ejecucion.executionId }} | Periodo: {{ ejecucion.periodo }} | Estado local: {{ ejecucion.estado }}</p>
                 <p>Ultima etapa: {{ ejecucion.ultimaEtapa || 'Sin etapa registrada' }}</p>
                 <p>Hilo: {{ ejecucion.thread || 'Aun no asignado' }} | Ultima actividad: {{ ejecucion.ultimaActividad }} | Intervalo sin actividad registrada: {{ ejecucion.milisegundosSinActividad }} ms</p>
+                <p *ngIf="ejecucion.detalleError">Detalle del error: {{ ejecucion.detalleError }}</p>
                 <p>La ausencia de logs nuevos no demuestra un bloqueo. El estado local no sustituye el estado confirmado en BD.</p>
               </div>
               <details *ngFor="let hilo of captura.hilos">

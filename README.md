@@ -357,7 +357,7 @@ flowchart LR
 
 ## 10. Configuración y variables de entorno
 
-El backend usa archivos de configuración por ambiente (`application-<perfil>.yml`) más un archivo especial **autosuficiente** para los despliegues reales (`application-cloud.yml`), pensado para arrancar el JAR apuntando directamente a él, con tokens `#{VARIABLE}#` que el pipeline de Azure DevOps reemplaza según el ambiente (patrón "Replace Tokens").
+El backend usa archivos de configuración por ambiente (`application-<perfil>.yml`) más un archivo especial **autosuficiente** para los despliegues reales (`application-cloud.yml`), pensado para arrancar el JAR apuntando directamente a él, con tokens `$(VARIABLE)` que el pipeline de Azure DevOps reemplaza según el ambiente (patrón "Replace Tokens").
 
 | Archivo | Cuándo se usa |
 |---|---|
@@ -397,7 +397,7 @@ java -Duser.timezone=America/Bogota -jar sipro.jar --spring.config.location=file
 
 Ese archivo es **autosuficiente** (no depende de `application.yml` empaquetado en el JAR) y es el **mismo archivo para DEV, QA y PDN** — lo que cambia entre ambientes son los valores que se le inyectan, no el archivo.
 
-**Sustitución de variables:** el pipeline de *release* en Azure DevOps ejecuta la tarea **Replace Tokens**, que reemplaza cada marcador con la sintaxis `#{NOMBRE_VARIABLE}#` presente en `application-cloud.yml` (credenciales de BD, credenciales de Entra ID, credenciales/host de la Landing Zone, configuración de correo, CORS, etc.) por el valor real tomado del Variable Group de Azure DevOps correspondiente al ambiente (DEV, QA o PDN). Tras ese reemplazo, el pipeline empaqueta el resultado como artefacto de release y lo despliega a la máquina AWS del ambiente correspondiente.
+**Sustitución de variables:** el pipeline de *release* en Azure DevOps ejecuta la tarea **Replace Tokens**, que reemplaza cada marcador con la sintaxis `$(NOMBRE_VARIABLE)` presente en `application-cloud.yml` (credenciales de BD, credenciales de Entra ID, credenciales/host de la Landing Zone, configuración de correo, CORS, etc.) por el valor real tomado del Variable Group de Azure DevOps correspondiente al ambiente (DEV, QA o PDN). Tras ese reemplazo, el pipeline empaqueta el resultado como artefacto de release y lo despliega a la máquina AWS del ambiente correspondiente.
 
 **Frontend:** se despliega desde la carpeta `Frontend/` de ese mismo repositorio de Azure DevOps, con su propio build y release, a partir del build de producción de Angular (`ng build`).
 

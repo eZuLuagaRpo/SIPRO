@@ -57,10 +57,17 @@ public class AdminDiagnosticService {
     }
 
     public synchronized void finalizar(String id, String estado) {
+        finalizar(id, estado, null);
+    }
+
+    public synchronized void finalizar(String id, String estado, String detalleError) {
         Trace trace = ejecuciones.get(id);
         trace.estado = estado;
         trace.terminadoEn = Instant.now();
         trace.ultimaActividad = trace.terminadoEn;
+        if (detalleError != null) {
+            trace.detalleError = detalleError;
+        }
         int completadas = (int) ejecuciones.values().stream().filter(value -> value.terminadoEn != null).count();
         var iterator = ejecuciones.values().iterator();
         while (completadas > MAX_COMPLETED_EXECUTIONS && iterator.hasNext()) {
@@ -123,7 +130,7 @@ public class AdminDiagnosticService {
                 selected.ultimaActividad,
                 Math.max(0, Duration.between(selected.ultimaActividad,
                         selected.terminadoEn != null ? selected.terminadoEn : ahora).toMillis()),
-                selected.threadId, selected.thread);
+                selected.threadId, selected.thread, selected.detalleError);
     }
 
     private static final class Trace {
@@ -137,6 +144,7 @@ public class AdminDiagnosticService {
         private String ultimaEtapa;
         private Long threadId;
         private String thread;
+        private String detalleError;
 
         private Trace(String id, LocalDate periodo) {
             this.id = id;

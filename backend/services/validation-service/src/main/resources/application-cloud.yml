@@ -6,7 +6,7 @@
 #        --spring.config.location=file:/ruta/application-cloud.yml
 #
 # El pipeline de Azure DevOps corre "Replace Tokens" sobre este archivo
-# antes del despliegue, reemplazando cada #{TOKEN}# con el valor del
+# antes del despliegue, reemplazando cada $(TOKEN) con el valor del
 # Variable Group del ambiente (DEV, QA o PDN).
 #
 # application-dev.yml  sigue existiendo solo para desarrollo local.
