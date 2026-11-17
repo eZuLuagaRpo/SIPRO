@@ -175,6 +175,7 @@ export interface AdminDiagnosticResponse {
     milisegundosSinActividad: number;
     threadId: number | null;
     thread: string | null;
+    detalleError?: string | null;
   } | null;
   executor: {
     activos: number;

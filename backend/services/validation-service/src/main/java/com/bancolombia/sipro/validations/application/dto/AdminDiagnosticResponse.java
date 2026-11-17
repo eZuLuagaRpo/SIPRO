@@ -17,7 +17,8 @@ public record AdminDiagnosticResponse(
 
     public record Execution(String executionId, String periodo, String estado, Instant solicitadoEn,
                             Instant iniciadoEn, Instant terminadoEn, String ultimaEtapa,
-                            Instant ultimaActividad, long milisegundosSinActividad, Long threadId, String thread) {
+                            Instant ultimaActividad, long milisegundosSinActividad, Long threadId, String thread,
+                            String detalleError) {
     }
 
     public record ExecutorStatus(int activos, int poolSize, int corePoolSize, int maxPoolSize,
