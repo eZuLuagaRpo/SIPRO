@@ -143,7 +143,9 @@ public class AdminController {
             String sqlTexto = request != null && request.sql() != null ? request.sql().trim() : "";
             boolean esCreateIndex = sqlTexto.toUpperCase(Locale.ROOT).startsWith("CREATE INDEX");
 
-            if (!esCreateIndex && "SELECT".equalsIgnoreCase(operation)) {
+            boolean esAnalyze = sqlTexto.toUpperCase(Locale.ROOT).startsWith("ANALYZE");
+
+            if (!esCreateIndex && !esAnalyze && "SELECT".equalsIgnoreCase(operation)) {
                 return ResponseEntity.ok(adminSqlService.ejecutarLectura(request, principal));
             }
 

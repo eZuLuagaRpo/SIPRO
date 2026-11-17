@@ -44,6 +44,13 @@ public class AdminSqlService {
     private static final Pattern CREATE_INDEX_TABLE_PATTERN = Pattern.compile(
             "(?i)\\bindex\\s+(?:if\\s+not\\s+exists\\s+)?[\\w.\"]+\\s+on\\s+([a-zA-Z_][\\w.\"]*)");
 
+    // Solo EXPLAIN simple sobre un SELECT: no admite opciones como ANALYZE, que ejecutaria la consulta.
+    private static final Pattern EXPLAIN_SELECT_PATTERN = Pattern.compile("(?is)^explain\\s+select\\s.*");
+
+    // Mantenimiento de estadisticas: solo la tabla de clientes del cruce TIPO_ID y su particion por defecto.
+    private static final Pattern ANALYZE_PATTERN = Pattern.compile(
+            "(?i)^analyze\\s+(?:[a-z_][a-z0-9_]*\\.)?(sipro_lz_mdm_datos_generales_clientes(?:_default)?)$");
+
     private final AdminPanelProperties adminPanelProperties;
     private final JdbcTemplate jdbcTemplate;
 
@@ -185,9 +192,18 @@ public class AdminSqlService {
         String sql = normalizarSql(request != null ? request.sql() : null);
         validarSintaxisSegura(sql);
 
-        if (!sql.toLowerCase(Locale.ROOT).startsWith(operation.sqlPrefix)) {
+        boolean explainSelect = operation == SqlOperation.SELECT && esExplainSelect(sql);
+        if (!explainSelect && !sql.toLowerCase(Locale.ROOT).startsWith(operation.sqlPrefix)) {
             throw new IllegalArgumentException(
                     "La sentencia no coincide con la operación seleccionada: " + operation.apiName + ".");
+        }
+
+        if (operation == SqlOperation.ANALYZE) {
+            Matcher analyze = ANALYZE_PATTERN.matcher(sql);
+            if (!analyze.matches()) {
+                throw new IllegalArgumentException("ANALYZE solo esta permitido sobre la tabla de clientes del cruce TIPO_ID.");
+            }
+            return new ValidatedSql(sql, Set.of(analyze.group(1).toLowerCase(Locale.ROOT)));
         }
 
         validarOperacionHabilitada(operation);
@@ -232,6 +248,10 @@ public class AdminSqlService {
         // seleccionado en la UI sea otro (workaround mientras el nuevo boton no se ve).
         if (sql.startsWith(SqlOperation.CREATE_INDEX.sqlPrefix.toUpperCase(Locale.ROOT))) {
             return SqlOperation.CREATE_INDEX;
+        }
+
+        if (sql.startsWith(SqlOperation.ANALYZE.sqlPrefix.toUpperCase(Locale.ROOT))) {
+            return SqlOperation.ANALYZE;
         }
 
         String explicitOperation = request != null && request.tipoOperacion() != null
@@ -301,7 +321,14 @@ public class AdminSqlService {
         return normalized.contains(" where ");
     }
 
+    private boolean esExplainSelect(String sql) {
+        return EXPLAIN_SELECT_PATTERN.matcher(sql).matches();
+    }
+
     private String agregarLimiteSiHaceFalta(String sql) {
+        if (esExplainSelect(sql)) {
+            return sql;
+        }
         String normalized = sql.toLowerCase(Locale.ROOT);
         if (normalized.contains(" limit ")) {
             return sql;
@@ -350,7 +377,8 @@ public class AdminSqlService {
         UPDATE("UPDATE", "update", true, true),
         INSERT("INSERT", "insert into", false, true),
         INSERT_OVERWRITE("INSERT_OVERWRITE", "insert overwrite", false, true),
-        CREATE_INDEX("CREATE_INDEX", "create index", false, false);
+        CREATE_INDEX("CREATE_INDEX", "create index", false, false),
+        ANALYZE("ANALYZE", "analyze", false, false);
 
         private final String apiName;
         private final String sqlPrefix;
