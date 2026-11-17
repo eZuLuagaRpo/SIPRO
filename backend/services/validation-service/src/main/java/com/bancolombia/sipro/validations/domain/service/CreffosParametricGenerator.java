@@ -14,8 +14,12 @@ import org.springframework.beans.BeanWrapper;
 import org.springframework.beans.PropertyAccessorFactory;
 import org.springframework.stereotype.Service;
 
+import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.UncheckedIOException;
+import java.io.Writer;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
@@ -661,21 +665,30 @@ public class CreffosParametricGenerator {
                                    List<Map<String, String>> rows,
                                    boolean includeHeader,
                                    char delimiter) {
-        StringBuilder builder = new StringBuilder();
-        if (includeHeader) {
-            builder.append(joinColumns(definitions.stream().map(CreffosColumnDefinition::nombreColumna).toList(), delimiter))
-                    .append(System.lineSeparator());
-        }
-
-        for (Map<String, String> row : rows) {
-            List<String> orderedValues = new ArrayList<>(definitions.size());
-            for (CreffosColumnDefinition definition : definitions) {
-                orderedValues.add(escapeDelimited(row.getOrDefault(definition.nombreColumna(), ""), delimiter));
+        // Antes se armaba todo el archivo en un StringBuilder y se convertia a bytes al final,
+        // lo que llegaba a mantener hasta 3 copias completas del archivo en memoria a la vez
+        // (StringBuilder + String + byte[]) y causaba OutOfMemoryError con periodos grandes.
+        // Escribir directo a un ByteArrayOutputStream, fila por fila, mantiene una sola copia.
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        try (Writer writer = new BufferedWriter(new OutputStreamWriter(buffer, StandardCharsets.UTF_8))) {
+            if (includeHeader) {
+                writer.write(joinColumns(definitions.stream().map(CreffosColumnDefinition::nombreColumna).toList(), delimiter));
+                writer.write(System.lineSeparator());
             }
-            builder.append(joinColumns(orderedValues, delimiter)).append(System.lineSeparator());
+
+            for (Map<String, String> row : rows) {
+                List<String> orderedValues = new ArrayList<>(definitions.size());
+                for (CreffosColumnDefinition definition : definitions) {
+                    orderedValues.add(escapeDelimited(row.getOrDefault(definition.nombreColumna(), ""), delimiter));
+                }
+                writer.write(joinColumns(orderedValues, delimiter));
+                writer.write(System.lineSeparator());
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException("Error generando archivo delimitado de CREFFSOS", e);
         }
 
-        return builder.toString().getBytes(StandardCharsets.UTF_8);
+        return buffer.toByteArray();
     }
 
     private byte[] renderXlsx(List<CreffosColumnDefinition> definitions,

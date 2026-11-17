@@ -18,6 +18,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Coordina cuándo debe intentarse una consolidación automática o manual de planillas.
@@ -26,7 +28,7 @@ import java.util.Optional;
 public class ConsolidacionPlanillasService {
 
     private static final Logger logger = LoggerFactory.getLogger(ConsolidacionPlanillasService.class);
-    private static final Long SISTEMA_USUARIO_ID = 1L;
+    private static final Long SISTEMA_USUARIO_ID = 13L;
     private static final Long SEGMENTO_COLGAAP_MODIFICADO_ID = 1L;
     private static final List<String> ESTADOS_EN_PROCESO = List.of("INICIADO", "EN_PROCESO");
     private static final List<String> ESTADOS_NO_DUPLICABLES = List.of("COMPLETADO", "COMPLETADO_CON_ADVERTENCIAS", "INICIADO", "EN_PROCESO", "ELIMINADA");
@@ -44,6 +46,12 @@ public class ConsolidacionPlanillasService {
     private final ParametroUnicoService parametroUnicoService;
     private final Environment environment;
     private final ProductoRepository productoRepository;
+
+    // Un intento automatico fallido no deja ningun rastro en BD (la transaccion de la
+    // consolidacion se revierte completa junto con el cambio de estado a ERROR), asi que la
+    // unica forma de "recordar" que ya fallo y no reintentarlo solo es en memoria del proceso.
+    // Se limpia solo si la aplicacion se reinicia; el boton manual nunca consulta este set.
+    private final Set<LocalDate> periodosConFalloAutomatico = ConcurrentHashMap.newKeySet();
 
     public ConsolidacionPlanillasService(SiproDetalleCargaPlanillasRepository planillaRepository,
                                          SiproDetalleConsolidacionesPlanillasRepository consolidacionRepository,
@@ -105,6 +113,12 @@ public class ConsolidacionPlanillasService {
             return;
         }
 
+        if (periodosConFalloAutomatico.contains(periodoActual)) {
+            logger.info("Barrido automático: periodo {} ya falló en un intento automático anterior; "
+                    + "se requiere ejecución manual para reintentar.", periodoActual);
+            return;
+        }
+
         long productosEsperados = productoRepository.countActivosByIdSegmento(SEGMENTO_COLGAAP_MODIFICADO_ID);
         long planillasCargadas = planillaRepository.countActivasByFechaCorteAndSegmentoId(periodoActual, SEGMENTO_COLGAAP_MODIFICADO_ID);
         if (planillasCargadas < productosEsperados) {
@@ -126,6 +140,7 @@ public class ConsolidacionPlanillasService {
                     SISTEMA_USUARIO_ID,
                     "Barrido automático de consolidaciones pendientes");
         } catch (Exception e) {
+            periodosConFalloAutomatico.add(periodoActual);
             logger.error("Error en barrido automático para periodo {}: {}", periodoActual, e.getMessage(), e);
         }
     }
@@ -276,11 +291,25 @@ public class ConsolidacionPlanillasService {
                 continue;
             }
 
+            if (periodosConFalloAutomatico.contains(periodo)) {
+                logger.info("Periodo {}: no consolida en barrido automático porque ya falló antes; "
+                        + "se requiere ejecución manual para reintentar.", periodo);
+                continue;
+            }
+
+            long productosEsperados = productoRepository.countActivosByIdSegmento(SEGMENTO_COLGAAP_MODIFICADO_ID);
             ResumenPlanillasPeriodo resumenPlanillas = construirResumenPlanillasPeriodo(periodo);
+            if (resumenPlanillas.totalActivas() < productosEsperados) {
+                logger.info("Periodo {}: no consolida en barrido automático post-aprobación; {}/{} planillas cargadas, "
+                        + "esperando a que se completen.", periodo, resumenPlanillas.totalActivas(), productosEsperados);
+                continue;
+            }
+
             String resumenEstadosNoAprobados = construirResumenEstadosNoAprobados(resumenPlanillas);
             if (!resumenEstadosNoAprobados.isBlank()) {
-                logger.info("Periodo {}: {} activas no bloquean la consolidación; se intentará consolidar solo lo aprobado.",
+                logger.info("Periodo {}: no consolida en barrido automático post-aprobación; {} activas pendientes de aprobación.",
                         periodo, resumenEstadosNoAprobados);
+                continue;
             }
 
             try {
@@ -289,6 +318,7 @@ public class ConsolidacionPlanillasService {
                         usuarioEjecutorId,
                         observacion);
             } catch (Exception e) {
+                periodosConFalloAutomatico.add(periodo);
                 logger.error("Error en barrido de consolidación para periodo {}: {}", periodo, e.getMessage(), e);
             }
         }

@@ -90,7 +90,7 @@ class ConsolidacionPlanillasServiceTest {
                 service.ejecutarBarridoConsolidacionesPendientes();
 
                 verify(consolidacionPeriodoExecutor)
-                        .consolidarPeriodoSiCorresponde(periodoReciente, 1L, "Barrido automático de consolidaciones pendientes");
+                        .consolidarPeriodoSiCorresponde(periodoReciente, 13L, "Barrido automático de consolidaciones pendientes");
                 verify(consolidacionPeriodoExecutor, never())
                         .consolidarPeriodoSiCorresponde(eq(periodoAntiguo), any(), any());
         }
@@ -146,7 +146,7 @@ class ConsolidacionPlanillasServiceTest {
                 service.ejecutarBarridoConsolidacionesPendientes();
 
                 verify(consolidacionPeriodoExecutor)
-                        .consolidarPeriodoSiCorresponde(periodo, 1L, "Barrido automático de consolidaciones pendientes");
+                        .consolidarPeriodoSiCorresponde(periodo, 13L, "Barrido automático de consolidaciones pendientes");
         }
 
         // Verifica que la validacion manual permite iniciar y consolida solo planillas aprobadas.

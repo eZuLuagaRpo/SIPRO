@@ -57,23 +57,10 @@ public interface ClienteLzRepository extends JpaRepository<SiproLzMdmCliente, Si
      * Se usa durante la consolidación para enriquecer TIPO_ID sin hacer N+1 queries.
      */
     @Query(value = """
-            SELECT ranked.numero_id AS numeroId,
-                   ranked.tipo_id AS tipoId
+            SELECT DISTINCT ON (candidate.numero_id)
+                   candidate.numero_id AS numeroId,
+                   candidate.tipo_id AS tipoId
             FROM (
-                SELECT candidate.numero_id,
-                       candidate.tipo_id,
-                       ROW_NUMBER() OVER (
-                           PARTITION BY candidate.numero_id
-                           ORDER BY candidate.match_priority ASC,
-                                    candidate.f_ult_actualizacion DESC NULLS LAST,
-                                    COALESCE(candidate.year, 0) DESC,
-                                    COALESCE(candidate.month, 0) DESC,
-                                    COALESCE(candidate.day, 0) DESC,
-                                    candidate.period_year DESC,
-                                    candidate.period_month DESC,
-                                    candidate.ingestion_run_id DESC
-                       ) AS rn
-                FROM (
                                    SELECT TRIM(CAST(c.numero_id AS text)) AS numero_id,
                            c.tipo_id,
                            1 AS match_priority,
@@ -102,8 +89,15 @@ public interface ClienteLzRepository extends JpaRepository<SiproLzMdmCliente, Si
                     WHERE c.numeroid_externo IS NOT NULL
                                                                              AND TRIM(CAST(c.numeroid_externo AS text)) IN (:documentos)
                 ) candidate
-            ) ranked
-            WHERE ranked.rn = 1
+            ORDER BY candidate.numero_id,
+                     candidate.match_priority ASC,
+                     candidate.f_ult_actualizacion DESC NULLS LAST,
+                     COALESCE(candidate.year, 0) DESC,
+                     COALESCE(candidate.month, 0) DESC,
+                     COALESCE(candidate.day, 0) DESC,
+                     candidate.period_year DESC,
+                     candidate.period_month DESC,
+                     candidate.ingestion_run_id DESC
             """, nativeQuery = true)
     List<DocumentoTipoIdProjection> findLatestTipoIdByNumeroIdIn(@Param("documentos") Collection<String> documentos);
 }

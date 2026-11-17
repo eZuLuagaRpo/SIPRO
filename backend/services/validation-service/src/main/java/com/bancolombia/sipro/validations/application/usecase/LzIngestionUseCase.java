@@ -82,6 +82,13 @@ public class LzIngestionUseCase {
     );
     private static final String PG_SCHEMA = "schsipro";
 
+    // Indices de expresion sobre la tabla de clientes (cruce TIPO_ID por NIT), creados aparte
+    // del catalogo generico de PK. Se quitan antes del INSERT masivo y se recrean despues,
+    // igual que ya se hace con la PK, para no mantenerlos fila por fila durante la carga.
+    private static final String TABLA_CLIENTES_FINAL = PG_SCHEMA + ".sipro_lz_mdm_datos_generales_clientes";
+    private static final String IDX_CLIENTES_NUMERO_ID = "ix_sipro_lz_mdm_clientes_numero_id_trim";
+    private static final String IDX_CLIENTES_NUMEROID_EXTERNO = "ix_sipro_lz_mdm_clientes_numeroid_externo_trim";
+
     public LzIngestionUseCase(SiproParametroTablaLzRepository paramRepo,
                                SiproLzIngestionRunRepository   runRepo,
                                LzJdbcService                   lzJdbc,
@@ -674,6 +681,15 @@ public class LzIngestionUseCase {
             log.info("Final: PK '{}' eliminada temporalmente en {} para INSERT masivo", pk.name(), finalTable);
         }
 
+        // Misma optimizacion que la PK, pero para los indices de expresion del cruce TIPO_ID:
+        // solo aplica a la tabla de clientes, ninguna otra tabla de este catalogo los tiene.
+        boolean esTablaClientes = TABLA_CLIENTES_FINAL.equalsIgnoreCase(finalTable);
+        if (esTablaClientes) {
+            pg.execute("DROP INDEX IF EXISTS " + PG_SCHEMA + "." + IDX_CLIENTES_NUMERO_ID);
+            pg.execute("DROP INDEX IF EXISTS " + PG_SCHEMA + "." + IDX_CLIENTES_NUMEROID_EXTERNO);
+            log.info("Final: indices de cruce TIPO_ID eliminados temporalmente en {} para INSERT masivo", finalTable);
+        }
+
         // INSERT desde staging SOLO para ESTE run_id, con columnas explicitas
         String sql = "INSERT INTO " + finalTable + " (" + columns + ") "
             + "SELECT " + columns + " FROM " + stgTable
@@ -695,6 +711,22 @@ public class LzIngestionUseCase {
                 throw e;
             }
         }
+
+        if (esTablaClientes) {
+            pg.execute("CREATE INDEX IF NOT EXISTS " + IDX_CLIENTES_NUMERO_ID + " ON " + finalTable
+                + " (TRIM(CAST(numero_id AS text)))");
+            pg.execute("CREATE INDEX IF NOT EXISTS " + IDX_CLIENTES_NUMEROID_EXTERNO + " ON " + finalTable
+                + " (TRIM(CAST(numeroid_externo AS text)))");
+            log.info("Final: indices de cruce TIPO_ID recreados en {}", finalTable);
+        }
+
+        // Estadisticas frescas tras el reemplazo total: sin esto, el planificador puede no usar
+        // bien los indices de arriba (ya nos paso: una consolidacion tardo horas hasta que se
+        // corrio ANALYZE a mano). Se corre para cualquier tabla que pase por este metodo, no
+        // solo la de clientes, porque todas sufren el mismo reseteo de estadisticas con el
+        // TRUNCATE de este mismo metodo.
+        pg.execute("ANALYZE " + finalTable);
+        log.info("Final: ANALYZE ejecutado sobre {} tras la carga masiva", finalTable);
 
         return (long) inserted;
     }

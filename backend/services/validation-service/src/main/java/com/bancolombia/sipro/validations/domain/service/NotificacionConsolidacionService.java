@@ -36,6 +36,9 @@ public class NotificacionConsolidacionService {
 
     private static final Logger logger = LoggerFactory.getLogger(NotificacionConsolidacionService.class);
     private static final int ADMIN_FUNCIONAL_ROLE_ID = 6;
+    // Usuario_Analista: tambien debe recibir las notificaciones de consolidacion (completada,
+    // fallida, eliminada), igual que el rol Admin_Permisos de arriba.
+    private static final int ANALISTA_ROLE_ID = 4;
     private static final String ESTADO_ERROR = "ERROR";
     private static final List<String> ESTADOS_EXITOSOS = List.of("COMPLETADO", "COMPLETADO_CON_ADVERTENCIAS");
     private static final Locale LOCALE_ES_CO = Locale.forLanguageTag("es-CO");
@@ -275,6 +278,7 @@ public class NotificacionConsolidacionService {
     private List<String> resolveDestinatarios(Long actorUserId, SiproAuthenticatedUser principal) {
         Set<String> destinatarios = new LinkedHashSet<>();
         destinatarios.addAll(usuarioProductoRolRepository.findDistinctActiveEmailsByRolId(ADMIN_FUNCIONAL_ROLE_ID));
+        destinatarios.addAll(usuarioProductoRolRepository.findDistinctActiveEmailsByRolId(ANALISTA_ROLE_ID));
 
         resolveActorEmail(actorUserId, principal)
                 .filter(correo -> !correo.isBlank())
