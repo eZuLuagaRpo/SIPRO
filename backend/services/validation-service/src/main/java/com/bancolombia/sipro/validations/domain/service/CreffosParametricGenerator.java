@@ -7,6 +7,7 @@ import com.bancolombia.sipro.validations.infrastructure.repository.CreffosParame
 import com.fasterxml.jackson.databind.JsonNode;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,31 +95,51 @@ public class CreffosParametricGenerator {
         Map<String, Map<String, String>> lookupCache = preloadLookups(definitions, registros);
         SequenceState sequenceState = resolveSequenceState(definitions, registros, documentosAsignados);
 
-        List<Map<String, String>> rows = new ArrayList<>(registros.size());
-        for (SiproDetalleConsolidadoRegistro registro : registros) {
-            Map<String, Object> source = buildSourceMap(registro);
-            LinkedHashMap<String, String> output = new LinkedHashMap<>();
-            for (CreffosColumnDefinition definition : definitions) {
-                String resolvedValue = resolveValue(definition, source, output, lookupCache, sequenceState,
-                        registro.getIdConsolidadoRegistro());
-                output.put(definition.nombreColumna(), formatValue(definition, resolvedValue));
-            }
-            rows.add(output);
-        }
-        byte[] content = renderFile(definitions, rows, outputConfig);
+        // Antes se armaba primero una lista "rows" con TODAS las filas ya resueltas (una segunda
+        // copia completa del periodo en memoria, ademas de "registros"), y recien ahi se generaban
+        // content y protectedContent -uno despues del otro- a partir de esa lista. Con archivos de
+        // decenas de miles de filas, esas dos copias completas mas los dos archivos finales vivos
+        // a la vez agotaban el heap (ver OutOfMemoryError en produccion). Ahora cada fila se
+        // resuelve UNA sola vez y se escribe de inmediato a los dos archivos de salida (normal y
+        // protegido), sin retener nunca la lista completa de filas resueltas.
+        byte[] content;
+        byte[] protectedContent;
+        int rowCount = 0;
+        try (RowSink normalSink = createRowSink(outputConfig.format(), outputConfig.sheetName(), null);
+             RowSink protectedSink = createRowSink("XLSX", outputConfig.sheetName(), LOCKED_SHEET_PASSWORD)) {
 
-        // Copia protegida contra edicion para ARCHIVOS_BLOQUEADOS_RUTA_SALIDA: se arma con las
-        // mismas filas ya calculadas arriba (sin repetir consultas a la LZ), siempre en XLSX sin
-        // importar el formato configurado para la salida normal (CSV/TSV/XLSX).
-        byte[] protectedContent = renderXlsx(definitions, rows, outputConfig.includeHeader(),
-                outputConfig.sheetName(), LOCKED_SHEET_PASSWORD);
+            if (outputConfig.includeHeader()) {
+                normalSink.writeHeader(definitions);
+                protectedSink.writeHeader(definitions);
+            }
+
+            for (SiproDetalleConsolidadoRegistro registro : registros) {
+                Map<String, Object> source = buildSourceMap(registro);
+                LinkedHashMap<String, String> output = new LinkedHashMap<>();
+                for (CreffosColumnDefinition definition : definitions) {
+                    String resolvedValue = resolveValue(definition, source, output, lookupCache, sequenceState,
+                            registro.getIdConsolidadoRegistro());
+                    output.put(definition.nombreColumna(), formatValue(definition, resolvedValue));
+                }
+                normalSink.writeRow(definitions, output);
+                protectedSink.writeRow(definitions, output);
+                rowCount++;
+            }
+
+            content = normalSink.finish();
+            protectedContent = protectedSink.finish();
+        }
+
+        // Copia protegida contra edicion para ARCHIVOS_BLOQUEADOS_RUTA_SALIDA: se arma en la misma
+        // pasada de arriba (sin repetir consultas a la LZ), siempre en XLSX sin importar el formato
+        // configurado para la salida normal (CSV/TSV/XLSX).
         String protectedFileName = ensureExtension(DEFAULT_OUTPUT_NAME, "XLSX");
 
         return new GeneratedCreffosFile(
                 ensureExtension(outputConfig.fileName(), outputConfig.format()),
                 outputConfig.contentType(),
                 content,
-                rows.size(),
+                rowCount,
                 outputConfig.format(),
                 protectedFileName,
                 protectedContent
@@ -651,83 +672,144 @@ public class CreffosParametricGenerator {
         };
     }
 
-    private byte[] renderFile(List<CreffosColumnDefinition> definitions,
-                              List<Map<String, String>> rows,
-                              OutputConfig outputConfig) {
-        return switch (outputConfig.format()) {
-            case "CSV" -> renderDelimited(definitions, rows, outputConfig.includeHeader(), ';');
-            case "TSV" -> renderDelimited(definitions, rows, outputConfig.includeHeader(), '\t');
-            default -> renderXlsx(definitions, rows, outputConfig.includeHeader(), outputConfig.sheetName(), null);
+    /**
+     * Recibe una fila ya resuelta a la vez y la escribe de inmediato a su destino final
+     * (delimitado o XLSX), en vez de acumular todas las filas en una lista intermedia.
+     */
+    private interface RowSink extends AutoCloseable {
+        void writeHeader(List<CreffosColumnDefinition> definitions);
+
+        void writeRow(List<CreffosColumnDefinition> definitions, Map<String, String> row);
+
+        byte[] finish();
+
+        @Override
+        void close();
+    }
+
+    private RowSink createRowSink(String format, String sheetName, String protectSheetPassword) {
+        return switch (format) {
+            case "CSV" -> new DelimitedRowSink(';');
+            case "TSV" -> new DelimitedRowSink('\t');
+            default -> new XlsxRowSink(sheetName, protectSheetPassword);
         };
     }
 
-    private byte[] renderDelimited(List<CreffosColumnDefinition> definitions,
-                                   List<Map<String, String>> rows,
-                                   boolean includeHeader,
-                                   char delimiter) {
-        // Antes se armaba todo el archivo en un StringBuilder y se convertia a bytes al final,
-        // lo que llegaba a mantener hasta 3 copias completas del archivo en memoria a la vez
-        // (StringBuilder + String + byte[]) y causaba OutOfMemoryError con periodos grandes.
-        // Escribir directo a un ByteArrayOutputStream, fila por fila, mantiene una sola copia.
-        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-        try (Writer writer = new BufferedWriter(new OutputStreamWriter(buffer, StandardCharsets.UTF_8))) {
-            if (includeHeader) {
-                writer.write(joinColumns(definitions.stream().map(CreffosColumnDefinition::nombreColumna).toList(), delimiter));
-                writer.write(System.lineSeparator());
-            }
+    /**
+     * Antes se armaba todo el archivo en un StringBuilder y se convertia a bytes al final,
+     * lo que llegaba a mantener hasta 3 copias completas del archivo en memoria a la vez
+     * (StringBuilder + String + byte[]) y causaba OutOfMemoryError con periodos grandes.
+     * Escribir directo a un ByteArrayOutputStream, fila por fila, mantiene una sola copia.
+     */
+    private final class DelimitedRowSink implements RowSink {
+        private final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        private final Writer writer = new BufferedWriter(new OutputStreamWriter(buffer, StandardCharsets.UTF_8));
+        private final char delimiter;
+        private boolean closed = false;
 
-            for (Map<String, String> row : rows) {
-                List<String> orderedValues = new ArrayList<>(definitions.size());
-                for (CreffosColumnDefinition definition : definitions) {
-                    orderedValues.add(escapeDelimited(row.getOrDefault(definition.nombreColumna(), ""), delimiter));
-                }
-                writer.write(joinColumns(orderedValues, delimiter));
-                writer.write(System.lineSeparator());
-            }
-        } catch (IOException e) {
-            throw new UncheckedIOException("Error generando archivo delimitado de CREFFSOS", e);
+        DelimitedRowSink(char delimiter) {
+            this.delimiter = delimiter;
         }
 
-        return buffer.toByteArray();
+        @Override
+        public void writeHeader(List<CreffosColumnDefinition> definitions) {
+            writeLine(joinColumns(definitions.stream().map(CreffosColumnDefinition::nombreColumna).toList(), delimiter));
+        }
+
+        @Override
+        public void writeRow(List<CreffosColumnDefinition> definitions, Map<String, String> row) {
+            List<String> orderedValues = new ArrayList<>(definitions.size());
+            for (CreffosColumnDefinition definition : definitions) {
+                orderedValues.add(escapeDelimited(row.getOrDefault(definition.nombreColumna(), ""), delimiter));
+            }
+            writeLine(joinColumns(orderedValues, delimiter));
+        }
+
+        private void writeLine(String line) {
+            try {
+                writer.write(line);
+                writer.write(System.lineSeparator());
+            } catch (IOException e) {
+                throw new UncheckedIOException("Error generando archivo delimitado de CREFFSOS", e);
+            }
+        }
+
+        @Override
+        public byte[] finish() {
+            try {
+                writer.flush();
+            } catch (IOException e) {
+                throw new UncheckedIOException("Error generando archivo delimitado de CREFFSOS", e);
+            }
+            return buffer.toByteArray();
+        }
+
+        @Override
+        public void close() {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            try {
+                writer.close();
+            } catch (IOException e) {
+                throw new UncheckedIOException("Error generando archivo delimitado de CREFFSOS", e);
+            }
+        }
     }
 
-    private byte[] renderXlsx(List<CreffosColumnDefinition> definitions,
-                              List<Map<String, String>> rows,
-                              boolean includeHeader,
-                              String sheetName,
-                              String protectSheetPassword) {
-        try (SXSSFWorkbook workbook = new SXSSFWorkbook(500);
-             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
-            var sheet = workbook.createSheet(firstNonBlank(sheetName, DEFAULT_SHEET_NAME));
+    private final class XlsxRowSink implements RowSink {
+        private final SXSSFWorkbook workbook = new SXSSFWorkbook(500);
+        private final Sheet sheet;
+        private int rowIndex = 0;
+
+        XlsxRowSink(String sheetName, String protectSheetPassword) {
+            this.sheet = workbook.createSheet(firstNonBlank(sheetName, DEFAULT_SHEET_NAME));
             if (protectSheetPassword != null && !protectSheetPassword.isBlank()) {
                 // Protege contra edicion (no es cifrado real): el archivo se abre sin pedir
                 // nada, pero no se puede modificar sin la contrasena. Igual a como ya lo hace
                 // ConsolidacionResumenExcelReportService para el resumen consolidado.
                 sheet.protectSheet(protectSheetPassword);
             }
-            int rowIndex = 0;
-            if (includeHeader) {
-                Row headerRow = sheet.createRow(rowIndex++);
-                for (int columnIndex = 0; columnIndex < definitions.size(); columnIndex++) {
-                    Cell cell = headerRow.createCell(columnIndex);
-                    cell.setCellValue(definitions.get(columnIndex).nombreColumna());
-                }
-            }
+        }
 
-            for (Map<String, String> row : rows) {
-                Row xlsxRow = sheet.createRow(rowIndex++);
-                for (int columnIndex = 0; columnIndex < definitions.size(); columnIndex++) {
-                    CreffosColumnDefinition definition = definitions.get(columnIndex);
-                    Cell cell = xlsxRow.createCell(columnIndex);
-                    cell.setCellValue(row.getOrDefault(definition.nombreColumna(), ""));
-                }
+        @Override
+        public void writeHeader(List<CreffosColumnDefinition> definitions) {
+            Row headerRow = sheet.createRow(rowIndex++);
+            for (int columnIndex = 0; columnIndex < definitions.size(); columnIndex++) {
+                Cell cell = headerRow.createCell(columnIndex);
+                cell.setCellValue(definitions.get(columnIndex).nombreColumna());
             }
+        }
 
-            workbook.write(outputStream);
+        @Override
+        public void writeRow(List<CreffosColumnDefinition> definitions, Map<String, String> row) {
+            Row xlsxRow = sheet.createRow(rowIndex++);
+            for (int columnIndex = 0; columnIndex < definitions.size(); columnIndex++) {
+                CreffosColumnDefinition definition = definitions.get(columnIndex);
+                Cell cell = xlsxRow.createCell(columnIndex);
+                cell.setCellValue(row.getOrDefault(definition.nombreColumna(), ""));
+            }
+        }
+
+        @Override
+        public byte[] finish() {
+            try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+                workbook.write(outputStream);
+                return outputStream.toByteArray();
+            } catch (IOException ex) {
+                throw new IllegalStateException("No se pudo generar el archivo XLSX de CREFFSOS", ex);
+            }
+        }
+
+        @Override
+        public void close() {
             workbook.dispose();
-            return outputStream.toByteArray();
-        } catch (IOException ex) {
-            throw new IllegalStateException("No se pudo generar el archivo XLSX de CREFFSOS", ex);
+            try {
+                workbook.close();
+            } catch (IOException e) {
+                logger.warn("No se pudo cerrar el workbook temporal de CREFFSOS: {}", e.getMessage());
+            }
         }
     }
 
