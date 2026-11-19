@@ -45,6 +45,7 @@ public class AdminConsolidacionService {
     private final ParametroUnicoService parametroUnicoService;
     private final NotificacionConsolidacionService notificacionConsolidacionService;
     private final ArchivosBloqueadosService archivosBloqueadosService;
+    private final ConsolidacionManualAsyncService consolidacionManualAsyncService;
     private final TransactionTemplate transactionTemplate;
 
     public AdminConsolidacionService(
@@ -55,6 +56,7 @@ public class AdminConsolidacionService {
             ParametroUnicoService parametroUnicoService,
             NotificacionConsolidacionService notificacionConsolidacionService,
             ArchivosBloqueadosService archivosBloqueadosService,
+            ConsolidacionManualAsyncService consolidacionManualAsyncService,
             PlatformTransactionManager transactionManager) {
         this.consolidacionRepository = consolidacionRepository;
         this.consolidacionArchivoRepository = consolidacionArchivoRepository;
@@ -63,6 +65,7 @@ public class AdminConsolidacionService {
         this.parametroUnicoService = parametroUnicoService;
         this.notificacionConsolidacionService = notificacionConsolidacionService;
         this.archivosBloqueadosService = archivosBloqueadosService;
+        this.consolidacionManualAsyncService = consolidacionManualAsyncService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
@@ -96,6 +99,9 @@ public class AdminConsolidacionService {
         StorageCleanupSummary storageSummary = eliminarArchivosStorage(cabecera.getPeriodoValoracion());
         SharedCleanupSummary sharedSummary = eliminarArchivoCompartido(cabecera.getPeriodoValoracion());
         archivosBloqueadosService.eliminarPeriodo(cabecera.getPeriodoValoracion());
+        // Sin esto, el dashboard se queda mostrando para siempre "publicando archivos
+        // bloqueados" para este periodo (ver limpiarEstadoTemporal para el detalle completo).
+        consolidacionManualAsyncService.limpiarEstadoTemporal(cabecera.getPeriodoValoracion());
 
         log.info("Consolidación {} eliminada por usuario {}. Periodo: {}. Registros: {}. Archivos BD: {}. "
                         + "Storage eliminados: {}. Motivo: {}",

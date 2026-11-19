@@ -31,6 +31,13 @@ public class FullIfrsBloqueadosConsolidacionService {
     private static final Logger logger = LoggerFactory.getLogger(FullIfrsBloqueadosConsolidacionService.class);
     private static final Long SEGMENTO_FULL_IFRS_ID = 2L;
     private static final String LOCKED_FILE_PASSWORD = "sipro-readonly";
+    // Antes hasta 4 planillas se procesaban en paralelo aqui, cada una cargando su XLSX completo
+    // en memoria (via XSSFWorkbook, sin streaming) para protegerlo contra edicion. Con varias
+    // planillas pesadas en el mismo periodo, esas cargas completas se sumaban todas a la vez en
+    // memoria. Se baja a 1 para que nunca haya mas de un archivo completo cargado al mismo
+    // tiempo — esta fase ya corre en segundo plano (Fase 2, despues de confirmada la
+    // consolidacion), asi que tardar un poco mas aqui no afecta a nadie esperando en pantalla.
+    private static final int MAX_CONCURRENCIA_PUBLICACION_FULL_IFRS = 1;
 
     private final SiproDetalleCargaPlanillasRepository planillaRepository;
     private final FileStorageService fileStorageService;
@@ -61,7 +68,7 @@ public class FullIfrsBloqueadosConsolidacionService {
             return;
         }
 
-        int concurrencia = Math.min(planillas.size(), 4);
+        int concurrencia = Math.min(planillas.size(), MAX_CONCURRENCIA_PUBLICACION_FULL_IFRS);
         ExecutorService executor = Executors.newFixedThreadPool(concurrencia);
         try {
             List<CompletableFuture<Void>> tareas = planillas.stream()

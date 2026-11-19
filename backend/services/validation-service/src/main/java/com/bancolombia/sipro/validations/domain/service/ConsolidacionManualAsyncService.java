@@ -110,6 +110,23 @@ public class ConsolidacionManualAsyncService {
         return Optional.ofNullable(estadoTemporalPorPeriodo.get(periodoValoracion));
     }
 
+    /**
+     * Olvida el ultimo estado en cache de un periodo. Esa foto se toma una sola vez, justo
+     * cuando la consolidacion manual termina (ver linea ~149 de este archivo) — momento en el
+     * que Fase 2 (archivos bloqueados) recien esta arrancando, asi que esa foto siempre queda
+     * con fase2EnCurso=true congelado. Mientras la cabecera siga en BD esto no se nota, porque
+     * obtenerEstado() siempre prefiere el estado real y actualizado. Pero si la consolidacion
+     * se elimina, obtenerEstado() cae de vuelta a esta foto vieja (ya no encuentra cabecera) y
+     * el dashboard queda mostrando para siempre "publicando archivos bloqueados", aunque Fase 2
+     * ya haya terminado hace rato. Se llama desde AdminConsolidacionService al eliminar, para
+     * que no quede ese residuo.
+     */
+    public void limpiarEstadoTemporal(LocalDate periodoValoracion) {
+        if (periodoValoracion != null) {
+            estadoTemporalPorPeriodo.remove(periodoValoracion);
+        }
+    }
+
     private void ejecutarEnSegundoPlano(LocalDate periodoValoracion,
                                         Long usuarioEjecutorId,
                                         String observacion,
